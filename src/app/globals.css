@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #2a2a2a;
+  --bg-surface: #353535;
+  --bg-elevated: #4a4a4a;
+  --bg-subtle: #303030;
+  --bg-header: #1e1e1e;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
+  --border-color: #4a4a4a;
+}
+
+[data-theme="light"] {
+  --bg-main: #e8e8e8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f0f0;
+  --bg-subtle: #f5f5f5;
+  --bg-header: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border-color: #e0e0e0;
+}
+
+@theme inline {
+  --color-background: var(--bg-main);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Анимация пульсации для активной остановки */
+@keyframes ping-slow {
+  0% {
+    transform-origin: center;
+    r: 28;
+    opacity: 0.6;
+  }
+  100% {
+    r: 40;
+    opacity: 0;
+  }
+}
+
+.animate-ping-slow {
+  animation: ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Анимация пунктирной линии маршрута */
+@keyframes dash-move {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animate-dash {
+  animation: dash-move 1s linear infinite;
+}
+
+/* Выезд модала снизу */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}

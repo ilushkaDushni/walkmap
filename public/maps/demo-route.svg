@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <!-- Фон -->
+  <rect width="1200" height="800" fill="#e8f5e9"/>
+
+  <!-- Парковые зоны -->
+  <ellipse cx="400" cy="350" rx="250" ry="200" fill="#c8e6c9" opacity="0.7"/>
+  <ellipse cx="800" cy="400" rx="200" ry="150" fill="#c8e6c9" opacity="0.5"/>
+
+  <!-- Озеро -->
+  <ellipse cx="500" cy="370" rx="80" ry="50" fill="#bbdefb" opacity="0.8"/>
+
+  <!-- Дорожки -->
+  <path d="M100 200 Q 200 150, 300 180 Q 400 210, 500 350 Q 550 400, 700 400 Q 800 390, 900 300 Q 950 270, 1050 250"
+        fill="none" stroke="#a5d6a7" stroke-width="12" stroke-linecap="round" opacity="0.6"/>
+  <path d="M200 500 Q 400 450, 600 500 Q 800 550, 1000 480"
+        fill="none" stroke="#a5d6a7" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+  <path d="M300 100 Q 350 300, 400 500 Q 420 600, 450 700"
+        fill="none" stroke="#a5d6a7" stroke-width="8" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Деревья (кружки) -->
+  <circle cx="200" cy="250" r="25" fill="#66bb6a" opacity="0.6"/>
+  <circle cx="280" cy="300" r="20" fill="#43a047" opacity="0.5"/>
+  <circle cx="350" cy="200" r="22" fill="#66bb6a" opacity="0.6"/>
+  <circle cx="600" cy="300" r="18" fill="#43a047" opacity="0.5"/>
+  <circle cx="650" cy="450" r="25" fill="#66bb6a" opacity="0.6"/>
+  <circle cx="850" cy="350" r="20" fill="#43a047" opacity="0.5"/>
+  <circle cx="950" cy="400" r="22" fill="#66bb6a" opacity="0.6"/>
+  <circle cx="150" cy="400" r="20" fill="#43a047" opacity="0.5"/>
+  <circle cx="450" cy="500" r="18" fill="#66bb6a" opacity="0.6"/>
+  <circle cx="750" cy="500" r="25" fill="#43a047" opacity="0.5"/>
+
+  <!-- Надпись -->
+  <text x="600" y="750" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#999" opacity="0.5">
+    Демо-карта парка (заглушка)
+  </text>
+</svg>

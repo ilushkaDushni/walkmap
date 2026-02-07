@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm i:*)",
+      "Bash(where:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)"
+    ]
+  }
+}
