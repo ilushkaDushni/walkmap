@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X, Shield, Route, Users, BarChart3 } from "lucide-react";
 
 export default function AdminModal({ isOpen, onClose }) {
+  const router = useRouter();
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -22,16 +25,19 @@ export default function AdminModal({ isOpen, onClose }) {
       icon: Route,
       title: "Управление маршрутами",
       description: "Добавление, редактирование и удаление маршрутов",
+      action: () => { router.push("/admin/routes"); onClose(); },
     },
     {
       icon: Users,
       title: "Пользователи",
       description: "Управление пользователями и ролями",
+      action: null,
     },
     {
       icon: BarChart3,
       title: "Статистика",
       description: "Просмотр активности и аналитики",
+      action: null,
     },
   ];
 
@@ -64,10 +70,12 @@ export default function AdminModal({ isOpen, onClose }) {
 
           {/* Секции */}
           <div className="space-y-2">
-            {sections.map(({ icon: Icon, title, description }) => (
+            {sections.map(({ icon: Icon, title, description, action }) => (
               <button
                 key={title}
-                className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-4 text-left transition hover:opacity-80"
+                onClick={action || undefined}
+                disabled={!action}
+                className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-4 text-left transition hover:opacity-80 disabled:opacity-50"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)]">
                   <Icon className="h-5 w-5 text-[var(--text-secondary)]" />

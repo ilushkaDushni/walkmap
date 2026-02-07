@@ -7,6 +7,46 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
+    // OpenFreeMap тайлы и стиль — CacheFirst, 30 дней
+    {
+      urlPattern: /^https:\/\/tiles\.openfreemap\.org\/.*/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "ofm-tiles",
+        expiration: {
+          maxEntries: 3000,
+          maxAgeSeconds: 30 * 24 * 60 * 60,
+        },
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
+    // Загруженные фото и аудио — CacheFirst, 30 дней
+    {
+      urlPattern: /\/uploads\/(photos|audio)\/.*/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "uploads-media",
+        expiration: {
+          maxEntries: 500,
+          maxAgeSeconds: 30 * 24 * 60 * 60,
+        },
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
+    // API маршрутов — NetworkFirst, 7 дней
+    {
+      urlPattern: /\/api\/routes.*/i,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "routes-api",
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 7 * 24 * 60 * 60,
+        },
+        cacheableResponse: { statuses: [0, 200] },
+        networkTimeoutSeconds: 5,
+      },
+    },
     // Картинки карт — CacheFirst, 30 дней
     {
       urlPattern: /\/maps\/.*/i,
@@ -20,7 +60,7 @@ const serwist = new Serwist({
         cacheableResponse: { statuses: [0, 200] },
       },
     },
-    // Фото и аудио остановок — CacheFirst, 30 дней
+    // Фото и аудио остановок (legacy) — CacheFirst, 30 дней
     {
       urlPattern: /\/(images|audio)\/.*/i,
       handler: "CacheFirst",

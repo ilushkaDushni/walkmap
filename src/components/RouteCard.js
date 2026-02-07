@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { MapPin, TrendingUp, Clock } from "lucide-react";
 
-/**
- * Карточка маршрута для списка на главной странице.
- */
 export default function RouteCard({ route }) {
   return (
     <Link
-      href={`/routes/${route.id}`}
+      href={`/routes/${route._id}`}
       className="group block overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-md"
     >
       {/* Обложка */}
@@ -24,7 +21,7 @@ export default function RouteCard({ route }) {
           </div>
         )}
         <span className="absolute right-3 top-3 rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] shadow-sm">
-          {route.stops.length} остановок
+          {route.checkpoints?.length || 0} точек
         </span>
       </div>
 
@@ -37,7 +34,7 @@ export default function RouteCard({ route }) {
           {route.description}
         </p>
         <div className="flex gap-4 text-xs text-[var(--text-muted)]">
-          {route.distance && (
+          {route.distance > 0 && (
             <span className="flex items-center gap-1">
               <TrendingUp className="h-4 w-4" />
               {route.distance >= 1000
@@ -45,7 +42,7 @@ export default function RouteCard({ route }) {
                 : `${route.distance} м`}
             </span>
           )}
-          {route.duration && (
+          {route.duration > 0 && (
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               {route.duration} мин
