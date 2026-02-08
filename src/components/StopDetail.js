@@ -33,9 +33,9 @@ export default function StopDetail({ stop, onClose }) {
       )}
 
       {/* Описание */}
-      <p className="mb-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+      <div className="mb-3 max-h-[40vh] overflow-y-auto scrollbar-thin text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
         {stop.description}
-      </p>
+      </div>
 
       {/* Аудио-плеер */}
       {stop.audio && (

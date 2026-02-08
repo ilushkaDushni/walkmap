@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { MapPin, TrendingUp, Clock } from "lucide-react";
+import { MapPin, TrendingUp, Clock, Pencil } from "lucide-react";
 
-export default function RouteCard({ route }) {
+export default function RouteCard({ route, isAdmin }) {
   return (
     <Link
       href={`/routes/${route._id}`}
@@ -23,6 +23,18 @@ export default function RouteCard({ route }) {
         <span className="absolute right-3 top-3 rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] shadow-sm">
           {route.checkpoints?.length || 0} точек
         </span>
+        {isAdmin && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.location.href = `/admin/routes?edit=${route._id}`;
+            }}
+            className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[var(--text-muted)] shadow-sm transition hover:text-blue-500"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Информация */}

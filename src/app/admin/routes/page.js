@@ -10,7 +10,12 @@ export default function AdminRoutesPage() {
   const { user, loading, authFetch } = useUser();
   const router = useRouter();
   const [routes, setRoutes] = useState([]);
-  const [editingRouteId, setEditingRouteId] = useState(null);
+  const [editingRouteId, setEditingRouteId] = useState(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("edit");
+    }
+    return null;
+  });
   const [loadingRoutes, setLoadingRoutes] = useState(true);
 
   // Редирект если не админ
@@ -103,7 +108,10 @@ export default function AdminRoutesPage() {
               className="flex items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 transition"
             >
               {/* Обложка */}
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-elevated)]">
+              <div
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-elevated)] cursor-pointer"
+                onClick={() => setEditingRouteId(route._id)}
+              >
                 {route.coverImage ? (
                   <img src={route.coverImage} alt="" className="h-full w-full object-cover" />
                 ) : (

@@ -1,5 +1,5 @@
 import { MapPinOff } from "lucide-react";
-import RouteCard from "@/components/RouteCard";
+import RoutesListClient from "./RoutesListClient";
 import { getDb } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +34,7 @@ export default async function RoutesPage() {
           <p>Маршруты пока не добавлены</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {serialized.map((route) => (
-            <RouteCard key={route._id} route={route} />
-          ))}
-        </div>
+        <RoutesListClient routes={serialized} />
       )}
     </div>
   );

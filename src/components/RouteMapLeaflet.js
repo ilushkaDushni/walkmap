@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import useUserLocation from "@/hooks/useUserLocation";
-import useCheckpointTrigger from "@/hooks/useCheckpointTrigger";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
-import { Download, Check } from "lucide-react";
+import { buildRouteEvents } from "@/lib/geo";
+import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import AudioPlayer from "@/components/AudioPlayer";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
+
+// Ростов-на-Дону и окрестности
+const ROSTOV_BOUNDS = [[38.8, 46.9], [40.6, 47.6]];
 
 function Dot({ color, size = 14, label, pulse }) {
   return (
@@ -36,20 +39,15 @@ function Dot({ color, size = 14, label, pulse }) {
   );
 }
 
-// Автоподгонка bounds
-function useFitBounds(mapRef, route) {
-  const fitted = useRef(false);
-  useEffect(() => {
-    if (fitted.current) return;
-    const map = mapRef.current;
-    if (!map) return;
-
+// Вычисление bounds маршрута
+function useRouteBounds(route) {
+  return useMemo(() => {
     const points = [];
     route.path?.forEach((p) => points.push([p.lng, p.lat]));
     route.checkpoints?.forEach((cp) => points.push([cp.position.lng, cp.position.lat]));
     if (route.finish?.position) points.push([route.finish.position.lng, route.finish.position.lat]);
 
-    if (points.length < 2) return;
+    if (points.length < 2) return null;
 
     let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
     for (const [lng, lat] of points) {
@@ -59,28 +57,32 @@ function useFitBounds(mapRef, route) {
       if (lat > maxLat) maxLat = lat;
     }
 
-    map.fitBounds(
-      [[minLng, minLat], [maxLng, maxLat]],
-      { padding: 40, duration: 0 }
-    );
-    fitted.current = true;
-  });
+    const PAD = 0.005;
+    return [[minLng - PAD, minLat - PAD], [maxLng + PAD, maxLat + PAD]];
+  }, [route]);
 }
 
 export default function RouteMapLeaflet({ route }) {
-  const { position: gpsPosition, accuracy, status, startTracking, stopTracking } = useUserLocation();
-  const [gpsEnabled, setGpsEnabled] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [eventIndex, setEventIndex] = useState(0);
   const mapRef = useRef(null);
 
-  const { triggeredIds, activeCheckpoint, finishReached, totalCoins } = useCheckpointTrigger({
-    checkpoints: route.checkpoints,
-    finish: route.finish,
-    userPosition: gpsEnabled ? gpsPosition : null,
-  });
-
   const { download, downloading, progress, done } = useOfflineDownload(route);
+  const routeBounds = useRouteBounds(route);
 
-  useFitBounds(mapRef, route);
+  // Упорядоченные события маршрута
+  const events = useMemo(() => {
+    if (!route.path || route.path.length < 2) return [];
+    return buildRouteEvents(
+      route.path,
+      route.checkpoints || [],
+      route.segments || [],
+      route.finish
+    );
+  }, [route]);
+
+  const currentEvent = events[eventIndex] || null;
+  const isLast = eventIndex >= events.length - 1;
 
   const pathGeoJson = useMemo(() => {
     if (!route.path || route.path.length < 2) return null;
@@ -93,22 +95,46 @@ export default function RouteMapLeaflet({ route }) {
     };
   }, [route.path]);
 
-  const center = route.mapCenter || { lat: 55.7558, lng: 37.6173 };
-  const zoom = route.mapZoom || 14;
-
-  const handleToggleGps = () => {
-    if (gpsEnabled) {
-      stopTracking();
-      setGpsEnabled(false);
-    } else {
-      startTracking();
-      setGpsEnabled(true);
+  // Подсветка текущего отрезка (если текущее событие — сегмент)
+  const activeSegmentGeoJson = useMemo(() => {
+    if (!currentEvent || !started) return null;
+    const path = route.path;
+    if (currentEvent.type === "segment") {
+      const i = currentEvent.data.pathIndex;
+      if (i >= 0 && i < path.length - 1) {
+        return {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [
+              [path[i].lng, path[i].lat],
+              [path[i + 1].lng, path[i + 1].lat],
+            ],
+          },
+        };
+      }
     }
-  };
+    return null;
+  }, [currentEvent, started, route.path]);
+
+  const center = route.mapCenter || { lat: 47.2357, lng: 39.7015 };
+  const zoom = route.mapZoom || 14;
 
   const onLoad = useCallback((e) => {
     mapRef.current = e.target;
   }, []);
+
+  const handleStart = () => {
+    setStarted(true);
+  };
+
+  const handleNext = () => {
+    if (!isLast) setEventIndex((i) => i + 1);
+  };
+
+  const handlePrev = () => {
+    if (eventIndex > 0) setEventIndex((i) => i - 1);
+  };
 
   return (
     <div className="space-y-4">
@@ -116,12 +142,14 @@ export default function RouteMapLeaflet({ route }) {
       <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm">
         <Map
           onLoad={onLoad}
-          initialViewState={{
-            longitude: center.lng,
-            latitude: center.lat,
-            zoom: zoom,
-          }}
-          style={{ height: "300px", width: "100%" }}
+          initialViewState={
+            routeBounds
+              ? { bounds: routeBounds, fitBoundsOptions: { padding: 40 } }
+              : { longitude: center.lng, latitude: center.lat, zoom }
+          }
+          maxBounds={ROSTOV_BOUNDS}
+          minZoom={10}
+          style={{ height: started ? "350px" : "300px", width: "100%" }}
           mapStyle={STYLE}
           attributionControl={true}
         >
@@ -140,20 +168,39 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
-          {/* Чекпоинты */}
-          {route.checkpoints?.map((cp) => (
-            <Marker
-              key={cp.id}
-              longitude={cp.position.lng}
-              latitude={cp.position.lat}
-            >
-              <Dot
-                color={triggeredIds.has(cp.id) ? "#ef4444" : "#f59e0b"}
-                size={14}
-                label={cp.order + 1}
+          {/* Подсветка активного отрезка */}
+          {activeSegmentGeoJson && (
+            <Source id="active-segment" type="geojson" data={activeSegmentGeoJson}>
+              <Layer
+                id="active-segment-line"
+                type="line"
+                paint={{
+                  "line-color": "#f97316",
+                  "line-width": 6,
+                  "line-opacity": 1,
+                }}
               />
-            </Marker>
-          ))}
+            </Source>
+          )}
+
+          {/* Чекпоинты */}
+          {route.checkpoints?.map((cp) => {
+            const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
+            return (
+              <Marker
+                key={cp.id}
+                longitude={cp.position.lng}
+                latitude={cp.position.lat}
+              >
+                <Dot
+                  color={isActive ? "#ef4444" : "#f59e0b"}
+                  size={isActive ? 18 : 14}
+                  label={cp.order + 1}
+                  pulse={isActive}
+                />
+              </Marker>
+            );
+          })}
 
           {/* Финиш */}
           {route.finish?.position && (
@@ -161,87 +208,188 @@ export default function RouteMapLeaflet({ route }) {
               longitude={route.finish.position.lng}
               latitude={route.finish.position.lat}
             >
-              <Dot color={finishReached ? "#ef4444" : "#22c55e"} size={16} label="F" />
-            </Marker>
-          )}
-
-          {/* Позиция пользователя */}
-          {gpsEnabled && gpsPosition && (
-            <Marker longitude={gpsPosition.lng} latitude={gpsPosition.lat}>
-              <Dot color="#3b82f6" size={16} pulse />
+              <Dot
+                color={started && currentEvent?.type === "finish" ? "#ef4444" : "#22c55e"}
+                size={16}
+                label="F"
+              />
             </Marker>
           )}
         </Map>
       </div>
 
-      {/* GPS + Оффлайн */}
-      <div className="flex gap-2">
-        <button
-          onClick={handleToggleGps}
-          className={`flex-1 rounded-xl px-4 py-3 text-sm font-medium transition ${
-            gpsEnabled
-              ? "bg-blue-600 text-white"
-              : "border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-          }`}
-        >
-          {gpsEnabled
-            ? `GPS: ${status === "watching" ? "Отслеживается" : status}`
-            : "Включить GPS"}
-        </button>
+      {/* До начала */}
+      {!started && (
+        <>
+          {/* GPS + Оффлайн */}
+          <div className="flex gap-2">
+            <button
+              disabled
+              className="flex-1 rounded-xl px-4 py-3 text-sm font-medium border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
+            >
+              GPS (скоро)
+            </button>
 
-        <button
-          onClick={download}
-          disabled={downloading || done}
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
-        >
-          {done ? (
-            <><Check className="h-4 w-4 text-green-600" /> Готово</>
-          ) : downloading ? (
-            <>{progress}%</>
-          ) : (
-            <><Download className="h-4 w-4" /> Оффлайн</>
-          )}
-        </button>
-      </div>
-
-      {/* Информация о чекпоинтах */}
-      {gpsEnabled && (
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-[var(--text-muted)]">
-              Найдено точек: {triggeredIds.size} / {route.checkpoints?.length || 0}
-            </span>
-            {totalCoins > 0 && (
-              <span className="font-medium text-amber-600">+{totalCoins} монет</span>
-            )}
+            <button
+              onClick={download}
+              disabled={downloading || done}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+            >
+              {done ? (
+                <><Check className="h-4 w-4 text-green-600" /> Готово</>
+              ) : downloading ? (
+                <>{progress}%</>
+              ) : (
+                <><Download className="h-4 w-4" /> Оффлайн</>
+              )}
+            </button>
           </div>
 
-          {activeCheckpoint && (
-            <div className="mt-3 rounded-xl bg-[var(--bg-elevated)] p-3">
-              <p className="font-semibold text-[var(--text-primary)]">{activeCheckpoint.title}</p>
-              {activeCheckpoint.description && (
-                <p className="mt-1 text-xs text-[var(--text-muted)]">{activeCheckpoint.description}</p>
+          {/* Intro текст + аудио маршрута */}
+          {(route.intro || route.audio?.length > 0) && (
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3">
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">{route.title}</h2>
+              {route.intro && (
+                <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {route.intro}
+                </div>
               )}
-              {activeCheckpoint.photos?.length > 0 && (
-                <div className="mt-2 flex gap-2 overflow-x-auto">
-                  {activeCheckpoint.photos.map((url, i) => (
-                    <img key={i} src={url} alt="" className="h-20 w-20 rounded-lg object-cover shrink-0" />
-                  ))}
+              {route.audio?.length > 0 && (
+                <AudioPlayer urls={route.audio} variant="full" />
+              )}
+            </div>
+          )}
+
+          {/* Кнопка "Начать маршрут" */}
+          <button
+            onClick={handleStart}
+            className="w-full rounded-xl bg-green-600 px-6 py-4 text-base font-semibold text-white transition hover:bg-green-700 active:bg-green-800"
+          >
+            Начать маршрут
+          </button>
+        </>
+      )}
+
+      {/* После начала — пошаговый просмотр */}
+      {started && (
+        <>
+          {/* Карточка текущего события */}
+          {currentEvent && (
+            <div
+              key={eventIndex}
+              className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3 animate-[fadeIn_0.7s_ease]"
+            >
+              {/* Сегмент (текст пути) */}
+              {currentEvent.type === "segment" && (
+                <>
+                  {currentEvent.data.title && (
+                    <h3 className="text-base font-bold text-[var(--text-primary)] text-center">
+                      {currentEvent.data.title}
+                    </h3>
+                  )}
+                  {currentEvent.data.text && (
+                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                      {currentEvent.data.text}
+                    </div>
+                  )}
+                  {currentEvent.data.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {currentEvent.data.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {currentEvent.data.audio?.length > 0 && (
+                    <AudioPlayer
+                      key={`seg-${eventIndex}`}
+                      urls={currentEvent.data.audio}
+                      autoPlay
+                      variant="full"
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Чекпоинт */}
+              {currentEvent.type === "checkpoint" && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                      {currentEvent.data.order + 1}
+                    </div>
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">
+                      {currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`}
+                    </h3>
+                  </div>
+                  {currentEvent.data.description && (
+                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                      {currentEvent.data.description}
+                    </div>
+                  )}
+                  {currentEvent.data.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {currentEvent.data.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {currentEvent.data.audio?.length > 0 && (
+                    <AudioPlayer
+                      key={`cp-${eventIndex}`}
+                      urls={currentEvent.data.audio}
+                      autoPlay
+                      variant="full"
+                    />
+                  )}
+                  {currentEvent.data.coinsReward > 0 && (
+                    <p className="text-sm font-medium text-amber-600">
+                      +{currentEvent.data.coinsReward} монет
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Финиш */}
+              {currentEvent.type === "finish" && (
+                <div className="text-center py-2">
+                  <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
+                  {currentEvent.data.coinsReward > 0 && (
+                    <p className="mt-1 text-sm text-green-600">
+                      +{currentEvent.data.coinsReward} монет за финиш
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {finishReached && (
-            <div className="mt-3 rounded-xl bg-green-500/10 p-3 text-center">
-              <p className="font-bold text-green-600">Маршрут пройден!</p>
-              {totalCoins > 0 && (
-                <p className="text-sm text-green-600">Всего монет: {totalCoins}</p>
-              )}
+          {/* Навигация */}
+          {events.length > 0 && (
+            <div className="flex items-center justify-between">
+              <button
+                onClick={handlePrev}
+                disabled={eventIndex === 0}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-30"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+
+              <span className="text-xs text-[var(--text-muted)]">
+                {eventIndex + 1} / {events.length}
+              </span>
+
+              <button
+                onClick={handleNext}
+                disabled={isLast}
+                className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600 text-white transition hover:bg-green-700 disabled:opacity-30"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
             </div>
           )}
-        </div>
+        </>
       )}
+
     </div>
   );
 }

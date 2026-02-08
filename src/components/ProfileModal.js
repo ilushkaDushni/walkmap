@@ -14,7 +14,7 @@ export default function ProfileModal({ isOpen, onClose }) {
   const [submitting, setSubmitting] = useState(false);
 
   // Login fields
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
   // Register fields
@@ -41,7 +41,7 @@ export default function ProfileModal({ isOpen, onClose }) {
     if (!isOpen) {
       setScreen("profile");
       setError("");
-      setLoginEmail("");
+      setLoginUsername("");
       setLoginPassword("");
       setRegUsername("");
       setRegEmail("");
@@ -56,7 +56,7 @@ export default function ProfileModal({ isOpen, onClose }) {
     setError("");
     setSubmitting(true);
     try {
-      await login(loginEmail, loginPassword);
+      await login(loginUsername, loginPassword);
       onClose();
       router.push("/");
     } catch (e) {
@@ -219,10 +219,10 @@ export default function ProfileModal({ isOpen, onClose }) {
         </div>
         <div className="space-y-3">
           <input
-            type="email"
-            value={loginEmail}
-            onChange={(e) => setLoginEmail(e.target.value)}
-            placeholder="Email"
+            type="text"
+            value={loginUsername}
+            onChange={(e) => setLoginUsername(e.target.value)}
+            placeholder="Логин"
             className={inputCls}
           />
           <input

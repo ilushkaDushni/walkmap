@@ -1,11 +1,11 @@
 "use client";
 
 import { useUser } from "@/components/UserProvider";
-import { Trash2, X, Upload, ChevronUp, ChevronDown } from "lucide-react";
+import { Trash2, X, Upload } from "lucide-react";
 import { validateFile } from "@/lib/validateFile";
 import AudioPlayer from "@/components/AudioPlayer";
 
-export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClose, onReorder, totalCheckpoints }) {
+export default function SegmentPanel({ segment, onUpdate, onDelete, onClose }) {
   const { authFetch } = useUser();
 
   const uploadFile = async (file, type) => {
@@ -26,7 +26,7 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
       const v = validateFile(file, "photo");
       if (!v.ok) { alert(v.error); continue; }
       const url = await uploadFile(file, "photo");
-      if (url) onUpdate({ photos: [...checkpoint.photos, url] });
+      if (url) onUpdate({ photos: [...(segment.photos || []), url] });
     }
     e.target.value = "";
   };
@@ -37,16 +37,16 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
     const v = validateFile(file, "audio");
     if (!v.ok) { alert(v.error); e.target.value = ""; return; }
     const url = await uploadFile(file, "audio");
-    if (url) onUpdate({ audio: [...checkpoint.audio, url] });
+    if (url) onUpdate({ audio: [...segment.audio, url] });
     e.target.value = "";
   };
 
   const removePhoto = (index) => {
-    onUpdate({ photos: checkpoint.photos.filter((_, i) => i !== index) });
+    onUpdate({ photos: (segment.photos || []).filter((_, i) => i !== index) });
   };
 
   const removeAudio = (index) => {
-    onUpdate({ audio: checkpoint.audio.filter((_, i) => i !== index) });
+    onUpdate({ audio: segment.audio.filter((_, i) => i !== index) });
   };
 
 
@@ -54,84 +54,37 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
     <div className="p-4 space-y-3">
       {/* Шапка */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">
-            Точка #{checkpoint.order + 1}
-          </h3>
-          {onReorder && (
-            <div className="flex gap-0.5">
-              <button
-                onClick={() => onReorder(checkpoint.id, "up")}
-                disabled={checkpoint.order === 0}
-                className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)] transition disabled:opacity-30"
-                title="Переместить выше"
-              >
-                <ChevronUp className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => onReorder(checkpoint.id, "down")}
-                disabled={checkpoint.order >= totalCheckpoints - 1}
-                className="rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)] transition disabled:opacity-30"
-                title="Переместить ниже"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">
+          Отрезок #{segment.pathIndex + 1}
+        </h3>
         <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Название */}
+      {/* Заголовок */}
       <input
         type="text"
-        value={checkpoint.title}
+        value={segment.title}
         onChange={(e) => onUpdate({ title: e.target.value })}
-        placeholder="Название точки"
+        placeholder="Заголовок отрезка"
         className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-green-500/50"
       />
 
-      {/* Описание */}
+      {/* Текст */}
       <textarea
-        value={checkpoint.description}
-        onChange={(e) => onUpdate({ description: e.target.value })}
-        placeholder="Описание точки"
-        rows={2}
-        className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-none"
+        value={segment.text}
+        onChange={(e) => onUpdate({ text: e.target.value })}
+        placeholder="Нарративный текст отрезка..."
+        rows={8}
+        className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-y"
       />
-
-      {/* Настройки */}
-      <div className="flex gap-3">
-        <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          Радиус (м):
-          <input
-            type="number"
-            min="5"
-            max="500"
-            value={checkpoint.triggerRadiusMeters}
-            onChange={(e) => onUpdate({ triggerRadiusMeters: parseInt(e.target.value) || 20 })}
-            className="w-16 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          Монеты:
-          <input
-            type="number"
-            min="0"
-            value={checkpoint.coinsReward}
-            onChange={(e) => onUpdate({ coinsReward: parseInt(e.target.value) || 0 })}
-            className="w-16 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
-          />
-        </label>
-      </div>
 
       {/* Фото */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Фото</p>
         <div className="flex flex-wrap gap-2">
-          {checkpoint.photos.map((url, i) => (
+          {(segment.photos || []).map((url, i) => (
             <div key={i} className="relative h-16 w-16 rounded-lg overflow-hidden">
               <img src={url} alt="" className="h-full w-full object-cover" />
               <button
@@ -158,11 +111,11 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
       {/* Аудио */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Аудио</p>
-        {checkpoint.audio.length > 0 && (
-          <AudioPlayer urls={checkpoint.audio} variant="compact" className="mb-2" />
+        {segment.audio.length > 0 && (
+          <AudioPlayer urls={segment.audio} variant="compact" className="mb-2" />
         )}
         <div className="space-y-1">
-          {checkpoint.audio.map((url, i) => (
+          {segment.audio.map((url, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg bg-[var(--bg-elevated)] px-3 py-2">
               <span className="flex-1 truncate text-xs text-[var(--text-muted)]">
                 {url.split("/").pop()}
@@ -185,13 +138,13 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
         </label>
       </div>
 
-      {/* Удалить точку */}
+      {/* Удалить отрезок */}
       <button
-        onClick={() => { if (window.confirm("Удалить точку?")) onDelete(); }}
+        onClick={() => { if (window.confirm("Удалить отрезок?")) onDelete(); }}
         className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 px-4 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-500/10"
       >
         <Trash2 className="h-4 w-4" />
-        Удалить точку
+        Удалить отрезок
       </button>
     </div>
   );

@@ -74,6 +74,11 @@ Local MongoDB (`MONGODB_URI` in `.env.local`). Domain: `malisha.website` (verifi
 - **authFetch**: wrapper in UserProvider that adds Bearer header; on 401 → auto-refresh → retry.
 - **Logout**: POST `/api/auth/logout` → deletes refresh token from DB + clears cookie.
 
+## GitHub
+
+- **Repo**: https://github.com/ilushkaDushni/walkmap
+- **Branch**: `main`
+
 ## .env.local
 
 ```

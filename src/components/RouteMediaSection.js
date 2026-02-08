@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef } from "react";
 import { useUser } from "@/components/UserProvider";
-import { Upload, Trash2, Play, Image } from "lucide-react";
+import { Upload, Trash2, Image } from "lucide-react";
+import { validateFile } from "@/lib/validateFile";
+import AudioPlayer from "@/components/AudioPlayer";
 
 export default function RouteMediaSection({ route, updateRoute }) {
   const { authFetch } = useUser();
-  const audioRef = useRef(null);
 
   const uploadFile = async (file, type) => {
     const formData = new FormData();
@@ -24,6 +24,8 @@ export default function RouteMediaSection({ route, updateRoute }) {
   const handleCoverUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const v = validateFile(file, "photo");
+    if (!v.ok) { alert(v.error); e.target.value = ""; return; }
     const url = await uploadFile(file, "photo");
     if (url) updateRoute({ ...route, coverImage: url });
     e.target.value = "";
@@ -33,6 +35,8 @@ export default function RouteMediaSection({ route, updateRoute }) {
   const handlePhotosUpload = async (e) => {
     const files = Array.from(e.target.files);
     for (const file of files) {
+      const v = validateFile(file, "photo");
+      if (!v.ok) { alert(v.error); continue; }
       const url = await uploadFile(file, "photo");
       if (url) {
         updateRoute((prev) => ({ ...prev, photos: [...prev.photos, url] }));
@@ -49,6 +53,8 @@ export default function RouteMediaSection({ route, updateRoute }) {
   const handleAudioUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const v = validateFile(file, "audio");
+    if (!v.ok) { alert(v.error); e.target.value = ""; return; }
     const url = await uploadFile(file, "audio");
     if (url) updateRoute({ ...route, audio: [...route.audio, url] });
     e.target.value = "";
@@ -58,11 +64,6 @@ export default function RouteMediaSection({ route, updateRoute }) {
     updateRoute({ ...route, audio: route.audio.filter((_, i) => i !== index) });
   };
 
-  const playAudio = (url) => {
-    if (audioRef.current) audioRef.current.pause();
-    audioRef.current = new Audio(url);
-    audioRef.current.play();
-  };
 
   return (
     <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-4">
@@ -130,12 +131,12 @@ export default function RouteMediaSection({ route, updateRoute }) {
       {/* Аудио */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Аудио маршрута</p>
+        {route.audio.length > 0 && (
+          <AudioPlayer urls={route.audio} variant="compact" className="mb-2" />
+        )}
         <div className="space-y-1">
           {route.audio.map((url, i) => (
             <div key={i} className="flex items-center gap-2 rounded-lg bg-[var(--bg-elevated)] px-3 py-2">
-              <button onClick={() => playAudio(url)} className="text-[var(--text-secondary)] hover:text-green-600 transition">
-                <Play className="h-4 w-4" />
-              </button>
               <span className="flex-1 truncate text-xs text-[var(--text-muted)]">
                 {url.split("/").pop()}
               </span>

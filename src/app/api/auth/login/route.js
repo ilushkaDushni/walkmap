@@ -4,22 +4,22 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 export async function POST(request) {
-  const { email, password } = await request.json();
+  const { username, password } = await request.json();
 
-  if (!email || !password) {
+  if (!username || !password) {
     return NextResponse.json({ error: "Заполните все поля" }, { status: 400 });
   }
 
   const db = await getDb();
-  const user = await db.collection("users").findOne({ email });
+  const user = await db.collection("users").findOne({ username });
 
   if (!user) {
-    return NextResponse.json({ error: "Неверный email или пароль" }, { status: 401 });
+    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    return NextResponse.json({ error: "Неверный email или пароль" }, { status: 401 });
+    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
   const userId = user._id.toString();
