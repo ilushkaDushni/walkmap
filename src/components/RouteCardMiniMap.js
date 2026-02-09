@@ -1,9 +1,52 @@
+"use client";
+
+import { useMemo } from "react";
+import Map, { Source, Layer } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
+
+const STYLE = "https://tiles.openfreemap.org/styles/liberty";
+
 /**
- * SVG мини-карта маршрута для карточки (без MapLibre).
- * Рисует polyline + кружки чекпоинтов.
+ * Мини-карта маршрута для карточки — настоящий MapLibre (неинтерактивный).
  */
 export default function RouteCardMiniMap({ path = [], checkpoints = [] }) {
-  if (!path.length) {
+  const bounds = useMemo(() => {
+    if (!path.length) return null;
+    let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    for (const p of path) {
+      const lng = p.lng ?? p[0];
+      const lat = p.lat ?? p[1];
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+    return [[minLng, minLat], [maxLng, maxLat]];
+  }, [path]);
+
+  const geojson = useMemo(() => {
+    if (!path.length) return null;
+    return {
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: path.map((p) => [p.lng ?? p[0], p.lat ?? p[1]]),
+      },
+    };
+  }, [path]);
+
+  const cpGeojson = useMemo(() => {
+    const features = checkpoints
+      .filter((cp) => cp.lat != null && cp.lng != null && !cp.isEmpty)
+      .map((cp) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [cp.lng, cp.lat] },
+        properties: { color: cp.color || "#22c55e" },
+      }));
+    return { type: "FeatureCollection", features };
+  }, [checkpoints]);
+
+  if (!bounds || !geojson) {
     return (
       <div className="flex h-full items-center justify-center text-[var(--text-muted)]">
         <span className="text-xs">Нет маршрута</span>
@@ -11,83 +54,37 @@ export default function RouteCardMiniMap({ path = [], checkpoints = [] }) {
     );
   }
 
-  // Вычисляем bounds
-  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
-  for (const p of path) {
-    const lng = p.lng ?? p[0];
-    const lat = p.lat ?? p[1];
-    if (lng < minLng) minLng = lng;
-    if (lng > maxLng) maxLng = lng;
-    if (lat < minLat) minLat = lat;
-    if (lat > maxLat) maxLat = lat;
-  }
-
-  const padding = 16;
-  const svgW = 320;
-  const svgH = 192;
-  const innerW = svgW - padding * 2;
-  const innerH = svgH - padding * 2;
-
-  const rangeLng = maxLng - minLng || 0.001;
-  const rangeLat = maxLat - minLat || 0.001;
-  const scale = Math.min(innerW / rangeLng, innerH / rangeLat);
-
-  const toSvg = (lng, lat) => {
-    const x = padding + (lng - minLng) * scale + (innerW - rangeLng * scale) / 2;
-    // Y инвертирован: больше lat → меньше y
-    const y = padding + (maxLat - lat) * scale + (innerH - rangeLat * scale) / 2;
-    return [x, y];
-  };
-
-  const pathPoints = path
-    .map((p) => {
-      const lng = p.lng ?? p[0];
-      const lat = p.lat ?? p[1];
-      return toSvg(lng, lat).join(",");
-    })
-    .join(" ");
-
-  const cpCircles = checkpoints
-    .filter((cp) => cp.lat != null && cp.lng != null)
-    .map((cp) => {
-      const [cx, cy] = toSvg(cp.lng, cp.lat);
-      return { cx, cy, color: cp.color || "#22c55e", isEmpty: cp.isEmpty };
-    });
-
   return (
-    <svg
-      viewBox={`0 0 ${svgW} ${svgH}`}
-      className="h-full w-full"
-      preserveAspectRatio="xMidYMid meet"
+    <Map
+      initialViewState={{ bounds, fitBoundsOptions: { padding: 30 } }}
+      style={{ width: "100%", height: "100%" }}
+      mapStyle={STYLE}
+      interactive={false}
+      attributionControl={false}
+      reuseMaps
     >
-      <defs>
-        <linearGradient id="minimap-bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--bg-elevated)" />
-          <stop offset="100%" stopColor="var(--bg-surface)" />
-        </linearGradient>
-      </defs>
-      <rect width={svgW} height={svgH} fill="url(#minimap-bg)" />
-      <polyline
-        points={pathPoints}
-        fill="none"
-        stroke="#3b82f6"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.8"
-      />
-      {cpCircles.map((c, i) => (
-        <circle
-          key={i}
-          cx={c.cx}
-          cy={c.cy}
-          r="5"
-          fill={c.isEmpty ? "none" : c.color}
-          stroke={c.color}
-          strokeWidth={c.isEmpty ? "1.5" : "2"}
-          strokeDasharray={c.isEmpty ? "2 2" : "none"}
+      <Source id="minimap-route" type="geojson" data={geojson}>
+        <Layer
+          id="minimap-route-line"
+          type="line"
+          paint={{ "line-color": "#3b82f6", "line-width": 3, "line-opacity": 0.9 }}
+          layout={{ "line-cap": "round", "line-join": "round" }}
         />
-      ))}
-    </svg>
+      </Source>
+      {cpGeojson.features.length > 0 && (
+        <Source id="minimap-cp" type="geojson" data={cpGeojson}>
+          <Layer
+            id="minimap-cp-circles"
+            type="circle"
+            paint={{
+              "circle-radius": 5,
+              "circle-color": ["get", "color"],
+              "circle-stroke-color": "#fff",
+              "circle-stroke-width": 2,
+            }}
+          />
+        </Source>
+      )}
+    </Map>
   );
 }
