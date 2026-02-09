@@ -1128,7 +1128,7 @@ export default function RouteEditor({ routeId, onSaved }) {
 
       {/* Модалка предпросмотра */}
       {showPreview && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-x-0 top-0 bottom-24 sm:inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full sm:max-w-2xl sm:mx-4 h-full sm:h-auto sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)] shrink-0">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Предпросмотр маршрута</h3>
@@ -1139,7 +1139,7 @@ export default function RouteEditor({ routeId, onSaved }) {
                 Закрыть
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto pb-24 sm:pb-6">
+            <div className="flex-1 overflow-y-auto pb-6">
               <RouteMapLeaflet route={route} />
             </div>
           </div>
