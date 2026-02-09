@@ -57,8 +57,13 @@ export async function POST(request) {
   for (const seed of seedRoles) {
     const existing = await db.collection("roles").findOne({ slug: seed.slug });
     if (existing) {
+      // Обновляем системные роли (позиция, права, цвет)
+      await db.collection("roles").updateOne(
+        { _id: existing._id },
+        { $set: { position: seed.position, permissions: seed.permissions, color: seed.color, name: seed.name, isSystem: true, isDefault: seed.isDefault, updatedAt: now } }
+      );
       roleIdMap[seed.slug] = existing._id;
-      log.push(`Роль "${seed.slug}" уже существует, пропускаем`);
+      log.push(`Роль "${seed.slug}" обновлена`);
     } else {
       const result = await db.collection("roles").insertOne({
         ...seed,
@@ -70,16 +75,11 @@ export async function POST(request) {
     }
   }
 
-  // 2. Маппинг user.role → user.roles (только юзеры без поля roles)
-  const usersToMigrate = await db.collection("users").find({
-    $or: [
-      { roles: { $exists: false } },
-      { roles: null },
-    ],
-  }).toArray();
+  // 2. Перемаппинг ВСЕХ юзеров по полю role → roles
+  const allUsers = await db.collection("users").find({}).toArray();
 
   let migratedCount = 0;
-  for (const u of usersToMigrate) {
+  for (const u of allUsers) {
     const oldRole = u.role || "user";
     const roleId = roleIdMap[oldRole];
     if (roleId) {
@@ -91,7 +91,7 @@ export async function POST(request) {
     }
   }
 
-  log.push(`Мигрировано ${migratedCount} юзеров`);
+  log.push(`Обновлено ${migratedCount} юзеров`);
 
   invalidateRolesCache();
 
