@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
-import { buildRouteEvents, buildRouteEventsWithBranches, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
+import { buildRouteEvents, buildRouteEventsWithBranches, splitPathByCheckpoints, projectPointOnPath, computeForkDirection } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -554,31 +554,37 @@ export default function RouteMapLeaflet({ route }) {
               )}
 
               {/* Fork — выбор пути */}
-              {currentEvent.type === "fork" && (
-                <div className="space-y-2">
-                  <p className="text-sm font-bold text-[var(--text-primary)] text-center">
-                    Развилка
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)] text-center">
-                    Выберите путь:
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={handleStayMain}
-                      className="w-full rounded-xl border border-blue-500 px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
-                    >
-                      Основной маршрут
-                    </button>
-                    <button
-                      onClick={() => handleChooseBranch(currentEvent.data.id)}
-                      className="w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
-                      style={{ background: currentEvent.data.color || "#10b981" }}
-                    >
-                      {currentEvent.data.name || "Ветка"}
-                    </button>
+              {currentEvent.type === "fork" && (() => {
+                const { mainDir, branchDir } = computeForkDirection(route.path, currentEvent.data);
+                const dirLabel = { left: "← Налево", right: "Направо →", straight: "↑ Прямо" };
+                return (
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-[var(--text-primary)] text-center">
+                      Развилка
+                    </p>
+                    <p className="text-sm text-[var(--text-secondary)] text-center">
+                      Выберите путь:
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={handleStayMain}
+                        className="w-full rounded-xl border border-blue-500 px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                      >
+                        <span className="block">{dirLabel[mainDir]}</span>
+                        <span className="text-xs opacity-70">Основной маршрут</span>
+                      </button>
+                      <button
+                        onClick={() => handleChooseBranch(currentEvent.data.id)}
+                        className="w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                        style={{ background: currentEvent.data.color || "#10b981" }}
+                      >
+                        <span className="block">{dirLabel[branchDir]}</span>
+                        <span className="text-xs opacity-80">{currentEvent.data.name || "Ветка"}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Merge — возврат к основному пути */}
               {currentEvent.type === "merge" && (

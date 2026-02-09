@@ -1,16 +1,15 @@
 "use client";
 
-import { Eye, Route, MapPin, Flag, Save, BookOpen, Play, Undo2, ScanEye, GitBranch, Merge } from "lucide-react";
+import { Eye, Route, MapPin, Save, BookOpen, Play, Undo2, ScanEye, GitBranch, Merge } from "lucide-react";
 
 const modes = [
   { id: "view", label: "Обзор", shortcut: "1", icon: Eye },
   { id: "drawPath", label: "Путь", shortcut: "2", icon: Route },
   { id: "addCheckpoint", label: "Точки", shortcut: "3", icon: MapPin },
   { id: "addSegment", label: "Текст", shortcut: "4", icon: BookOpen },
-  { id: "setFinish", label: "Финиш", shortcut: "5", icon: Flag },
-  { id: "simulate", label: "Тест", shortcut: "6", icon: Play },
-  { id: "addBranch", label: "Ветка", shortcut: "7", icon: GitBranch },
-  { id: "setMerge", label: "Слияние", shortcut: "8", icon: Merge, branchOnly: true },
+  { id: "simulate", label: "Тест", shortcut: "5", icon: Play },
+  { id: "addBranch", label: "Ветка", shortcut: "6", icon: GitBranch },
+  { id: "setMerge", label: "Слияние", shortcut: "7", icon: Merge, branchOnly: true },
 ];
 
 export default function RouteEditorToolbar({ mode, onModeChange, onSave, isDirty, saving, onUndo, canUndo, onPreview, activeBranchId }) {

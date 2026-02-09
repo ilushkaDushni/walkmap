@@ -353,6 +353,63 @@ export function buildRouteEventsWithBranches(route) {
   return { mainEvents, branchEvents };
 }
 
+/**
+ * Азимут (bearing) от p1 к p2 в градусах (0-360).
+ */
+export function bearing(p1, p2) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const toDeg = (r) => (r * 180) / Math.PI;
+  const dLng = toRad(p2.lng - p1.lng);
+  const lat1 = toRad(p1.lat);
+  const lat2 = toRad(p2.lat);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+/**
+ * Определяет направления на развилке (left/right/straight).
+ * @param {Array} mainPath — основной path маршрута
+ * @param {Object} branch — ветка с fork { pathIndex, fraction } и path
+ * @returns {{ mainDir: string, branchDir: string }} "left"|"right"|"straight"
+ */
+export function computeForkDirection(mainPath, branch) {
+  const fork = branch.fork;
+  if (!fork || !mainPath || mainPath.length < 2) {
+    return { mainDir: "straight", branchDir: "straight" };
+  }
+
+  const forkIdx = fork.pathIndex;
+  const forkPos = forkPositionOnPath(mainPath, forkIdx, fork.fraction);
+
+  // Входящее направление: от предыдущей точки main path к fork
+  const prevPoint = forkIdx > 0 ? mainPath[forkIdx] : mainPath[0];
+  const inBearing = bearing(prevPoint, forkPos);
+
+  const normalizeTurn = (out) => {
+    let turn = out - inBearing;
+    while (turn > 180) turn -= 360;
+    while (turn < -180) turn += 360;
+    return turn;
+  };
+
+  const dirFromTurn = (turn) => {
+    if (turn >= -15 && turn <= 15) return "straight";
+    return turn < 0 ? "left" : "right";
+  };
+
+  // Направление main после fork
+  const mainNext = forkIdx + 1 < mainPath.length ? mainPath[forkIdx + 1] : null;
+  const mainDir = mainNext ? dirFromTurn(normalizeTurn(bearing(forkPos, mainNext))) : "straight";
+
+  // Направление ветки: path[0] = fork point, path[1] = следующая точка
+  const branchPath = branch.path || [];
+  const branchNext = branchPath.length > 1 ? branchPath[1] : null;
+  const branchDir = branchNext ? dirFromTurn(normalizeTurn(bearing(forkPos, branchNext))) : "straight";
+
+  return { mainDir, branchDir };
+}
+
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2 || !checkpoints?.length) return [path];
 

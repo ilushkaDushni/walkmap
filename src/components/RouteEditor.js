@@ -11,18 +11,18 @@ import RouteMediaSection from "./RouteMediaSection";
 import SimulationPanel from "./SimulationPanel";
 import BranchSwitcher from "./BranchSwitcher";
 import { X } from "lucide-react";
-import { projectPointOnPath, getPathContext } from "@/lib/geo";
+import { projectPointOnPath, getPathContext, haversineDistance } from "@/lib/geo";
 
 const RouteMapLeaflet = dynamic(() => import("./RouteMapLeaflet"), { ssr: false });
 
-const MODE_KEYS = { "1": "view", "2": "drawPath", "3": "addCheckpoint", "4": "addSegment", "5": "setFinish", "6": "simulate", "7": "addBranch", "8": "setMerge" };
+const MODE_KEYS = { "1": "view", "2": "drawPath", "3": "addCheckpoint", "4": "addSegment", "5": "simulate", "6": "addBranch", "7": "setMerge" };
 
 function validateRoute(route) {
   const errors = [];
   if (!route.title?.trim()) errors.push("Не указано название маршрута");
   if ((route.path?.length || 0) < 2) errors.push("Путь содержит менее 2 точек");
   if ((route.checkpoints?.length || 0) === 0) errors.push("Нет ни одного чекпоинта");
-  if (!route.finish?.position) errors.push("Не установлен финиш");
+  if (route.finishPointIndex == null) errors.push("Не установлен финиш");
   return errors;
 }
 
@@ -40,12 +40,30 @@ export default function RouteEditor({ routeId, onSaved }) {
   const [activeBranchId, setActiveBranchId] = useState(null);
   const historyRef = useRef([]);
   const handleSaveRef = useRef(null);
+  const [pathPointMenu, setPathPointMenu] = useState(null);
+  const [pathLineMenu, setPathLineMenu] = useState(null);
+  const [toastError, setToastError] = useState(null);
 
-  // Загрузка маршрута
+  // Загрузка маршрута (с миграцией finishPointIndex)
   useEffect(() => {
     (async () => {
       const res = await authFetch(`/api/routes/${routeId}`);
-      if (res.ok) setRoute(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        // Миграция: если finishPointIndex не задан, но есть finish.position — найти ближайшую точку
+        if (data.finishPointIndex === undefined && data.finish?.position && data.path?.length >= 2) {
+          const proj = projectPointOnPath(data.finish.position, data.path);
+          if (proj) {
+            // Ставим на ближайшую вершину пути
+            const nearestIdx = proj.fraction > 0.5 ? proj.pathIndex + 1 : proj.pathIndex;
+            data.finishPointIndex = Math.min(nearestIdx, data.path.length - 1);
+            data.finish.position = data.path[data.finishPointIndex];
+          }
+        }
+        if (data.finishPointIndex === undefined) data.finishPointIndex = null;
+        if (data.startPointIndex === undefined) data.startPointIndex = null;
+        setRoute(data);
+      }
     })();
   }, [routeId, authFetch]);
 
@@ -248,6 +266,8 @@ export default function RouteEditor({ routeId, onSaved }) {
   // Клик по карте
   const handleMapClick = useCallback(
     (latlng, clickMode) => {
+      setPathPointMenu(null);
+      setPathLineMenu(null);
       if (clickMode === "drawPath") {
         updateActiveContext((ctx) => ({
           ...ctx,
@@ -277,14 +297,6 @@ export default function RouteEditor({ routeId, onSaved }) {
         // Создание ветки — обрабатывается в handleBranchClick
       } else if (clickMode === "setMerge") {
         // Установка merge — обрабатывается в handleMergeClick
-      } else if (clickMode === "setFinish") {
-        updateRoute((prev) => ({
-          ...prev,
-          finish: {
-            position: { lat: latlng.lat, lng: latlng.lng },
-            coinsReward: prev.finish?.coinsReward || 0,
-          },
-        }));
       } else if (clickMode === "simulate") {
         setSimulatedPosition({ lat: latlng.lat, lng: latlng.lng });
       }
@@ -302,10 +314,25 @@ export default function RouteEditor({ routeId, onSaved }) {
         const newSegments = (ctx.segments || []).map((s) =>
           s.pathIndex >= insertIndex ? { ...s, pathIndex: s.pathIndex + 1 } : s
         );
-        return { ...ctx, path: reindexed, segments: newSegments };
+        // Корректируем boundToPathIndex
+        const newCheckpoints = ctx.checkpoints.map((cp) => {
+          if (cp.boundToPathIndex != null && cp.boundToPathIndex >= insertIndex) {
+            return { ...cp, boundToPathIndex: cp.boundToPathIndex + 1 };
+          }
+          return cp;
+        });
+        return { ...ctx, path: reindexed, segments: newSegments, checkpoints: newCheckpoints };
+      });
+      // Корректируем finishPointIndex / startPointIndex
+      updateRoute((prev) => {
+        let fp = prev.finishPointIndex;
+        let sp = prev.startPointIndex;
+        if (fp != null && fp >= insertIndex) fp++;
+        if (sp != null && sp >= insertIndex) sp++;
+        return { ...prev, finishPointIndex: fp, startPointIndex: sp };
       });
     },
-    [updateActiveContext]
+    [updateActiveContext, updateRoute]
   );
 
   // Клик по отрезку линии (режим addSegment)
@@ -336,13 +363,24 @@ export default function RouteEditor({ routeId, onSaved }) {
       updateActiveContext((ctx) => {
         const newPath = [...ctx.path];
         newPath[index] = { ...newPath[index], lat: newPos.lat, lng: newPos.lng };
-        return { ...ctx, path: newPath };
+        // Двигаем привязанный чекпоинт
+        const newCheckpoints = ctx.checkpoints.map((cp) =>
+          cp.boundToPathIndex === index ? { ...cp, position: { lat: newPos.lat, lng: newPos.lng } } : cp
+        );
+        return { ...ctx, path: newPath, checkpoints: newCheckpoints };
+      });
+      // Синхронизируем finish.position если drag'аем финишную точку
+      setRoute((prev) => {
+        if (prev?.finishPointIndex === index) {
+          return { ...prev, finish: { ...prev.finish, position: newPos } };
+        }
+        return prev;
       });
     },
     [updateActiveContext]
   );
 
-  // Удаление точки пути (правый клик) — с фиксом segment indices
+  // Удаление точки пути (правый клик) — с фиксом segment indices, start/finish, bound checkpoints
   const handlePathPointRightClick = useCallback(
     (index) => {
       updateActiveContext((ctx) => {
@@ -350,10 +388,30 @@ export default function RouteEditor({ routeId, onSaved }) {
         const newSegments = (ctx.segments || [])
           .filter((s) => s.pathIndex !== index)
           .map((s) => (s.pathIndex > index ? { ...s, pathIndex: s.pathIndex - 1 } : s));
-        return { ...ctx, path: newPath, segments: newSegments };
+        // Удаляем привязанные чекпоинты и корректируем boundToPathIndex
+        const newCheckpoints = ctx.checkpoints
+          .filter((cp) => cp.boundToPathIndex !== index)
+          .map((cp) => {
+            if (cp.boundToPathIndex != null && cp.boundToPathIndex > index) {
+              return { ...cp, boundToPathIndex: cp.boundToPathIndex - 1 };
+            }
+            return cp;
+          });
+        return { ...ctx, path: newPath, segments: newSegments, checkpoints: newCheckpoints };
+      });
+      // Корректируем finishPointIndex / startPointIndex
+      updateRoute((prev) => {
+        let fp = prev.finishPointIndex;
+        let sp = prev.startPointIndex;
+        if (fp === index) { fp = null; }
+        else if (fp != null && fp > index) fp--;
+        if (sp === index) { sp = null; }
+        else if (sp != null && sp > index) sp--;
+        const finish = fp != null && prev.path?.[fp] ? { position: prev.path[fp], coinsReward: prev.finish?.coinsReward || 0 } : (fp == null ? null : prev.finish);
+        return { ...prev, finishPointIndex: fp, startPointIndex: sp, finish };
       });
     },
-    [updateActiveContext]
+    [updateActiveContext, updateRoute]
   );
 
   // Клик по чекпоинту
@@ -374,20 +432,172 @@ export default function RouteEditor({ routeId, onSaved }) {
     [updateActiveContext]
   );
 
-  // Перетаскивание финиша
-  const handleFinishDrag = useCallback(
-    (newPos) => {
+  // --- Контекстное меню точки пути ---
+  const handlePathPointContextMenu = useCallback((index, { x, y }) => {
+    setPathPointMenu({ index, x, y });
+    setPathLineMenu(null);
+  }, []);
+
+  const handleSetAsFinish = useCallback(
+    (index) => {
       updateRoute((prev) => ({
         ...prev,
-        finish: { ...prev.finish, position: newPos },
+        finishPointIndex: index,
+        finish: { position: activeContext.path[index], coinsReward: prev.finish?.coinsReward || 0 },
       }));
+      setPathPointMenu(null);
+    },
+    [updateRoute, activeContext.path]
+  );
+
+  const handleClearFinish = useCallback(() => {
+    updateRoute((prev) => ({ ...prev, finishPointIndex: null, finish: null }));
+    setPathPointMenu(null);
+  }, [updateRoute]);
+
+  const handleSetAsStart = useCallback(
+    (index) => {
+      updateRoute((prev) => ({ ...prev, startPointIndex: index }));
+      setPathPointMenu(null);
     },
     [updateRoute]
   );
 
+  const handleClearStart = useCallback(() => {
+    updateRoute((prev) => ({ ...prev, startPointIndex: null }));
+    setPathPointMenu(null);
+  }, [updateRoute]);
+
+  const handleMakeCheckpointAtPoint = useCallback(
+    (index) => {
+      const point = activeContext.path[index];
+      if (!point) return;
+      const id = crypto.randomUUID();
+      updateActiveContext((ctx) => ({
+        ...ctx,
+        checkpoints: [
+          ...ctx.checkpoints,
+          {
+            id,
+            title: "",
+            description: "",
+            position: { lat: point.lat, lng: point.lng },
+            triggerRadiusMeters: 20,
+            coinsReward: 0,
+            photos: [],
+            audio: [],
+            order: ctx.checkpoints.length,
+            boundToPathIndex: index,
+          },
+        ],
+      }));
+      setPathPointMenu(null);
+      setSelectedCheckpointId(id);
+    },
+    [activeContext.path, updateActiveContext]
+  );
+
+  const handleMergeAtPoint = useCallback(
+    (index) => {
+      setPathPointMenu(null);
+      updateActiveContext((ctx) => {
+        const { path: p, segments: segs } = ctx;
+        if (index <= 0 || index >= p.length - 1) return ctx;
+
+        const seg1 = (segs || []).find((s) => s.pathIndex === index - 1);
+        const seg2 = (segs || []).find((s) => s.pathIndex === index);
+
+        const hasContent = (s) => s && (s.title || s.text || (s.photos && s.photos.length) || (s.audio && s.audio.length));
+        const content1 = hasContent(seg1);
+        const content2 = hasContent(seg2);
+
+        if (content1 && content2) {
+          setToastError("Нельзя объединить два отрезка с контентом. Сделайте один пустым.");
+          setTimeout(() => setToastError(null), 3000);
+          return ctx;
+        }
+
+        let newSegments = [...(segs || [])];
+
+        if (content1 && !content2) {
+          // Оставляем seg1 на ребре (index-1), удаляем seg2
+          newSegments = newSegments.filter((s) => s.pathIndex !== index);
+        } else if (!content1 && content2) {
+          // Переносим контент seg2 на ребро (index-1), удаляем оригинал
+          newSegments = newSegments.filter((s) => s.pathIndex !== index - 1);
+          newSegments = newSegments.map((s) => s.pathIndex === index ? { ...s, pathIndex: index - 1 } : s);
+        } else {
+          // Оба пустые — удаляем оба
+          newSegments = newSegments.filter((s) => s.pathIndex !== index - 1 && s.pathIndex !== index);
+        }
+
+        // Убираем isDivider чекпоинт рядом (< 10м)
+        const pointPos = p[index];
+        const newCheckpoints = ctx.checkpoints.map((cp) => {
+          if (cp.isDivider && haversineDistance(cp.position, pointPos) < 10) {
+            return { ...cp, isDivider: false };
+          }
+          return cp;
+        });
+
+        // Геометрия пути НЕ меняется — точка остаётся, но становится «склейкой»
+        const newPath = p.map((pt, i) => i === index ? { ...pt, isJunction: false, isMerged: true } : pt);
+
+        return { ...ctx, path: newPath, checkpoints: newCheckpoints, segments: newSegments };
+      });
+    },
+    [updateActiveContext]
+  );
+
+  // --- Контекстное меню линии пути ---
+  const handlePathLineContextMenu = useCallback((insertIndex, { x, y, lat, lng }) => {
+    setPathLineMenu({ insertIndex, x, y, lat, lng });
+    setPathPointMenu(null);
+  }, []);
+
+  const handleAddJunction = useCallback(() => {
+    if (!pathLineMenu) return;
+    const { insertIndex, lat, lng } = pathLineMenu;
+    updateActiveContext((ctx) => {
+      const newPath = [...ctx.path];
+      newPath.splice(insertIndex, 0, { lat, lng, order: 0, isJunction: true });
+      const reindexed = newPath.map((p, i) => ({ ...p, order: i }));
+      const newSegments = (ctx.segments || []).map((s) =>
+        s.pathIndex >= insertIndex ? { ...s, pathIndex: s.pathIndex + 1 } : s
+      );
+      const newCheckpoints = ctx.checkpoints.map((cp) => {
+        if (cp.boundToPathIndex != null && cp.boundToPathIndex >= insertIndex) {
+          return { ...cp, boundToPathIndex: cp.boundToPathIndex + 1 };
+        }
+        return cp;
+      });
+      return { ...ctx, path: reindexed, segments: newSegments, checkpoints: newCheckpoints };
+    });
+    updateRoute((prev) => {
+      let fp = prev.finishPointIndex;
+      let sp = prev.startPointIndex;
+      if (fp != null && fp >= insertIndex) fp++;
+      if (sp != null && sp >= insertIndex) sp++;
+      return { ...prev, finishPointIndex: fp, startPointIndex: sp };
+    });
+    setPathLineMenu(null);
+  }, [pathLineMenu, updateActiveContext, updateRoute]);
+
   // Обновление чекпоинта
   const handleCheckpointUpdate = useCallback(
     (id, updates) => {
+      // Предвычисляем insertIdx если isDivider
+      let dividerInsertIdx = null;
+      if (updates.isDivider === true && activeContext.path.length >= 2) {
+        const cp = activeContext.checkpoints.find((c) => c.id === id);
+        if (cp) {
+          const proj = projectPointOnPath(cp.position, activeContext.path);
+          if (proj && proj.fraction > 0.01 && proj.fraction < 0.99) {
+            dividerInsertIdx = proj.pathIndex + 1;
+          }
+        }
+      }
+
       updateActiveContext((ctx) => {
         const updatedCheckpoints = ctx.checkpoints.map((cp) =>
           cp.id === id ? { ...cp, ...updates } : cp
@@ -411,15 +621,33 @@ export default function RouteEditor({ routeId, onSaved }) {
               const newSegments = (ctx.segments || []).map((s) =>
                 s.pathIndex >= insertIdx ? { ...s, pathIndex: s.pathIndex + 1 } : s
               );
-              next = { ...next, path: reindexedPath, segments: newSegments };
+              // Корректируем boundToPathIndex у чекпоинтов
+              const fixedCheckpoints = (next.checkpoints || updatedCheckpoints).map((c) => {
+                if (c.boundToPathIndex != null && c.boundToPathIndex >= insertIdx) {
+                  return { ...c, boundToPathIndex: c.boundToPathIndex + 1 };
+                }
+                return c;
+              });
+              next = { ...next, path: reindexedPath, segments: newSegments, checkpoints: fixedCheckpoints };
             }
           }
         }
 
         return next;
       });
+
+      // Корректируем indices при вставке от isDivider
+      if (dividerInsertIdx != null) {
+        updateRoute((prev) => {
+          let fp = prev.finishPointIndex;
+          let sp = prev.startPointIndex;
+          if (fp != null && fp >= dividerInsertIdx) fp++;
+          if (sp != null && sp >= dividerInsertIdx) sp++;
+          return { ...prev, finishPointIndex: fp, startPointIndex: sp };
+        });
+      }
     },
-    [updateActiveContext]
+    [updateActiveContext, updateRoute, activeContext.path, activeContext.checkpoints]
   );
 
   // Удаление чекпоинта
@@ -578,6 +806,8 @@ export default function RouteEditor({ routeId, onSaved }) {
           activeBranchId={activeBranchId}
           mainPath={route.path}
           mainCheckpoints={route.checkpoints}
+          startPointIndex={route.startPointIndex}
+          finishPointIndex={route.finishPointIndex}
           onMapClick={handleMapClick}
           onPathPointDrag={handlePathPointDrag}
           onPathPointRightClick={handlePathPointRightClick}
@@ -586,7 +816,8 @@ export default function RouteEditor({ routeId, onSaved }) {
           onCheckpointDrag={handleCheckpointDrag}
           onCheckpointDelete={handleCheckpointDelete}
           onSegmentLineClick={handleSegmentLineClick}
-          onFinishDrag={handleFinishDrag}
+          onPathPointContextMenu={handlePathPointContextMenu}
+          onPathLineContextMenu={handlePathLineContextMenu}
           selectedCheckpointId={selectedCheckpointId}
           selectedSegmentIndex={selectedSegmentIndex}
           segmentIndicesWithContent={segmentIndicesWithContent}
@@ -618,6 +849,113 @@ export default function RouteEditor({ routeId, onSaved }) {
           </div>
         )}
       </div>
+
+      {/* Контекстное меню точки пути */}
+      {pathPointMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setPathPointMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setPathPointMenu(null); }}
+        >
+          <div
+            className="fixed z-50 min-w-[180px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xl py-1"
+            style={{ left: pathPointMenu.x, top: pathPointMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Старт */}
+            {route.startPointIndex !== pathPointMenu.index && pathPointMenu.index !== (route.startPointIndex ?? 0) && (
+              <button
+                onClick={() => handleSetAsStart(pathPointMenu.index)}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Назначить стартом
+              </button>
+            )}
+            {route.startPointIndex === pathPointMenu.index && (
+              <button
+                onClick={handleClearStart}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Сбросить старт
+              </button>
+            )}
+            {/* Финиш */}
+            {route.finishPointIndex !== pathPointMenu.index && (
+              <button
+                onClick={() => handleSetAsFinish(pathPointMenu.index)}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Назначить финишем
+              </button>
+            )}
+            {route.finishPointIndex === pathPointMenu.index && (
+              <button
+                onClick={handleClearFinish}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Убрать финиш
+              </button>
+            )}
+            {/* Сделать поинтом — если нет привязанного чекпоинта */}
+            {!activeContext.checkpoints.some((cp) => cp.boundToPathIndex === pathPointMenu.index) && (
+              <button
+                onClick={() => handleMakeCheckpointAtPoint(pathPointMenu.index)}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Сделать поинтом
+              </button>
+            )}
+            {/* Объединить — только для внутренних точек */}
+            {pathPointMenu.index > 0 && pathPointMenu.index < activeContext.path.length - 1 && (
+              <button
+                onClick={() => handleMergeAtPoint(pathPointMenu.index)}
+                className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                Объединить отрезки
+              </button>
+            )}
+            {/* Удалить */}
+            <button
+              onClick={() => {
+                handlePathPointRightClick(pathPointMenu.index);
+                setPathPointMenu(null);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-[var(--bg-elevated)] transition"
+            >
+              Удалить точку
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Контекстное меню линии пути */}
+      {pathLineMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setPathLineMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setPathLineMenu(null); }}
+        >
+          <div
+            className="fixed z-50 min-w-[160px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xl py-1"
+            style={{ left: pathLineMenu.x, top: pathLineMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleAddJunction}
+              className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+            >
+              Добавить стык
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast ошибки */}
+      {toastError && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl bg-red-600/90 px-4 py-2.5 text-sm text-white shadow-lg">
+          {toastError}
+        </div>
+      )}
 
       {/* Переключатель веток */}
       <BranchSwitcher
@@ -761,7 +1099,7 @@ export default function RouteEditor({ routeId, onSaved }) {
           </select>
         </label>
 
-        {route.finish && (
+        {route.finishPointIndex != null && (
           <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] ml-auto mr-4">
             <span>Монеты за финиш:</span>
             <input

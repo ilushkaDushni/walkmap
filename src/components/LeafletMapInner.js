@@ -10,15 +10,18 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 // Ростов-на-Дону и окрестности
 const ROSTOV_BOUNDS = [[38.8, 46.9], [40.6, 47.6]];
 
-// Маркер точки пути с long-press и крестиком удаления
-function PathPointMarker({ index, point, onDrag, onDelete }) {
+// Маркер точки пути с long-press и контекстным меню
+function PathPointMarker({ index, point, isStart, isFinish, isMerged, onDrag, onContextMenu }) {
   const longPressRef = useRef(null);
 
   const startLongPress = useCallback(() => {
-    longPressRef.current = setTimeout(() => {
-      onDelete?.(index);
+    longPressRef.current = setTimeout((e) => {
+      // Берём позицию из ref-а не из события
+      onContextMenu?.(index, { x: lastTouchRef.current?.x || 0, y: lastTouchRef.current?.y || 0 });
     }, 600);
-  }, [index, onDelete]);
+  }, [index, onContextMenu]);
+
+  const lastTouchRef = useRef(null);
 
   const cancelLongPress = useCallback(() => {
     if (longPressRef.current) {
@@ -26,6 +29,55 @@ function PathPointMarker({ index, point, onDrag, onDelete }) {
       longPressRef.current = null;
     }
   }, []);
+
+  // Стиль точки
+  let markerStyle;
+  if (isFinish) {
+    // Шахматный квадрат
+    markerStyle = {
+      width: 14,
+      height: 14,
+      borderRadius: 2,
+      background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 7px 7px",
+      border: isStart ? "2px solid #22c55e" : "2px solid white",
+      boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+      cursor: "pointer",
+    };
+  } else if (isStart) {
+    // Зелёный круг
+    markerStyle = {
+      width: 14,
+      height: 14,
+      borderRadius: "50%",
+      background: "#22c55e",
+      border: "2px solid white",
+      boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+      cursor: "pointer",
+    };
+  } else if (isMerged) {
+    // Объединённая точка — полупрозрачное кольцо
+    markerStyle = {
+      width: 10,
+      height: 10,
+      borderRadius: "50%",
+      background: "white",
+      border: "2px solid #3b82f6",
+      boxShadow: "0 1px 4px rgba(0,0,0,.15)",
+      cursor: "pointer",
+      opacity: 0.4,
+    };
+  } else {
+    // Стык — кольцо (белый центр, синяя обводка)
+    markerStyle = {
+      width: 14,
+      height: 14,
+      borderRadius: "50%",
+      background: "white",
+      border: "3px solid #3b82f6",
+      boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+      cursor: "pointer",
+    };
+  }
 
   return (
     <Marker
@@ -41,52 +93,25 @@ function PathPointMarker({ index, point, onDrag, onDelete }) {
         className="group relative"
         onContextMenu={(e) => {
           e.preventDefault();
-          onDelete?.(index);
+          onContextMenu?.(index, { x: e.clientX, y: e.clientY });
         }}
-        onTouchStart={startLongPress}
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          lastTouchRef.current = { x: touch.clientX, y: touch.clientY };
+          startLongPress();
+        }}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
         style={{ padding: 8, margin: -8 }}
       >
-        <div
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            background: "#3b82f6",
-            border: "2px solid white",
-            boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-            cursor: "pointer",
-          }}
-        />
-        {/* Крестик при hover (десктоп) */}
-        <div
-          className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center"
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: "50%",
-            background: "#ef4444",
-            cursor: "pointer",
-            fontSize: 10,
-            fontWeight: 700,
-            color: "white",
-            lineHeight: 1,
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete?.(index);
-          }}
-        >
-          ×
-        </div>
+        <div style={markerStyle} />
       </div>
     </Marker>
   );
 }
 
 // Маркер чекпоинта с крестиком удаления
-function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDelete, path }) {
+function CheckpointMarker({ cp, isSelected, isBound, isDraggable, onClick, onDrag, onDelete, path }) {
   const longPressRef = useRef(null);
 
   const startLongPress = useCallback(() => {
@@ -152,8 +177,10 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
           <div style={{ opacity: cp.color === "transparent" ? 0.25 : 1 }}>
             <Dot
               color={isSelected ? "#ef4444" : (cp.color === "transparent" ? "#9ca3af" : (cp.color || "#f59e0b"))}
-              size={16}
+              size={isBound ? 18 : 16}
               label={cp.order + 1}
+              borderWidth={isBound ? 3 : 2}
+              borderColor="white"
             />
           </div>
         )}
@@ -186,7 +213,7 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
 }
 
 // Круглый маркер
-function Dot({ color, size = 12, label }) {
+function Dot({ color, size = 12, label, borderWidth = 2, borderColor = "white" }) {
   return (
     <div
       style={{
@@ -194,7 +221,7 @@ function Dot({ color, size = 12, label }) {
         height: size,
         borderRadius: "50%",
         background: color,
-        border: "2px solid white",
+        border: `${borderWidth}px solid ${borderColor}`,
         boxShadow: "0 1px 4px rgba(0,0,0,.3)",
         cursor: "pointer",
         display: "flex",
@@ -225,6 +252,8 @@ export default function LeafletMapInner({
   activeBranchId = null,
   mainPath = [],
   mainCheckpoints = [],
+  startPointIndex = null,
+  finishPointIndex = null,
   onMapClick,
   onPathPointDrag,
   onPathPointRightClick,
@@ -233,7 +262,8 @@ export default function LeafletMapInner({
   onCheckpointDrag,
   onSegmentLineClick,
   onCheckpointDelete,
-  onFinishDrag,
+  onPathPointContextMenu,
+  onPathLineContextMenu,
   selectedCheckpointId,
   selectedSegmentIndex,
   segmentIndicesWithContent = [],
@@ -426,22 +456,30 @@ export default function LeafletMapInner({
     return { type: "FeatureCollection", features };
   }, [path, checkpoints]);
 
-  // GeoJSON FeatureCollection: каждый отрезок пути — отдельный Feature (для сегментов)
+  // GeoJSON FeatureCollection: рёбра пути, сгруппированные через isMerged-точки
   const segmentLinesGeoJson = useMemo(() => {
     if (path.length < 2) return null;
     const features = [];
+    let groupStart = 0;
+    let coords = [[path[0].lng, path[0].lat]];
+
     for (let i = 0; i < path.length - 1; i++) {
-      features.push({
-        type: "Feature",
-        properties: { pathIndex: i },
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [path[i].lng, path[i].lat],
-            [path[i + 1].lng, path[i + 1].lat],
-          ],
-        },
-      });
+      coords.push([path[i + 1].lng, path[i + 1].lat]);
+      const isLastEdge = i === path.length - 2;
+      // Следующая точка — «склейка»? → продолжаем группу
+      const nextIsMerged = !isLastEdge && path[i + 1].isMerged;
+
+      if (isLastEdge || !nextIsMerged) {
+        features.push({
+          type: "Feature",
+          properties: { pathIndex: groupStart },
+          geometry: { type: "LineString", coordinates: coords },
+        });
+        if (!isLastEdge) {
+          groupStart = i + 1;
+          coords = [[path[i + 1].lng, path[i + 1].lat]];
+        }
+      }
     }
     return { type: "FeatureCollection", features };
   }, [path]);
@@ -542,6 +580,22 @@ export default function LeafletMapInner({
       maxBounds={ROSTOV_BOUNDS}
       minZoom={10}
       onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // ПКМ по линии пути → контекстное меню
+        const features = mapRef.current?.queryRenderedFeatures(e.point, {
+          layers: ["path-segment-hit-line"],
+        });
+        if (features?.length > 0) {
+          const insertIndex = features[0].properties.insertIndex;
+          onPathLineContextMenu?.(insertIndex, {
+            x: e.originalEvent.clientX,
+            y: e.originalEvent.clientY,
+            lat: e.lngLat.lat,
+            lng: e.lngLat.lng,
+          });
+        }
+      }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       interactiveLayerIds={interactiveLayerIds}
@@ -574,8 +628,8 @@ export default function LeafletMapInner({
         </Source>
       )}
 
-      {/* Невидимый hit-слой для вставки точек в режиме drawPath */}
-      {mode === "drawPath" && pathSegmentHitGeoJson && (
+      {/* Невидимый hit-слой для вставки точек и ПКМ по линии */}
+      {pathSegmentHitGeoJson && (
         <Source id="path-segment-hit" type="geojson" data={pathSegmentHitGeoJson}>
           <Layer
             id="path-segment-hit-line"
@@ -643,17 +697,47 @@ export default function LeafletMapInner({
         </Source>
       )}
 
-      {/* Точки пути (только в режиме drawPath) */}
-      {mode === "drawPath" &&
-        path.map((p, i) => (
+      {/* Start/Finish/Junction/Merged маркеры — всегда видны (кроме тех, где есть привязанный чекпоинт) */}
+      {path.map((p, i) => {
+        const isStart = i === (startPointIndex ?? 0);
+        const isFinish = i === finishPointIndex;
+        const isJunction = !!p.isJunction;
+        const isMerged = !!p.isMerged;
+        if (!isStart && !isFinish && !isJunction && !isMerged) return null;
+        // Не рисуем отдельный маркер если на этой точке есть привязанный чекпоинт
+        if ((isJunction || isMerged) && !isStart && !isFinish && checkpoints.some((cp) => cp.boundToPathIndex === i)) return null;
+        return (
           <PathPointMarker
-            key={`path-${i}`}
+            key={`sf-${i}`}
             index={i}
             point={p}
+            isStart={isStart}
+            isFinish={isFinish}
+            isMerged={isMerged && !isStart && !isFinish}
             onDrag={onPathPointDrag}
-            onDelete={onPathPointRightClick}
+            onContextMenu={onPathPointContextMenu}
           />
-        ))}
+        );
+      })}
+      {/* Обычные точки пути — только в режиме drawPath */}
+      {mode === "drawPath" &&
+        path.map((p, i) => {
+          const isStart = i === (startPointIndex ?? 0);
+          const isFinish = i === finishPointIndex;
+          if (isStart || isFinish || p.isJunction || p.isMerged) return null;
+          return (
+            <PathPointMarker
+              key={`path-${i}`}
+              index={i}
+              point={p}
+              isStart={false}
+              isFinish={false}
+              isMerged={false}
+              onDrag={onPathPointDrag}
+              onContextMenu={onPathPointContextMenu}
+            />
+          );
+        })}
 
       {/* Чекпоинты */}
       {checkpoints.map((cp) => (
@@ -661,7 +745,8 @@ export default function LeafletMapInner({
           key={cp.id}
           cp={cp}
           isSelected={selectedCheckpointId === cp.id}
-          isDraggable={mode !== "view"}
+          isBound={cp.boundToPathIndex != null}
+          isDraggable={cp.boundToPathIndex != null ? false : mode !== "view"}
           onClick={onCheckpointClick}
           onDrag={onCheckpointDrag}
           onDelete={onCheckpointDelete}
@@ -782,30 +867,6 @@ export default function LeafletMapInner({
             />
           </Marker>
         ) : null
-      )}
-
-      {/* Финиш */}
-      {finish?.position && (
-        <Marker
-          longitude={finish.position.lng}
-          latitude={finish.position.lat}
-          draggable={mode === "setFinish"}
-          onDragEnd={(e) => {
-            onFinishDrag?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 3,
-              background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 11px 11px",
-              border: "2px solid white",
-              boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-              cursor: "pointer",
-            }}
-          />
-        </Marker>
       )}
 
       {/* Симулированная позиция пользователя */}
