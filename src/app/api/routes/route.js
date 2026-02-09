@@ -43,6 +43,7 @@ export async function POST(request) {
     path: [],
     checkpoints: [],
     segments: [],
+    branches: [],
     photos: [],
     audio: [],
     finish: null,

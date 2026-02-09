@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
-import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
+import { buildRouteEvents, buildRouteEventsWithBranches, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -65,24 +65,29 @@ function useRouteBounds(route) {
 export default function RouteMapLeaflet({ route }) {
   const [started, setStarted] = useState(false);
   const [eventIndex, setEventIndex] = useState(0);
+  const [activeBranchId, setActiveBranchId] = useState(null);
+  const [branchEventIndex, setBranchEventIndex] = useState(0);
   const mapRef = useRef(null);
 
   const { download, downloading, progress, done } = useOfflineDownload(route);
   const routeBounds = useRouteBounds(route);
 
-  // Упорядоченные события маршрута
-  const events = useMemo(() => {
-    if (!route.path || route.path.length < 2) return [];
-    return buildRouteEvents(
-      route.path,
-      route.checkpoints || [],
-      route.segments || [],
-      route.finish
-    );
+  // Упорядоченные события маршрута (с ветками)
+  const { mainEvents, branchEvents } = useMemo(() => {
+    if (!route.path || route.path.length < 2) return { mainEvents: [], branchEvents: {} };
+    if (route.branches?.length) {
+      return buildRouteEventsWithBranches(route);
+    }
+    return {
+      mainEvents: buildRouteEvents(route.path, route.checkpoints || [], route.segments || [], route.finish),
+      branchEvents: {},
+    };
   }, [route]);
 
-  const currentEvent = events[eventIndex] || null;
-  const isLast = eventIndex >= events.length - 1;
+  const events = activeBranchId ? (branchEvents[activeBranchId] || []) : mainEvents;
+  const currentIdx = activeBranchId ? branchEventIndex : eventIndex;
+  const currentEvent = events[currentIdx] || null;
+  const isLast = currentIdx >= events.length - 1;
 
   const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
   const pathSegmentsGeoJson = useMemo(() => {
@@ -98,6 +103,23 @@ export default function RouteMapLeaflet({ route }) {
     }));
     return { type: "FeatureCollection", features };
   }, [route.path, route.checkpoints]);
+
+  // GeoJSON для веток (пунктир на карте просмотра)
+  const branchesGeoJson = useMemo(() => {
+    const branches = route.branches || [];
+    if (branches.length === 0) return null;
+    const features = branches
+      .filter((b) => b.path?.length >= 2)
+      .map((b) => ({
+        type: "Feature",
+        properties: { color: b.color || "#10b981" },
+        geometry: {
+          type: "LineString",
+          coordinates: b.path.map((p) => [p.lng, p.lat]),
+        },
+      }));
+    return features.length > 0 ? { type: "FeatureCollection", features } : null;
+  }, [route.branches]);
 
   // Подсветка текущего отрезка — учитывает isDivider чекпоинты
   const activeSegmentGeoJson = useMemo(() => {
@@ -179,11 +201,51 @@ export default function RouteMapLeaflet({ route }) {
   };
 
   const handleNext = () => {
-    if (!isLast) setEventIndex((i) => i + 1);
+    if (activeBranchId) {
+      // На ветке
+      const bEvents = branchEvents[activeBranchId] || [];
+      const nextBranchEvent = bEvents[branchEventIndex + 1];
+      if (nextBranchEvent?.type === "merge") {
+        // Возвращаемся на main
+        setActiveBranchId(null);
+        // Находим следующее событие после fork
+        const forkIdx = mainEvents.findIndex((e) => e.type === "fork" && e.data.id === activeBranchId);
+        if (forkIdx >= 0 && forkIdx + 1 < mainEvents.length) {
+          setEventIndex(forkIdx + 1);
+        }
+        setBranchEventIndex(0);
+        return;
+      }
+      if (branchEventIndex < bEvents.length - 1) {
+        setBranchEventIndex((i) => i + 1);
+      }
+    } else {
+      if (!isLast) setEventIndex((i) => i + 1);
+    }
   };
 
   const handlePrev = () => {
-    if (eventIndex > 0) setEventIndex((i) => i - 1);
+    if (activeBranchId) {
+      if (branchEventIndex > 0) setBranchEventIndex((i) => i - 1);
+      else {
+        // Возвращаемся к fork на main
+        setActiveBranchId(null);
+        setBranchEventIndex(0);
+      }
+    } else {
+      if (eventIndex > 0) setEventIndex((i) => i - 1);
+    }
+  };
+
+  // Выбор ветки на fork
+  const handleChooseBranch = (branchId) => {
+    setActiveBranchId(branchId);
+    setBranchEventIndex(0);
+  };
+
+  const handleStayMain = () => {
+    // Просто идём дальше по main
+    setEventIndex((i) => i + 1);
   };
 
   return (
@@ -227,6 +289,44 @@ export default function RouteMapLeaflet({ route }) {
                 }}
               />
             </Source>
+          )}
+
+          {/* Ветки — пунктир */}
+          {branchesGeoJson && (
+            <Source id="branches-view" type="geojson" data={branchesGeoJson}>
+              <Layer
+                id="branches-view-line"
+                type="line"
+                paint={{
+                  "line-color": ["get", "color"],
+                  "line-width": 3,
+                  "line-opacity": 0.5,
+                  "line-dasharray": [4, 3],
+                }}
+              />
+            </Source>
+          )}
+
+          {/* Fork маркеры */}
+          {(route.branches || []).map((branch) =>
+            branch.fork?.position ? (
+              <Marker
+                key={`fork-${branch.id}`}
+                longitude={branch.fork.position.lng}
+                latitude={branch.fork.position.lat}
+              >
+                <div
+                  style={{
+                    width: 10,
+                    height: 10,
+                    background: branch.color || "#10b981",
+                    border: "2px solid white",
+                    boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                    transform: "rotate(45deg)",
+                  }}
+                />
+              </Marker>
+            ) : null
           )}
 
           {/* Подсветка активного отрезка */}
@@ -452,22 +552,61 @@ export default function RouteMapLeaflet({ route }) {
                   )}
                 </div>
               )}
+
+              {/* Fork — выбор пути */}
+              {currentEvent.type === "fork" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-bold text-[var(--text-primary)] text-center">
+                    Развилка
+                  </p>
+                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                    Выберите путь:
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleStayMain}
+                      className="w-full rounded-xl border border-blue-500 px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+                    >
+                      Основной маршрут
+                    </button>
+                    <button
+                      onClick={() => handleChooseBranch(currentEvent.data.id)}
+                      className="w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                      style={{ background: currentEvent.data.color || "#10b981" }}
+                    >
+                      {currentEvent.data.name || "Ветка"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Merge — возврат к основному пути */}
+              {currentEvent.type === "merge" && (
+                <div className="text-center py-2">
+                  <p className="text-sm text-[var(--text-muted)]">Возврат к основному маршруту</p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Навигация */}
-          {events.length > 0 && (
+          {events.length > 0 && currentEvent?.type !== "fork" && (
             <div className="flex items-center justify-between">
               <button
                 onClick={handlePrev}
-                disabled={eventIndex === 0}
+                disabled={currentIdx === 0 && !activeBranchId}
                 className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-30"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
 
               <span className="text-xs text-[var(--text-muted)]">
-                {eventIndex + 1} / {events.length}
+                {activeBranchId && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] mr-1">
+                    ветка
+                  </span>
+                )}
+                {currentIdx + 1} / {events.length}
               </span>
 
               <button

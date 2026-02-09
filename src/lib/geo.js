@@ -253,6 +253,106 @@ export function buildRouteEvents(path, checkpoints = [], segments = [], finish =
  * @param {Object[]} checkpoints — с полем position
  * @returns {{ lat: number, lng: number }[][] }
  */
+/**
+ * Возвращает path/checkpoints/segments для main или ветки.
+ * @param {Object} route
+ * @param {string|null} branchId — null = main
+ * @returns {{ path: Array, checkpoints: Array, segments: Array }}
+ */
+export function getPathContext(route, branchId) {
+  if (!branchId) {
+    return {
+      path: route.path || [],
+      checkpoints: route.checkpoints || [],
+      segments: route.segments || [],
+    };
+  }
+  const branch = (route.branches || []).find((b) => b.id === branchId);
+  if (!branch) return { path: [], checkpoints: [], segments: [] };
+  return {
+    path: branch.path || [],
+    checkpoints: branch.checkpoints || [],
+    segments: branch.segments || [],
+  };
+}
+
+/**
+ * Возвращает path родителя ветки (main или другая ветка).
+ * @param {Object} route
+ * @param {Object} branch
+ * @returns {Array} path родителя
+ */
+export function getParentPath(route, branch) {
+  if (!branch.parentId) return route.path || [];
+  const parent = (route.branches || []).find((b) => b.id === branch.parentId);
+  return parent ? parent.path || [] : route.path || [];
+}
+
+/**
+ * GPS-позиция на ребре пути по pathIndex и fraction.
+ * @param {Array} path
+ * @param {number} pathIndex
+ * @param {number} fraction — 0-1
+ * @returns {{ lat: number, lng: number }}
+ */
+export function forkPositionOnPath(path, pathIndex, fraction) {
+  const i = Math.min(pathIndex, path.length - 2);
+  if (i < 0 || path.length < 2) return path[0] || { lat: 0, lng: 0 };
+  return {
+    lat: path[i].lat + fraction * (path[i + 1].lat - path[i].lat),
+    lng: path[i].lng + fraction * (path[i + 1].lng - path[i].lng),
+  };
+}
+
+/**
+ * Собирает события маршрута с учётом веток.
+ * @param {Object} route
+ * @returns {{ mainEvents: Array, branchEvents: Object<string, Array> }}
+ */
+export function buildRouteEventsWithBranches(route) {
+  const mainEvents = buildRouteEvents(
+    route.path || [],
+    route.checkpoints || [],
+    route.segments || [],
+    route.finish
+  );
+
+  // Вставляем fork-события в main
+  const branches = route.branches || [];
+  for (const branch of branches) {
+    if (!branch.fork || branch.parentId) continue; // только ветки от main
+    const forkSortKey = branch.fork.pathIndex + branch.fork.fraction;
+    mainEvents.push({
+      type: "fork",
+      data: branch,
+      sortKey: forkSortKey,
+    });
+  }
+  mainEvents.sort((a, b) => a.sortKey - b.sortKey);
+
+  // События для каждой ветки
+  const branchEvents = {};
+  for (const branch of branches) {
+    const bEvents = buildRouteEvents(
+      branch.path || [],
+      branch.checkpoints || [],
+      branch.segments || [],
+      null
+    );
+    // Добавляем merge-событие в конец ветки если есть
+    if (branch.merge) {
+      bEvents.push({
+        type: "merge",
+        data: branch,
+        sortKey: (branch.path || []).length,
+      });
+    }
+    branchEvents[branch.id] = bEvents;
+  }
+
+  return { mainEvents, branchEvents };
+}
+
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2 || !checkpoints?.length) return [path];
 
