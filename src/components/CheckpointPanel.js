@@ -98,21 +98,34 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
         </button>
       </div>
 
-      {/* Тип: разделитель */}
+      {/* Разделитель */}
       <label className="flex items-center gap-2 text-xs text-[var(--text-muted)] cursor-pointer">
         <input
           type="checkbox"
-          checked={!!checkpoint.isEmpty}
-          onChange={(e) => onUpdate({ isEmpty: e.target.checked })}
+          checked={!!checkpoint.isDivider}
+          onChange={(e) => onUpdate({ isDivider: e.target.checked, ...(!e.target.checked && { isEmpty: false }) })}
           className="rounded border-[var(--border-color)] accent-green-600"
         />
-        Разделитель (без контента)
+        Разделитель (делит маршрут)
       </label>
 
-      {checkpoint.isEmpty ? (
-        /* Упрощённая панель для разделителя */
+      {/* Без контента — только если разделитель */}
+      {checkpoint.isDivider && (
+        <label className="flex items-center gap-2 text-xs text-[var(--text-muted)] cursor-pointer ml-4">
+          <input
+            type="checkbox"
+            checked={!!checkpoint.isEmpty}
+            onChange={(e) => onUpdate({ isEmpty: e.target.checked })}
+            className="rounded border-[var(--border-color)] accent-green-600"
+          />
+          Без контента (невидим для пользователя)
+        </label>
+      )}
+
+      {checkpoint.isDivider && checkpoint.isEmpty ? (
+        /* Упрощённая панель для разделителя без контента */
         <div className="rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-elevated)] p-3 text-center">
-          <p className="text-xs text-[var(--text-muted)]">Визуальная метка на карте без контента</p>
+          <p className="text-xs text-[var(--text-muted)]">Невидимая метка — только разделяет маршрут</p>
         </div>
       ) : (
         <>
@@ -222,7 +235,27 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
       {/* Цвет */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Цвет</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {/* Прозрачный */}
+          <button
+            onClick={() => onUpdate({ color: "transparent" })}
+            className="rounded-full p-0.5 transition"
+            style={{
+              outline: checkpoint.color === "transparent" ? "2px solid #9ca3af" : "2px solid transparent",
+              outlineOffset: 1,
+            }}
+            title="Невидимый"
+          >
+            <div
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background: "repeating-conic-gradient(#d1d5db 0% 25%, white 0% 50%) 50% / 11px 11px",
+                border: "1px solid #d1d5db",
+              }}
+            />
+          </button>
           {PRESET_COLORS.map((c) => (
             <button
               key={c}
@@ -241,7 +274,7 @@ export default function CheckpointPanel({ checkpoint, onUpdate, onDelete, onClos
           <label className="flex items-center">
             <input
               type="color"
-              value={checkpoint.color || "#f59e0b"}
+              value={checkpoint.color === "transparent" ? "#f59e0b" : (checkpoint.color || "#f59e0b")}
               onChange={(e) => onUpdate({ color: e.target.value })}
               className="h-7 w-7 cursor-pointer rounded-full border-0 bg-transparent p-0"
             />

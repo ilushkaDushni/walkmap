@@ -198,8 +198,8 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
-          {/* Чекпоинты */}
-          {route.checkpoints?.map((cp) => {
+          {/* Чекпоинты — скрываем isEmpty и transparent для пользователя */}
+          {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
             const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
             return (
               <Marker
@@ -207,26 +207,12 @@ export default function RouteMapLeaflet({ route }) {
                 longitude={cp.position.lng}
                 latitude={cp.position.lat}
               >
-                {cp.isEmpty ? (
-                <div
-                  style={{
-                    width: isActive ? 18 : 14,
-                    height: isActive ? 18 : 14,
-                    borderRadius: "50%",
-                    border: `2px dashed ${isActive ? "#ef4444" : (cp.color || "#f59e0b")}`,
-                    background: "transparent",
-                    boxShadow: isActive ? `0 0 8px ${(cp.color || "#f59e0b")}88` : "0 1px 4px rgba(0,0,0,.2)",
-                    animation: isActive ? "pulse 2s infinite" : "none",
-                  }}
-                />
-              ) : (
                 <Dot
                   color={isActive ? "#ef4444" : (cp.color || "#f59e0b")}
                   size={isActive ? 18 : 14}
                   label={cp.order + 1}
                   pulse={isActive}
                 />
-              )}
               </Marker>
             );
           })}
@@ -348,9 +334,11 @@ export default function RouteMapLeaflet({ route }) {
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: currentEvent.data.color || "#f59e0b" }}>
-                        {currentEvent.data.order + 1}
-                      </div>
+                      {currentEvent.data.color !== "transparent" && (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: currentEvent.data.color || "#f59e0b" }}>
+                          {currentEvent.data.order + 1}
+                        </div>
+                      )}
                       <h3 className="text-base font-bold text-[var(--text-primary)]">
                         {currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`}
                       </h3>

@@ -256,8 +256,12 @@ export function buildRouteEvents(path, checkpoints = [], segments = [], finish =
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2 || !checkpoints?.length) return [path];
 
-  // Проецируем все чекпоинты на путь и сортируем по позиции
-  const splits = checkpoints
+  // Только isDivider чекпоинты разбивают путь
+  const dividers = checkpoints.filter((cp) => cp.isDivider);
+  if (dividers.length === 0) return [path];
+
+  // Проецируем разделители на путь и сортируем по позиции
+  const splits = dividers
     .map((cp) => projectPointOnPath(cp.position, path))
     .filter(Boolean)
     .sort((a, b) => a.pathIndex - b.pathIndex || a.fraction - b.fraction);

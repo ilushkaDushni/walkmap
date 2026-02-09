@@ -3,7 +3,7 @@
 import { useRef, useCallback, useMemo, useState } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { projectPointOnPath, splitPathByCheckpoints } from "@/lib/geo";
+import { projectPointOnPath, splitPathByCheckpoints, haversineDistance } from "@/lib/geo";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -149,11 +149,13 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
             }}
           />
         ) : (
-          <Dot
-            color={isSelected ? "#ef4444" : (cp.color || "#f59e0b")}
-            size={16}
-            label={cp.order + 1}
-          />
+          <div style={{ opacity: cp.color === "transparent" ? 0.25 : 1 }}>
+            <Dot
+              color={isSelected ? "#ef4444" : (cp.color === "transparent" ? "#9ca3af" : (cp.color || "#f59e0b"))}
+              size={16}
+              label={cp.order + 1}
+            />
+          </div>
         )}
         {/* Крестик при hover (десктоп) */}
         <div
@@ -372,16 +374,27 @@ export default function LeafletMapInner({
           setHoveredSegmentIndex(e.features[0].properties.pathIndex);
         }
       }
-      if (mode === "addCheckpoint" && path.length >= 2) {
-        const proj = projectPointOnPath({ lat: e.lngLat.lat, lng: e.lngLat.lng }, path);
-        if (proj && proj.distance < 50) {
-          setGhostDot(proj.position);
+      if (mode === "addCheckpoint") {
+        const cursorPos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        // Прячем ghost dot если курсор рядом с существующим чекпоинтом
+        const nearExisting = checkpoints.some(
+          (cp) => haversineDistance(cursorPos, cp.position) < 30
+        );
+        if (nearExisting) {
+          setGhostDot(null);
+        } else if (path.length >= 2) {
+          const proj = projectPointOnPath(cursorPos, path);
+          if (proj && proj.distance < 50) {
+            setGhostDot(proj.position);
+          } else {
+            setGhostDot(null);
+          }
         } else {
           setGhostDot(null);
         }
       }
     },
-    [mode, path]
+    [mode, path, checkpoints]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -555,7 +568,7 @@ export default function LeafletMapInner({
           key={cp.id}
           cp={cp}
           isSelected={selectedCheckpointId === cp.id}
-          isDraggable={mode === "addCheckpoint"}
+          isDraggable={mode !== "view"}
           onClick={onCheckpointClick}
           onDrag={onCheckpointDrag}
           onDelete={onCheckpointDelete}
