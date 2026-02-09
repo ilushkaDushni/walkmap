@@ -164,10 +164,12 @@ export default function ProfileModal({ isOpen, onClose }) {
           </div>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">{user.username}</h2>
           <p className="text-sm text-[var(--text-muted)]">{user.email}</p>
-          {user.role === "admin" && (
-            <span className="mt-1 flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
+          {(user.role === "admin" || user.role === "moderator") && (
+            <span className={`mt-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              user.role === "admin" ? "bg-blue-500/20 text-blue-500" : "bg-red-500/20 text-red-500"
+            }`}>
               <Shield className="h-3 w-3" />
-              Админ
+              {user.role === "admin" ? "Админ" : "Модератор"}
             </span>
           )}
         </div>

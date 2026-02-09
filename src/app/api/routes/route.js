@@ -12,14 +12,14 @@ export async function GET(request) {
   const auth = request.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const payload = await verifyAccessToken(auth.slice(7));
-    if (payload?.role === "admin") isAdmin = true;
+    if (payload?.role === "admin" || payload?.role === "moderator") isAdmin = true;
   }
 
   const filter = isAdmin ? {} : { status: "published" };
   const routes = await db
     .collection("routes")
     .find(filter)
-    .sort({ createdAt: -1 })
+    .sort({ sortOrder: 1, createdAt: -1 })
     .toArray();
 
   return NextResponse.json(routes);
@@ -49,6 +49,8 @@ export async function POST(request) {
     finish: null,
     mapCenter: { lat: 47.2357, lng: 39.7015 },
     mapZoom: 14,
+    folderIds: [],
+    sortOrder: 0,
     status: "draft",
     createdBy: payload.userId,
     createdAt: now,

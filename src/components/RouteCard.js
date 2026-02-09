@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { TrendingUp, Clock, Pencil } from "lucide-react";
+import { TrendingUp, Clock, Pencil, Shield } from "lucide-react";
 import { normalizeCoverImage, coverImageStyle } from "@/lib/coverImage";
 import RouteCardMiniMap from "@/components/RouteCardMiniMap";
 
-export default function RouteCard({ route, isAdmin }) {
+export default function RouteCard({ route, isAdmin, onToggleHidden }) {
   return (
     <Link
       href={`/routes/${route._id}`}
@@ -38,16 +38,33 @@ export default function RouteCard({ route, isAdmin }) {
           {route.checkpoints?.length || 0} точек
         </span>
         {isAdmin && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.location.href = `/admin/routes?edit=${route._id}`;
-            }}
-            className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[var(--text-muted)] shadow-sm transition hover:text-blue-500"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
+          <div className="absolute left-3 top-3 flex gap-2">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = `/admin/routes?edit=${route._id}`;
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-surface)] text-[var(--text-muted)] shadow-sm transition hover:text-blue-500"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleHidden?.(route._id, !route._hidden);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition ${
+                route._hidden
+                  ? "bg-red-500 text-white hover:bg-red-600"
+                  : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-orange-500"
+              }`}
+              title={route._hidden ? "Скрыт — нажмите чтобы показать" : "Виден — нажмите чтобы скрыть"}
+            >
+              <Shield className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 

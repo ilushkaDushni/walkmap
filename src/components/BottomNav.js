@@ -17,7 +17,7 @@ export default function BottomNav() {
   const [adminOpen, setAdminOpen] = useState(false);
 
   const isRoutesActive = pathname === "/routes" || pathname.startsWith("/routes/");
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "moderator";
 
   return (
     <>

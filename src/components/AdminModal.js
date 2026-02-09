@@ -31,7 +31,7 @@ export default function AdminModal({ isOpen, onClose }) {
       icon: Users,
       title: "Пользователи",
       description: "Управление пользователями и ролями",
-      action: null,
+      action: () => { router.push("/admin/users"); onClose(); },
     },
     {
       icon: BarChart3,

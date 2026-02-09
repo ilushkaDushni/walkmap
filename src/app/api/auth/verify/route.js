@@ -26,7 +26,10 @@ export async function POST(request) {
     email: pending.email,
     passwordHash: pending.passwordHash,
     role: "user",
+    coins: 0,
+    banned: false,
     createdAt: new Date(),
+    lastLoginAt: new Date(),
   });
 
   // Удаляем pending

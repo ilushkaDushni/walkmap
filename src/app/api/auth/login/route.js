@@ -22,7 +22,17 @@ export async function POST(request) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
+  if (user.banned) {
+    return NextResponse.json({ error: "Аккаунт заблокирован" }, { status: 403 });
+  }
+
   const userId = user._id.toString();
+
+  // Обновляем lastLoginAt
+  await db.collection("users").updateOne(
+    { _id: user._id },
+    { $set: { lastLoginAt: new Date() } }
+  );
 
   const accessToken = await signAccessToken({ userId, role: user.role });
   const refreshToken = generateRefreshToken();

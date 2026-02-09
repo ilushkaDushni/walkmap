@@ -16,7 +16,7 @@ export async function requireAdmin(request) {
     return { error: NextResponse.json({ error: "Невалидный токен" }, { status: 401 }) };
   }
 
-  if (payload.role !== "admin") {
+  if (payload.role !== "admin" && payload.role !== "moderator") {
     return { error: NextResponse.json({ error: "Нет прав администратора" }, { status: 403 }) };
   }
 

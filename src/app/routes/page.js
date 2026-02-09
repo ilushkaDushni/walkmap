@@ -4,20 +4,60 @@ import { getDb } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
+// Хелпер: folderIds из маршрута (совместимость со старым folderId)
+function getFolderIds(r) {
+  if (Array.isArray(r.folderIds)) return r.folderIds.map(String);
+  if (r.folderId) return [String(r.folderId)];
+  return [];
+}
+
 export default async function RoutesPage() {
   const db = await getDb();
-  const routes = await db
-    .collection("routes")
-    .find({ status: "published" })
-    .sort({ createdAt: -1 })
-    .toArray();
 
-  // Сериализация ObjectId для клиента
-  const serialized = routes.map((r) => ({
-    ...r,
-    _id: r._id.toString(),
-    createdBy: r.createdBy?.toString?.() || null,
-  }));
+  const [routes, folders] = await Promise.all([
+    db
+      .collection("routes")
+      .find({ status: "published" })
+      .sort({ sortOrder: 1, createdAt: -1 })
+      .toArray(),
+    db.collection("folders").find({}).toArray(),
+  ]);
+
+  // Map папок
+  const folderMap = {};
+  for (const f of folders) {
+    folderMap[f._id.toString()] = f;
+  }
+
+  // Определяем скрытость маршрута
+  const serialized = routes.map((r) => {
+    const rid = r._id.toString();
+    let hidden = false;
+
+    // Маршрут сам adminOnly
+    if (r.adminOnly) {
+      hidden = true;
+    } else {
+      // Проверяем папки: маршрут скрыт если ВСЕ его папки — adminOnly и он не в исключениях
+      const fids = getFolderIds(r);
+      if (fids.length > 0) {
+        const allFoldersHide = fids.every((fid) => {
+          const folder = folderMap[fid];
+          if (!folder?.adminOnly) return false; // папка не скрытая — не прячет
+          const exceptions = folder.exceptions || [];
+          return !exceptions.includes(rid);
+        });
+        if (allFoldersHide) hidden = true;
+      }
+    }
+
+    return {
+      ...r,
+      _id: rid,
+      createdBy: r.createdBy?.toString?.() || null,
+      _hidden: hidden,
+    };
+  });
 
   return (
     <div className="mx-auto max-w-lg px-4 pt-4">
