@@ -46,6 +46,14 @@ export async function GET(request) {
     completedMap[s._id] = s.count;
   }
 
+  // Сортировка по роли: moderator → admin → user
+  const rolePriority = { moderator: 0, admin: 1, user: 2 };
+  users.sort((a, b) => {
+    const ra = rolePriority[a.role] ?? 2;
+    const rb = rolePriority[b.role] ?? 2;
+    return ra - rb;
+  });
+
   const result = users.map((u) => ({
     _id: u._id.toString(),
     username: u.username || u.email || "—",
