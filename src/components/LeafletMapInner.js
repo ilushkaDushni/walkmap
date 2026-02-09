@@ -114,7 +114,7 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
         const pos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
         if (path && path.length >= 2) {
           const proj = projectPointOnPath(pos, path);
-          if (proj) {
+          if (proj && proj.distance < 50) {
             onDrag?.(cp.id, proj.position);
             return;
           }
@@ -124,7 +124,7 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
     >
       <div
         className="group relative"
-        onClick={() => onClick?.(cp.id)}
+        onClick={(e) => { e.stopPropagation(); onClick?.(cp.id); }}
         onContextMenu={(e) => {
           e.preventDefault();
           if (window.confirm(`Удалить точку #${cp.order + 1}?`)) {
@@ -298,14 +298,21 @@ export default function LeafletMapInner({
         return;
       }
 
-      // В режиме addCheckpoint — snap к пути
-      if (mode === "addCheckpoint" && path.length >= 2) {
-        const proj = projectPointOnPath({ lat: e.lngLat.lat, lng: e.lngLat.lng }, path);
-        if (proj) {
-          onMapClick?.(proj.position, mode);
-          setGhostDot(null);
-          return;
+      // В режиме addCheckpoint — snap к пути если рядом, иначе ставим где кликнули
+      if (mode === "addCheckpoint") {
+        const clickPos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        if (path.length >= 2) {
+          const proj = projectPointOnPath(clickPos, path);
+          // Snap если ближе 50 метров к маршруту
+          if (proj && proj.distance < 50) {
+            onMapClick?.(proj.position, mode);
+            setGhostDot(null);
+            return;
+          }
         }
+        onMapClick?.(clickPos, mode);
+        setGhostDot(null);
+        return;
       }
 
       // В режиме addSegment — обрабатываем клик по отрезку
@@ -367,8 +374,10 @@ export default function LeafletMapInner({
       }
       if (mode === "addCheckpoint" && path.length >= 2) {
         const proj = projectPointOnPath({ lat: e.lngLat.lat, lng: e.lngLat.lng }, path);
-        if (proj) {
+        if (proj && proj.distance < 50) {
           setGhostDot(proj.position);
+        } else {
+          setGhostDot(null);
         }
       }
     },
