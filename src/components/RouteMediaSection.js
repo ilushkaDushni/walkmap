@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useUser } from "@/components/UserProvider";
-import { Upload, Trash2, Image } from "lucide-react";
+import { Upload, Trash2, Image, Pencil } from "lucide-react";
 import { validateFile } from "@/lib/validateFile";
 import AudioPlayer from "@/components/AudioPlayer";
+import CoverImageEditor from "@/components/CoverImageEditor";
+import { normalizeCoverImage, coverImageStyle } from "@/lib/coverImage";
 
 export default function RouteMediaSection({ route, updateRoute }) {
   const { authFetch } = useUser();
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const uploadFile = async (file, type) => {
     const formData = new FormData();
@@ -27,7 +31,11 @@ export default function RouteMediaSection({ route, updateRoute }) {
     const v = validateFile(file, "photo");
     if (!v.ok) { alert(v.error); e.target.value = ""; return; }
     const url = await uploadFile(file, "photo");
-    if (url) updateRoute({ ...route, coverImage: url });
+    if (url) {
+      const newCover = { url, posX: 50, posY: 50, zoom: 1 };
+      updateRoute({ ...route, coverImage: newCover });
+      setEditorOpen(true);
+    }
     e.target.value = "";
   };
 
@@ -72,18 +80,39 @@ export default function RouteMediaSection({ route, updateRoute }) {
       {/* Обложка */}
       <div>
         <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Обложка</p>
-        <div className="flex items-center gap-3">
-          {route.coverImage ? (
-            <div className="relative h-20 w-32 rounded-xl overflow-hidden">
-              <img src={route.coverImage} alt="" className="h-full w-full object-cover" />
-              <button
-                onClick={() => updateRoute({ ...route, coverImage: "" })}
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition"
-              >
-                <Trash2 className="h-5 w-5 text-white" />
-              </button>
-            </div>
-          ) : (
+        {(() => {
+          const cover = normalizeCoverImage(route.coverImage);
+          if (cover) {
+            const style = coverImageStyle(cover);
+            return (
+              <div className="flex items-center gap-3">
+                <div
+                  className="relative h-20 w-32 shrink-0 rounded-xl overflow-hidden cursor-pointer group/cover"
+                  onClick={() => setEditorOpen(true)}
+                >
+                  <img
+                    src={cover.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    style={{
+                      ...style,
+                      transformOrigin: `${cover.posX}% ${cover.posY}%`,
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition">
+                    <Pencil className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditorOpen(true)}
+                  className="text-xs text-[var(--text-muted)] hover:text-green-500 transition"
+                >
+                  Настроить
+                </button>
+              </div>
+            );
+          }
+          return (
             <label className="flex h-20 w-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-muted)] hover:border-green-500 hover:text-green-500 transition">
               <div className="flex flex-col items-center gap-1">
                 <Image className="h-6 w-6" />
@@ -96,9 +125,19 @@ export default function RouteMediaSection({ route, updateRoute }) {
                 className="hidden"
               />
             </label>
-          )}
-        </div>
+          );
+        })()}
       </div>
+
+      {/* Модалка редактора обложки */}
+      <CoverImageEditor
+        cover={normalizeCoverImage(route.coverImage)}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        onSave={(newCover) => updateRoute({ ...route, coverImage: newCover })}
+        onReplace={(e) => { handleCoverUpload(e); }}
+        onDelete={() => { updateRoute({ ...route, coverImage: null }); setEditorOpen(false); }}
+      />
 
       {/* Фото */}
       <div>

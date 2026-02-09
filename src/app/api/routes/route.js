@@ -37,7 +37,7 @@ export async function POST(request) {
     title: "Новый маршрут",
     description: "",
     intro: "",
-    coverImage: "",
+    coverImage: null,
     distance: 0,
     duration: 0,
     path: [],

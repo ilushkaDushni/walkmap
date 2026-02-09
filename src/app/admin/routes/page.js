@@ -113,7 +113,7 @@ export default function AdminRoutesPage() {
                 onClick={() => setEditingRouteId(route._id)}
               >
                 {route.coverImage ? (
-                  <img src={route.coverImage} alt="" className="h-full w-full object-cover" />
+                  <img src={typeof route.coverImage === "string" ? route.coverImage : route.coverImage.url} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[var(--text-muted)]">
                     <Eye className="h-5 w-5" />

@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { MapPin, TrendingUp, Clock, Pencil } from "lucide-react";
+import { TrendingUp, Clock, Pencil } from "lucide-react";
+import { normalizeCoverImage, coverImageStyle } from "@/lib/coverImage";
+import RouteCardMiniMap from "@/components/RouteCardMiniMap";
 
 export default function RouteCard({ route, isAdmin }) {
   return (
@@ -8,18 +10,30 @@ export default function RouteCard({ route, isAdmin }) {
       className="group block overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-md"
     >
       {/* Обложка */}
-      <div className="relative h-48 overflow-hidden bg-[var(--bg-elevated)]">
-        {route.coverImage ? (
-          <img
-            src={route.coverImage}
-            alt={route.title}
-            className="h-full w-full object-cover transition group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-[var(--text-muted)]">
-            <MapPin className="h-16 w-16" strokeWidth={1} />
-          </div>
-        )}
+      <div className="relative h-48 overflow-hidden bg-[var(--bg-elevated)] transition group-hover:scale-[1.02]">
+        {(() => {
+          const cover = normalizeCoverImage(route.coverImage);
+          if (cover) {
+            const style = coverImageStyle(cover);
+            return (
+              <img
+                src={cover.url}
+                alt={route.title}
+                className="h-full w-full object-cover"
+                style={{
+                  ...style,
+                  transformOrigin: `${cover.posX}% ${cover.posY}%`,
+                }}
+              />
+            );
+          }
+          return (
+            <RouteCardMiniMap
+              path={route.path}
+              checkpoints={route.checkpoints}
+            />
+          );
+        })()}
         <span className="absolute right-3 top-3 rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] shadow-sm">
           {route.checkpoints?.length || 0} точек
         </span>

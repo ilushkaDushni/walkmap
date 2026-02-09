@@ -21,7 +21,10 @@ export default function useOfflineDownload(route) {
       // Собираем все URL медиа
       const urls = new Set();
 
-      if (route.coverImage) urls.add(route.coverImage);
+      if (route.coverImage) {
+        const coverUrl = typeof route.coverImage === "string" ? route.coverImage : route.coverImage.url;
+        if (coverUrl) urls.add(coverUrl);
+      }
       route.photos?.forEach((u) => urls.add(u));
       route.audio?.forEach((u) => urls.add(u));
       route.checkpoints?.forEach((cp) => {
