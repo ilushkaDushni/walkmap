@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { put, del } from "@vercel/blob";
 import { randomBytes } from "crypto";
 
 const ALLOWED = {
@@ -48,13 +47,26 @@ export async function POST(request) {
 
   const ext = file.name.split(".").pop().toLowerCase();
   const filename = `${randomBytes(12).toString("hex")}.${ext}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", config.dir);
 
-  await mkdir(uploadDir, { recursive: true });
+  const { url } = await put(`${config.dir}/${filename}`, file, {
+    access: "public",
+    contentType: file.type,
+  });
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadDir, filename), buffer);
-
-  const url = `/uploads/${config.dir}/${filename}`;
   return NextResponse.json({ url });
+}
+
+// DELETE /api/upload — удаление файла (admin only)
+export async function DELETE(request) {
+  const { payload, error } = await requireAdmin(request);
+  if (error) return error;
+
+  const { url } = await request.json();
+
+  if (!url) {
+    return NextResponse.json({ error: "URL не указан" }, { status: 400 });
+  }
+
+  await del(url);
+  return NextResponse.json({ ok: true });
 }

@@ -40,6 +40,9 @@ yarn-error.log*
 public/sw*
 public/swe-worker*
 
+# uploads (хранятся в Vercel Blob)
+public/uploads
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
