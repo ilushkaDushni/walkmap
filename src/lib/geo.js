@@ -148,6 +148,44 @@ export function sortKeyToProgress(sortKey, cumDist) {
 }
 
 /**
+ * Проецирует точку на ближайшую позицию на пути.
+ * Возвращает { position, pathIndex, fraction, distance }.
+ * @param {{ lat: number, lng: number }} point
+ * @param {{ lat: number, lng: number }[]} path
+ * @returns {{ position: { lat: number, lng: number }, pathIndex: number, fraction: number, distance: number } | null}
+ */
+export function projectPointOnPath(point, path) {
+  if (!path || path.length < 2) return null;
+  let bestIdx = 0;
+  let bestFrac = 0;
+  let bestDist = Infinity;
+  let bestPos = null;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const dx = path[i + 1].lng - path[i].lng;
+    const dy = path[i + 1].lat - path[i].lat;
+    const lenSq = dx * dx + dy * dy;
+    let t = 0;
+    if (lenSq > 0) {
+      t = ((point.lng - path[i].lng) * dx + (point.lat - path[i].lat) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+    }
+    const closest = {
+      lat: path[i].lat + t * dy,
+      lng: path[i].lng + t * dx,
+    };
+    const dist = haversineDistance(point, closest);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+      bestFrac = t;
+      bestPos = closest;
+    }
+  }
+  return { position: bestPos, pathIndex: bestIdx, fraction: bestFrac, distance: bestDist };
+}
+
+/**
  * Доля проекции точки на отрезок (0 = начало, 1 = конец).
  */
 function projectionFraction(point, lineStart, lineEnd) {
@@ -205,4 +243,45 @@ export function buildRouteEvents(path, checkpoints = [], segments = [], finish =
 
   events.sort((a, b) => a.sortKey - b.sortKey);
   return events;
+}
+
+/**
+ * Разбивает путь на сегменты по позициям чекпоинтов.
+ * Возвращает массив подпутей (каждый — массив {lat, lng}).
+ * Чередующиеся цвета отображают разбиение.
+ * @param {{ lat: number, lng: number }[]} path
+ * @param {Object[]} checkpoints — с полем position
+ * @returns {{ lat: number, lng: number }[][] }
+ */
+export function splitPathByCheckpoints(path, checkpoints) {
+  if (!path || path.length < 2 || !checkpoints?.length) return [path];
+
+  // Проецируем все чекпоинты на путь и сортируем по позиции
+  const splits = checkpoints
+    .map((cp) => projectPointOnPath(cp.position, path))
+    .filter(Boolean)
+    .sort((a, b) => a.pathIndex - b.pathIndex || a.fraction - b.fraction);
+
+  if (splits.length === 0) return [path];
+
+  const segments = [];
+  let currentSegment = [{ lat: path[0].lat, lng: path[0].lng }];
+  let splitIdx = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    // Добавляем точки разбиения на этом ребре
+    while (splitIdx < splits.length && splits[splitIdx].pathIndex === i) {
+      const sp = splits[splitIdx];
+      currentSegment.push({ lat: sp.position.lat, lng: sp.position.lng });
+      segments.push(currentSegment);
+      currentSegment = [{ lat: sp.position.lat, lng: sp.position.lng }];
+      splitIdx++;
+    }
+    currentSegment.push({ lat: path[i + 1].lat, lng: path[i + 1].lng });
+  }
+
+  // Добавляем оставшиеся split-точки (если pathIndex === last edge)
+  if (currentSegment.length > 0) segments.push(currentSegment);
+
+  return segments;
 }

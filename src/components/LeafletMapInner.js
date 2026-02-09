@@ -3,6 +3,7 @@
 import { useRef, useCallback, useMemo, useState } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { projectPointOnPath, splitPathByCheckpoints } from "@/lib/geo";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -85,7 +86,7 @@ function PathPointMarker({ index, point, onDrag, onDelete }) {
 }
 
 // Маркер чекпоинта с крестиком удаления
-function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDelete }) {
+function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDelete, path }) {
   const longPressRef = useRef(null);
 
   const startLongPress = useCallback(() => {
@@ -110,7 +111,15 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
       draggable={isDraggable}
       onDragEnd={(e) => {
         cancelLongPress();
-        onDrag?.(cp.id, { lat: e.lngLat.lat, lng: e.lngLat.lng });
+        const pos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        if (path && path.length >= 2) {
+          const proj = projectPointOnPath(pos, path);
+          if (proj) {
+            onDrag?.(cp.id, proj.position);
+            return;
+          }
+        }
+        onDrag?.(cp.id, pos);
       }}
     >
       <div
@@ -127,11 +136,25 @@ function CheckpointMarker({ cp, isSelected, isDraggable, onClick, onDrag, onDele
         onTouchMove={cancelLongPress}
         style={{ padding: 6, margin: -6 }}
       >
-        <Dot
-          color={isSelected ? "#ef4444" : "#f59e0b"}
-          size={16}
-          label={cp.order + 1}
-        />
+        {cp.isEmpty ? (
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              border: `2px dashed ${isSelected ? "#ef4444" : (cp.color || "#f59e0b")}`,
+              background: "transparent",
+              boxShadow: "0 1px 4px rgba(0,0,0,.2)",
+              cursor: "pointer",
+            }}
+          />
+        ) : (
+          <Dot
+            color={isSelected ? "#ef4444" : (cp.color || "#f59e0b")}
+            size={16}
+            label={cp.order + 1}
+          />
+        )}
         {/* Крестик при hover (десктоп) */}
         <div
           className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center"
@@ -212,6 +235,7 @@ export default function LeafletMapInner({
 }) {
   const mapRef = useRef(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
+  const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
 
   // fitBounds к маршруту если есть достаточно точек
   const routeBounds = useMemo(() => {
@@ -274,6 +298,16 @@ export default function LeafletMapInner({
         return;
       }
 
+      // В режиме addCheckpoint — snap к пути
+      if (mode === "addCheckpoint" && path.length >= 2) {
+        const proj = projectPointOnPath({ lat: e.lngLat.lat, lng: e.lngLat.lng }, path);
+        if (proj) {
+          onMapClick?.(proj.position, mode);
+          setGhostDot(null);
+          return;
+        }
+      }
+
       // В режиме addSegment — обрабатываем клик по отрезку
       if (mode === "addSegment") {
         if (e.features && e.features.length > 0) {
@@ -287,17 +321,21 @@ export default function LeafletMapInner({
     [mode, onMapClick, onSegmentLineClick, onPathInsert]
   );
 
-  // GeoJSON для линии пути
-  const pathGeoJson = useMemo(() => {
+  // GeoJSON для линии пути — разбитый по чекпоинтам на чередующиеся сегменты
+  const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
+  const pathSegmentsGeoJson = useMemo(() => {
     if (path.length < 2) return null;
-    return {
+    const parts = splitPathByCheckpoints(path, checkpoints);
+    const features = parts.map((segment, i) => ({
       type: "Feature",
+      properties: { colorIndex: i % 2 },
       geometry: {
         type: "LineString",
-        coordinates: path.map((p) => [p.lng, p.lat]),
+        coordinates: segment.map((p) => [p.lng, p.lat]),
       },
-    };
-  }, [path]);
+    }));
+    return { type: "FeatureCollection", features };
+  }, [path, checkpoints]);
 
   // GeoJSON FeatureCollection: каждый отрезок пути — отдельный Feature (для сегментов)
   const segmentLinesGeoJson = useMemo(() => {
@@ -319,19 +357,27 @@ export default function LeafletMapInner({
     return { type: "FeatureCollection", features };
   }, [path]);
 
-  // Обработчики hover на слое сегментов
+  // Обработчики hover на слое сегментов + ghost dot для addCheckpoint
   const handleMouseMove = useCallback(
     (e) => {
-      if (mode !== "addSegment") return;
-      if (e.features && e.features.length > 0) {
-        setHoveredSegmentIndex(e.features[0].properties.pathIndex);
+      if (mode === "addSegment") {
+        if (e.features && e.features.length > 0) {
+          setHoveredSegmentIndex(e.features[0].properties.pathIndex);
+        }
+      }
+      if (mode === "addCheckpoint" && path.length >= 2) {
+        const proj = projectPointOnPath({ lat: e.lngLat.lat, lng: e.lngLat.lng }, path);
+        if (proj) {
+          setGhostDot(proj.position);
+        }
       }
     },
-    [mode]
+    [mode, path]
   );
 
   const handleMouseLeave = useCallback(() => {
     setHoveredSegmentIndex(null);
+    setGhostDot(null);
   }, []);
 
   // Фильтры для слоёв
@@ -387,14 +433,25 @@ export default function LeafletMapInner({
       cursor={cursor}
       attributionControl={true}
     >
-      {/* Линия пути */}
-      {pathGeoJson && (
-        <Source id="route-path" type="geojson" data={pathGeoJson}>
+      {/* Линия пути — чередующиеся цвета по чекпоинтам */}
+      {pathSegmentsGeoJson && (
+        <Source id="route-path" type="geojson" data={pathSegmentsGeoJson}>
           <Layer
-            id="route-path-line"
+            id="route-path-line-0"
             type="line"
+            filter={["==", ["get", "colorIndex"], 0]}
             paint={{
-              "line-color": "#3b82f6",
+              "line-color": PATH_COLORS[0],
+              "line-width": 3,
+              "line-opacity": 0.8,
+            }}
+          />
+          <Layer
+            id="route-path-line-1"
+            type="line"
+            filter={["==", ["get", "colorIndex"], 1]}
+            paint={{
+              "line-color": PATH_COLORS[1],
               "line-width": 3,
               "line-opacity": 0.8,
             }}
@@ -493,8 +550,27 @@ export default function LeafletMapInner({
           onClick={onCheckpointClick}
           onDrag={onCheckpointDrag}
           onDelete={onCheckpointDelete}
+          path={path}
         />
       ))}
+
+      {/* Ghost dot — превью чекпоинта при наведении */}
+      {mode === "addCheckpoint" && ghostDot && (
+        <Marker longitude={ghostDot.lng} latitude={ghostDot.lat}>
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "#f59e0b",
+              border: "2px solid white",
+              boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+              opacity: 0.5,
+              pointerEvents: "none",
+            }}
+          />
+        </Marker>
+      )}
 
       {/* Финиш */}
       {finish?.position && (

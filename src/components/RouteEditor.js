@@ -366,7 +366,7 @@ export default function RouteEditor({ routeId, onSaved }) {
   );
   handleSegmentDeleteRef.current = handleSegmentDelete;
 
-  // Переупорядочивание чекпоинтов
+  // Переупорядочивание чекпоинтов (стрелками)
   const handleCheckpointReorder = useCallback(
     (id, direction) => {
       updateRoute((prev) => {
@@ -381,6 +381,25 @@ export default function RouteEditor({ routeId, onSaved }) {
         cps[idx] = { ...cps[idx], order: orderB };
         cps[swapIdx] = { ...cps[swapIdx], order: orderA };
         return { ...prev, checkpoints: cps };
+      });
+    },
+    [updateRoute]
+  );
+
+  // Переупорядочивание чекпоинтов (по номеру)
+  const handleCheckpointReorderTo = useCallback(
+    (id, newOrder) => {
+      updateRoute((prev) => {
+        const sorted = [...prev.checkpoints].sort((a, b) => a.order - b.order);
+        const currentIdx = sorted.findIndex((cp) => cp.id === id);
+        if (currentIdx === -1) return prev;
+        // Remove and reinsert at new position
+        const [item] = sorted.splice(currentIdx, 1);
+        const targetIdx = Math.max(0, Math.min(sorted.length, newOrder));
+        sorted.splice(targetIdx, 0, item);
+        // Re-assign orders
+        const reordered = sorted.map((cp, i) => ({ ...cp, order: i }));
+        return { ...prev, checkpoints: reordered };
       });
     },
     [updateRoute]
@@ -520,7 +539,7 @@ export default function RouteEditor({ routeId, onSaved }) {
           onClick={() => { setSelectedCheckpointId(null); setSelectedSegmentIndex(null); }}
         >
           <div
-            className="w-full max-w-lg mx-0 sm:mx-4 max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl"
+            className="w-full max-w-lg mx-0 sm:mx-4 max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl pb-20 sm:pb-0"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Навигация: тип + номер */}
@@ -586,6 +605,7 @@ export default function RouteEditor({ routeId, onSaved }) {
                   onDelete={() => handleCheckpointDelete(selectedCheckpoint.id)}
                   onClose={() => setSelectedCheckpointId(null)}
                   onReorder={handleCheckpointReorder}
+                  onReorderTo={handleCheckpointReorderTo}
                   totalCheckpoints={route.checkpoints.length}
                 />
               )}
@@ -654,9 +674,9 @@ export default function RouteEditor({ routeId, onSaved }) {
 
       {/* Модалка предпросмотра */}
       {showPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-2xl mx-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full sm:max-w-2xl sm:mx-4 h-full sm:h-auto sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)] shrink-0">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Предпросмотр маршрута</h3>
               <button
                 onClick={() => setShowPreview(false)}
@@ -665,7 +685,7 @@ export default function RouteEditor({ routeId, onSaved }) {
                 Закрыть
               </button>
             </div>
-            <div style={{ height: "70vh" }}>
+            <div className="flex-1 overflow-y-auto pb-6">
               <RouteMapLeaflet route={route} />
             </div>
           </div>

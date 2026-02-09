@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
-import { buildRouteEvents } from "@/lib/geo";
+import { buildRouteEvents, splitPathByCheckpoints } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -84,16 +84,20 @@ export default function RouteMapLeaflet({ route }) {
   const currentEvent = events[eventIndex] || null;
   const isLast = eventIndex >= events.length - 1;
 
-  const pathGeoJson = useMemo(() => {
+  const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
+  const pathSegmentsGeoJson = useMemo(() => {
     if (!route.path || route.path.length < 2) return null;
-    return {
+    const parts = splitPathByCheckpoints(route.path, route.checkpoints || []);
+    const features = parts.map((segment, i) => ({
       type: "Feature",
+      properties: { colorIndex: i % 2 },
       geometry: {
         type: "LineString",
-        coordinates: route.path.map((p) => [p.lng, p.lat]),
+        coordinates: segment.map((p) => [p.lng, p.lat]),
       },
-    };
-  }, [route.path]);
+    }));
+    return { type: "FeatureCollection", features };
+  }, [route.path, route.checkpoints]);
 
   // Подсветка текущего отрезка (если текущее событие — сегмент)
   const activeSegmentGeoJson = useMemo(() => {
@@ -153,14 +157,25 @@ export default function RouteMapLeaflet({ route }) {
           mapStyle={STYLE}
           attributionControl={true}
         >
-          {/* Путь */}
-          {pathGeoJson && (
-            <Source id="route-path" type="geojson" data={pathGeoJson}>
+          {/* Путь — чередующиеся цвета по чекпоинтам */}
+          {pathSegmentsGeoJson && (
+            <Source id="route-path" type="geojson" data={pathSegmentsGeoJson}>
               <Layer
-                id="route-path-line"
+                id="route-path-line-0"
                 type="line"
+                filter={["==", ["get", "colorIndex"], 0]}
                 paint={{
-                  "line-color": "#3b82f6",
+                  "line-color": PATH_COLORS[0],
+                  "line-width": 3,
+                  "line-opacity": 0.8,
+                }}
+              />
+              <Layer
+                id="route-path-line-1"
+                type="line"
+                filter={["==", ["get", "colorIndex"], 1]}
+                paint={{
+                  "line-color": PATH_COLORS[1],
                   "line-width": 3,
                   "line-opacity": 0.8,
                 }}
@@ -192,12 +207,26 @@ export default function RouteMapLeaflet({ route }) {
                 longitude={cp.position.lng}
                 latitude={cp.position.lat}
               >
+                {cp.isEmpty ? (
+                <div
+                  style={{
+                    width: isActive ? 18 : 14,
+                    height: isActive ? 18 : 14,
+                    borderRadius: "50%",
+                    border: `2px dashed ${isActive ? "#ef4444" : (cp.color || "#f59e0b")}`,
+                    background: "transparent",
+                    boxShadow: isActive ? `0 0 8px ${(cp.color || "#f59e0b")}88` : "0 1px 4px rgba(0,0,0,.2)",
+                    animation: isActive ? "pulse 2s infinite" : "none",
+                  }}
+                />
+              ) : (
                 <Dot
-                  color={isActive ? "#ef4444" : "#f59e0b"}
+                  color={isActive ? "#ef4444" : (cp.color || "#f59e0b")}
                   size={isActive ? 18 : 14}
                   label={cp.order + 1}
                   pulse={isActive}
                 />
+              )}
               </Marker>
             );
           })}
@@ -312,41 +341,47 @@ export default function RouteMapLeaflet({ route }) {
 
               {/* Чекпоинт */}
               {currentEvent.type === "checkpoint" && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
-                      {currentEvent.data.order + 1}
+                currentEvent.data.isEmpty ? (
+                  <p className="text-sm font-medium text-[var(--text-muted)] text-center py-2">
+                    Раздел #{currentEvent.data.order + 1}
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: currentEvent.data.color || "#f59e0b" }}>
+                        {currentEvent.data.order + 1}
+                      </div>
+                      <h3 className="text-base font-bold text-[var(--text-primary)]">
+                        {currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`}
+                      </h3>
                     </div>
-                    <h3 className="text-base font-bold text-[var(--text-primary)]">
-                      {currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`}
-                    </h3>
-                  </div>
-                  {currentEvent.data.description && (
-                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
-                      {currentEvent.data.description}
-                    </div>
-                  )}
-                  {currentEvent.data.photos?.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto">
-                      {currentEvent.data.photos.map((url, i) => (
-                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
-                      ))}
-                    </div>
-                  )}
-                  {currentEvent.data.audio?.length > 0 && (
-                    <AudioPlayer
-                      key={`cp-${eventIndex}`}
-                      urls={currentEvent.data.audio}
-                      autoPlay
-                      variant="full"
-                    />
-                  )}
-                  {currentEvent.data.coinsReward > 0 && (
-                    <p className="text-sm font-medium text-amber-600">
-                      +{currentEvent.data.coinsReward} монет
-                    </p>
-                  )}
-                </>
+                    {currentEvent.data.description && (
+                      <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                        {currentEvent.data.description}
+                      </div>
+                    )}
+                    {currentEvent.data.photos?.length > 0 && (
+                      <div className="flex gap-2 overflow-x-auto">
+                        {currentEvent.data.photos.map((url, i) => (
+                          <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                        ))}
+                      </div>
+                    )}
+                    {currentEvent.data.audio?.length > 0 && (
+                      <AudioPlayer
+                        key={`cp-${eventIndex}`}
+                        urls={currentEvent.data.audio}
+                        autoPlay
+                        variant="full"
+                      />
+                    )}
+                    {currentEvent.data.coinsReward > 0 && (
+                      <p className="text-sm font-medium text-amber-600">
+                        +{currentEvent.data.coinsReward} монет
+                      </p>
+                    )}
+                  </>
+                )
               )}
 
               {/* Финиш */}

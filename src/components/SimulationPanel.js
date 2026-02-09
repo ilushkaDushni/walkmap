@@ -228,39 +228,45 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
 
             {/* Чекпоинт */}
             {currentEvent.type === "checkpoint" && (
-              <>
-                <p className="text-xs font-medium text-amber-500">
-                  Точка #{currentEvent.data.order + 1}
+              currentEvent.data.isEmpty ? (
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  Раздел #{currentEvent.data.order + 1}
                 </p>
-                {currentEvent.data.title && (
-                  <p className="font-semibold text-[var(--text-primary)]">{currentEvent.data.title}</p>
-                )}
-                {currentEvent.data.description && (
-                  <div className="max-h-[30vh] overflow-y-auto scrollbar-thin text-xs text-[var(--text-muted)] whitespace-pre-wrap">
-                    {currentEvent.data.description}
-                  </div>
-                )}
-                {currentEvent.data.photos?.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto">
-                    {currentEvent.data.photos.map((url, i) => (
-                      <img key={i} src={url} alt="" className="h-16 w-16 rounded-lg object-cover shrink-0" />
-                    ))}
-                  </div>
-                )}
-                {currentEvent.data.audio?.length > 0 && (
-                  <AudioPlayer
-                    key={`sim-cp-${currentEventIndex}`}
-                    urls={currentEvent.data.audio}
-                    autoPlay={isPlaying}
-                    variant="full"
-                  />
-                )}
-                {currentEvent.data.coinsReward > 0 && (
-                  <p className="text-xs font-medium text-amber-600">
-                    +{currentEvent.data.coinsReward} монет
+              ) : (
+                <>
+                  <p className="text-xs font-medium" style={{ color: currentEvent.data.color || "#f59e0b" }}>
+                    Точка #{currentEvent.data.order + 1}
                   </p>
-                )}
-              </>
+                  {currentEvent.data.title && (
+                    <p className="font-semibold text-[var(--text-primary)]">{currentEvent.data.title}</p>
+                  )}
+                  {currentEvent.data.description && (
+                    <div className="max-h-[30vh] overflow-y-auto scrollbar-thin text-xs text-[var(--text-muted)] whitespace-pre-wrap">
+                      {currentEvent.data.description}
+                    </div>
+                  )}
+                  {currentEvent.data.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {currentEvent.data.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-16 w-16 rounded-lg object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {currentEvent.data.audio?.length > 0 && (
+                    <AudioPlayer
+                      key={`sim-cp-${currentEventIndex}`}
+                      urls={currentEvent.data.audio}
+                      autoPlay={isPlaying}
+                      variant="full"
+                    />
+                  )}
+                  {currentEvent.data.coinsReward > 0 && (
+                    <p className="text-xs font-medium text-amber-600">
+                      +{currentEvent.data.coinsReward} монет
+                    </p>
+                  )}
+                </>
+              )
             )}
 
             {/* Финиш */}
