@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
-import { buildRouteEvents, splitPathByCheckpoints } from "@/lib/geo";
+import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -99,26 +99,72 @@ export default function RouteMapLeaflet({ route }) {
     return { type: "FeatureCollection", features };
   }, [route.path, route.checkpoints]);
 
-  // Подсветка текущего отрезка (если текущее событие — сегмент)
+  // Подсветка текущего отрезка — учитывает isDivider чекпоинты
   const activeSegmentGeoJson = useMemo(() => {
     if (!currentEvent || !started) return null;
     const path = route.path;
-    if (currentEvent.type === "segment") {
-      const i = currentEvent.data.pathIndex;
-      if (i >= 0 && i < path.length - 1) {
-        return {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: [
-              [path[i].lng, path[i].lat],
-              [path[i + 1].lng, path[i + 1].lat],
-            ],
-          },
-        };
-      }
+    if (currentEvent.type !== "segment") return null;
+
+    const i = currentEvent.data.pathIndex;
+    if (i < 0 || i >= path.length - 1) return null;
+
+    const segStart = { lat: path[i].lat, lng: path[i].lng };
+    const segEnd = { lat: path[i + 1].lat, lng: path[i + 1].lng };
+
+    // Ищем isDivider чекпоинты на этом ребре
+    const dividers = (route.checkpoints || []).filter((cp) => cp.isDivider);
+    const splitsOnEdge = dividers
+      .map((cp) => {
+        const proj = projectPointOnPath(cp.position, path);
+        return proj && proj.pathIndex === i ? proj : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.fraction - b.fraction);
+
+    if (splitsOnEdge.length === 0) {
+      // Нет разделителей — подсвечиваем весь отрезок
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: [[segStart.lng, segStart.lat], [segEnd.lng, segEnd.lat]],
+        },
+      };
     }
-    return null;
+
+    // Подсвечиваем от начала ребра до первого разделителя
+    const firstSplit = splitsOnEdge[0];
+    return {
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [segStart.lng, segStart.lat],
+          [firstSplit.position.lng, firstSplit.position.lat],
+        ],
+      },
+    };
+  }, [currentEvent, started, route.path, route.checkpoints]);
+
+  // Подсветка после isDivider чекпоинта до конца ребра
+  const activeAfterDividerGeoJson = useMemo(() => {
+    if (!currentEvent || !started) return null;
+    if (currentEvent.type !== "checkpoint" || !currentEvent.data.isDivider) return null;
+    const path = route.path;
+    const proj = projectPointOnPath(currentEvent.data.position, path);
+    if (!proj) return null;
+    const i = proj.pathIndex;
+    if (i < 0 || i >= path.length - 1) return null;
+    return {
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: [
+          [proj.position.lng, proj.position.lat],
+          [path[i + 1].lng, path[i + 1].lat],
+        ],
+      },
+    };
   }, [currentEvent, started, route.path]);
 
   const center = route.mapCenter || { lat: 47.2357, lng: 39.7015 };
@@ -198,6 +244,21 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
+          {/* Подсветка после isDivider чекпоинта */}
+          {activeAfterDividerGeoJson && (
+            <Source id="active-after-divider" type="geojson" data={activeAfterDividerGeoJson}>
+              <Layer
+                id="active-after-divider-line"
+                type="line"
+                paint={{
+                  "line-color": "#f97316",
+                  "line-width": 6,
+                  "line-opacity": 1,
+                }}
+              />
+            </Source>
+          )}
+
           {/* Чекпоинты — скрываем isEmpty и transparent для пользователя */}
           {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
             const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
@@ -217,16 +278,24 @@ export default function RouteMapLeaflet({ route }) {
             );
           })}
 
-          {/* Финиш */}
+          {/* Финиш — шахматный флаг */}
           {route.finish?.position && (
             <Marker
               longitude={route.finish.position.lng}
               latitude={route.finish.position.lat}
             >
-              <Dot
-                color={started && currentEvent?.type === "finish" ? "#ef4444" : "#22c55e"}
-                size={16}
-                label="F"
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 3,
+                  background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 10px 10px",
+                  border: "2px solid white",
+                  boxShadow: started && currentEvent?.type === "finish"
+                    ? "0 0 10px #ef444488"
+                    : "0 1px 4px rgba(0,0,0,.3)",
+                  animation: started && currentEvent?.type === "finish" ? "pulse 2s infinite" : "none",
+                }}
               />
             </Marker>
           )}

@@ -604,7 +604,17 @@ export default function LeafletMapInner({
             onFinishDrag?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
           }}
         >
-          <Dot color="#22c55e" size={18} label="F" />
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 3,
+              background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 11px 11px",
+              border: "2px solid white",
+              boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+              cursor: "pointer",
+            }}
+          />
         </Marker>
       )}
 
