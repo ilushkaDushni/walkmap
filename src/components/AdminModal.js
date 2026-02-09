@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Shield, Route, Users, BarChart3 } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown } from "lucide-react";
+import { useUser } from "./UserProvider";
 
 export default function AdminModal({ isOpen, onClose }) {
   const router = useRouter();
+  const { hasPermission, hasAnyPermission } = useUser();
 
   useEffect(() => {
     if (isOpen) {
@@ -26,20 +28,30 @@ export default function AdminModal({ isOpen, onClose }) {
       title: "Управление маршрутами",
       description: "Добавление, редактирование и удаление маршрутов",
       action: () => { router.push("/admin/routes"); onClose(); },
+      visible: hasAnyPermission("routes.create", "routes.edit", "routes.delete"),
     },
     {
       icon: Users,
       title: "Пользователи",
       description: "Управление пользователями и ролями",
       action: () => { router.push("/admin/users"); onClose(); },
+      visible: hasPermission("users.view"),
+    },
+    {
+      icon: Crown,
+      title: "Роли",
+      description: "Управление ролями и правами",
+      action: () => { router.push("/admin/roles"); onClose(); },
+      visible: hasPermission("roles.manage"),
     },
     {
       icon: BarChart3,
       title: "Статистика",
       description: "Просмотр активности и аналитики",
       action: null,
+      visible: true,
     },
-  ];
+  ].filter((s) => s.visible);
 
   return (
     <>

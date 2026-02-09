@@ -1,6 +1,8 @@
 import { getDb } from "@/lib/mongodb";
 import { signAccessToken, generateRefreshToken } from "@/lib/tokens";
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
+import { buildUserResponse } from "@/lib/permissions";
 
 export async function POST(request) {
   const cookieHeader = request.cookies.get("refreshToken");
@@ -28,8 +30,6 @@ export async function POST(request) {
     return res;
   }
 
-  // Fetch user to get current role
-  const { ObjectId } = await import("mongodb");
   const user = await db.collection("users").findOne({ _id: new ObjectId(stored.userId) });
 
   if (!user) {
@@ -52,21 +52,13 @@ export async function POST(request) {
     token: newRefreshToken,
     userId: stored.userId,
     createdAt: new Date(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
-  const accessToken = await signAccessToken({
-    userId: stored.userId,
-    role: user.role,
-  });
+  const accessToken = await signAccessToken({ userId: stored.userId });
 
   const res = NextResponse.json({
-    user: {
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
+    user: await buildUserResponse(user),
     accessToken,
   });
 
@@ -75,7 +67,7 @@ export async function POST(request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+    maxAge: 7 * 24 * 60 * 60,
   });
 
   return res;

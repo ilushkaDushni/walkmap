@@ -3,8 +3,8 @@ import { randomBytes } from "crypto";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
-export async function signAccessToken({ userId, role }) {
-  return new SignJWT({ userId, role })
+export async function signAccessToken({ userId }) {
+  return new SignJWT({ userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("15m")

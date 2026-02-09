@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requirePermission } from "@/lib/adminAuth";
 import { totalPathDistance } from "@/lib/geo";
 
 // GET /api/routes/[id]
@@ -21,9 +21,9 @@ export async function GET(request, { params }) {
   return NextResponse.json(route);
 }
 
-// PUT /api/routes/[id] — обновить (admin only)
+// PUT /api/routes/[id] — обновить
 export async function PUT(request, { params }) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "routes.edit");
   if (error) return error;
 
   const { id } = await params;
@@ -71,9 +71,9 @@ export async function PUT(request, { params }) {
   return NextResponse.json(result);
 }
 
-// DELETE /api/routes/[id] — удалить (admin only)
+// DELETE /api/routes/[id] — удалить
 export async function DELETE(request, { params }) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "routes.delete");
   if (error) return error;
 
   const { id } = await params;

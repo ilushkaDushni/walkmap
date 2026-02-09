@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/adminAuth";
-import { verifyAccessToken } from "@/lib/tokens";
+import { requirePermission, requireAuth } from "@/lib/adminAuth";
 
 // GET /api/routes — список маршрутов
 export async function GET(request) {
   const db = await getDb();
 
-  // Проверяем, админ ли запрашивает (если есть токен)
-  let isAdmin = false;
-  const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    const payload = await verifyAccessToken(auth.slice(7));
-    if (payload?.role === "admin" || payload?.role === "moderator") isAdmin = true;
+  // Проверяем, есть ли у юзера право видеть скрытые
+  let canViewHidden = false;
+  const authResult = await requireAuth(request);
+  if (!authResult.error) {
+    const { resolveUserPermissions } = await import("@/lib/permissions");
+    const perms = await resolveUserPermissions(authResult.user);
+    canViewHidden = perms.includes("routes.view_hidden");
   }
 
-  const filter = isAdmin ? {} : { status: "published" };
+  const filter = canViewHidden ? {} : { status: "published" };
   const routes = await db
     .collection("routes")
     .find(filter)
@@ -25,9 +25,9 @@ export async function GET(request) {
   return NextResponse.json(routes);
 }
 
-// POST /api/routes — создать маршрут (admin only)
+// POST /api/routes — создать маршрут
 export async function POST(request) {
-  const { payload, error } = await requireAdmin(request);
+  const { user, error } = await requirePermission(request, "routes.create");
   if (error) return error;
 
   const db = await getDb();
@@ -52,7 +52,7 @@ export async function POST(request) {
     folderIds: [],
     sortOrder: 0,
     status: "draft",
-    createdBy: payload.userId,
+    createdBy: user._id.toString(),
     createdAt: now,
     updatedAt: now,
   };

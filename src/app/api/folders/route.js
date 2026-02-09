@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requirePermission } from "@/lib/adminAuth";
 
 // GET /api/folders — все папки
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
 
 // POST /api/folders — создать папку (admin)
 export async function POST(request) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "folders.create");
   if (error) return error;
 
   const { name } = await request.json();

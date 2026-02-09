@@ -11,13 +11,13 @@ import AdminModal from "./AdminModal";
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, hasPermission } = useUser();
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
   const isRoutesActive = pathname === "/routes" || pathname.startsWith("/routes/");
-  const isAdmin = user?.role === "admin" || user?.role === "moderator";
+  const isAdmin = hasPermission("admin.access");
 
   return (
     <>

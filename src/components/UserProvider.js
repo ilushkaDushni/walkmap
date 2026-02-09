@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 const UserContext = createContext(null);
 
@@ -111,8 +111,20 @@ export default function UserProvider({ children }) {
     setUser(null);
   }, []);
 
+  // Проверка прав: ALL (AND)
+  const hasPermission = useCallback((...perms) => {
+    if (!user?.permissions) return false;
+    return perms.every((p) => user.permissions.includes(p));
+  }, [user]);
+
+  // Проверка прав: ANY (OR)
+  const hasAnyPermission = useCallback((...perms) => {
+    if (!user?.permissions) return false;
+    return perms.some((p) => user.permissions.includes(p));
+  }, [user]);
+
   return (
-    <UserContext.Provider value={{ user, loading, login, register, verify, logout, authFetch }}>
+    <UserContext.Provider value={{ user, loading, login, register, verify, logout, authFetch, hasPermission, hasAnyPermission }}>
       {children}
     </UserContext.Provider>
   );

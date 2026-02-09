@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requirePermission } from "@/lib/adminAuth";
 
-// PUT /api/folders/[id] — обновить папку (admin)
+// PUT /api/folders/[id] — обновить папку
 export async function PUT(request, { params }) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "folders.edit");
   if (error) return error;
 
   const { id } = await params;
@@ -36,9 +36,9 @@ export async function PUT(request, { params }) {
   return NextResponse.json(result);
 }
 
-// DELETE /api/folders/[id] — удалить папку (admin)
+// DELETE /api/folders/[id] — удалить папку
 export async function DELETE(request, { params }) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "folders.delete");
   if (error) return error;
 
   const { id } = await params;

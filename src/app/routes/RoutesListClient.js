@@ -5,8 +5,8 @@ import { useUser } from "@/components/UserProvider";
 import RouteCard from "@/components/RouteCard";
 
 export default function RoutesListClient({ routes: initialRoutes }) {
-  const { user, authFetch } = useUser();
-  const isAdmin = user?.role === "admin" || user?.role === "moderator";
+  const { user, authFetch, hasPermission } = useUser();
+  const isAdmin = hasPermission("routes.view_hidden");
   const [routes, setRoutes] = useState(initialRoutes);
 
   const visible = isAdmin ? routes : routes.filter((r) => !r._hidden);

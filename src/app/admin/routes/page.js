@@ -28,7 +28,7 @@ function getFolderIds(route) {
 }
 
 export default function AdminRoutesPage() {
-  const { user, loading, authFetch } = useUser();
+  const { user, loading, authFetch, hasPermission, hasAnyPermission } = useUser();
   const router = useRouter();
   const [routes, setRoutes] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -42,10 +42,10 @@ export default function AdminRoutesPage() {
   const [settingsFolder, setSettingsFolder] = useState(null);
 
   useEffect(() => {
-    if (!loading && user?.role !== "admin" && user?.role !== "moderator") {
+    if (!loading && !hasPermission("admin.access")) {
       router.replace("/");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, hasPermission]);
 
   const fetchData = useCallback(async () => {
     const [rRes, fRes] = await Promise.all([
@@ -58,8 +58,8 @@ export default function AdminRoutesPage() {
   }, [authFetch]);
 
   useEffect(() => {
-    if (user?.role === "admin" || user?.role === "moderator") fetchData();
-  }, [user, fetchData]);
+    if (hasPermission("admin.access")) fetchData();
+  }, [user, fetchData, hasPermission]);
 
   const handleCreate = async () => {
     const res = await authFetch("/api/routes", { method: "POST" });
@@ -125,7 +125,7 @@ export default function AdminRoutesPage() {
 
   const handleSaved = () => fetchData();
 
-  if (loading || user?.role !== "admin" && user?.role !== "moderator") return null;
+  if (loading || !hasPermission("admin.access")) return null;
 
   if (editingRouteId) {
     return (

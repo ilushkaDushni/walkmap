@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import {
@@ -16,9 +16,10 @@ import {
 } from "lucide-react";
 
 export default function AdminUsersPage() {
-  const { user, loading, authFetch } = useUser();
+  const { user, loading, authFetch, hasPermission } = useUser();
   const router = useRouter();
   const [users, setUsers] = useState([]);
+  const [allRoles, setAllRoles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("createdAt");
@@ -26,22 +27,26 @@ export default function AdminUsersPage() {
   const [coinsModal, setCoinsModal] = useState(null);
 
   useEffect(() => {
-    if (!loading && user?.role !== "admin" && user?.role !== "moderator") {
+    if (!loading && !hasPermission("users.view")) {
       router.replace("/");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, hasPermission]);
 
   const fetchUsers = useCallback(async () => {
     const params = new URLSearchParams({ sort, order });
     if (search.trim()) params.set("q", search.trim());
-    const res = await authFetch(`/api/admin/users?${params}`);
-    if (res.ok) setUsers(await res.json());
+    const [uRes, rRes] = await Promise.all([
+      authFetch(`/api/admin/users?${params}`),
+      authFetch("/api/admin/roles"),
+    ]);
+    if (uRes.ok) setUsers(await uRes.json());
+    if (rRes.ok) setAllRoles(await rRes.json());
     setLoadingData(false);
   }, [authFetch, search, sort, order]);
 
   useEffect(() => {
-    if (user?.role === "admin" || user?.role === "moderator") fetchUsers();
-  }, [user, fetchUsers]);
+    if (hasPermission("users.view")) fetchUsers();
+  }, [user, fetchUsers, hasPermission]);
 
   const handleUpdate = async (id, data) => {
     const res = await authFetch(`/api/admin/users/${id}`, {
@@ -61,7 +66,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (loading || user?.role !== "admin" && user?.role !== "moderator") return null;
+  if (loading || !hasPermission("users.view")) return null;
 
   const totalUsers = users.length;
   const totalCoins = users.reduce((s, u) => s + (u.coins || 0), 0);
@@ -150,7 +155,11 @@ export default function AdminUsersPage() {
               key={u._id}
               u={u}
               isSelf={u._id === user?.id}
-              onChangeRole={(role) => handleUpdate(u._id, { role })}
+              allRoles={allRoles}
+              canAssignRoles={hasPermission("users.assign_roles")}
+              canBan={hasPermission("users.ban")}
+              canManageCoins={hasPermission("users.manage_coins")}
+              onChangeRoles={(roleIds) => handleUpdate(u._id, { roles: roleIds })}
               onToggleBan={() => handleUpdate(u._id, { banned: !u.banned })}
               onOpenCoins={() => setCoinsModal(u)}
             />
@@ -173,8 +182,82 @@ export default function AdminUsersPage() {
   );
 }
 
+// === Мульти-роль пикер ===
+function RolePicker({ currentRoleIds, allRoles, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const toggle = (roleId) => {
+    const next = currentRoleIds.includes(roleId)
+      ? currentRoleIds.filter((id) => id !== roleId)
+      : [...currentRoleIds, roleId];
+    onChange(next);
+  };
+
+  const currentRoles = allRoles.filter((r) => currentRoleIds.includes(r._id));
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 flex-wrap rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-1.5 py-1 text-xs min-w-[4rem] max-w-[10rem]"
+      >
+        {currentRoles.length === 0 ? (
+          <span className="text-[var(--text-muted)] px-0.5">Нет ролей</span>
+        ) : (
+          currentRoles.map((r) => (
+            <span
+              key={r._id}
+              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{ backgroundColor: `${r.color}20`, color: r.color }}
+            >
+              {r.name}
+            </span>
+          ))
+        )}
+        <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-[var(--text-muted)]" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-lg py-1">
+          {allRoles.map((r) => (
+            <label
+              key={r._id}
+              className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-elevated)] cursor-pointer text-xs text-[var(--text-primary)]"
+            >
+              <input
+                type="checkbox"
+                checked={currentRoleIds.includes(r._id)}
+                onChange={() => toggle(r._id)}
+                className="h-3.5 w-3.5 rounded accent-blue-600"
+              />
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                style={{ backgroundColor: `${r.color}20`, color: r.color }}
+              >
+                {r.name}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // === Строка пользователя ===
-function UserRow({ u, isSelf, onChangeRole, onToggleBan, onOpenCoins }) {
+function UserRow({ u, isSelf, allRoles, canAssignRoles, canBan, canManageCoins, onChangeRoles, onToggleBan, onOpenCoins }) {
+  const topRole = u.roles?.[0];
+  const avatarColor = topRole?.color || "#22c55e";
+
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl border p-3 transition ${
@@ -185,9 +268,8 @@ function UserRow({ u, isSelf, onChangeRole, onToggleBan, onOpenCoins }) {
     >
       {/* Аватар */}
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm ${
-          u.role === "admin" ? "bg-blue-500" : u.role === "moderator" ? "bg-red-500" : "bg-green-500"
-        }`}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm"
+        style={{ backgroundColor: avatarColor }}
       >
         {(u.username || "?")[0].toUpperCase()}
       </div>
@@ -198,16 +280,22 @@ function UserRow({ u, isSelf, onChangeRole, onToggleBan, onOpenCoins }) {
           <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
             {u.username}
           </p>
-          {u.role === "admin" && <Crown className="h-3 w-3 text-blue-500 shrink-0" />}
-          {u.role === "moderator" && <Shield className="h-3 w-3 text-red-500 shrink-0" />}
           {u.banned && <Ban className="h-3 w-3 text-red-500 shrink-0" />}
         </div>
-        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+        <div className="flex items-center gap-1 flex-wrap mt-0.5">
+          {(u.roles || []).map((role) => (
+            <span
+              key={role.id}
+              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{ backgroundColor: `${role.color}20`, color: role.color }}
+            >
+              {role.name}
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] mt-0.5">
           <span>{u.coins || 0} монет</span>
           <span>{u.completedRoutes || 0} маршр.</span>
-          {u.createdAt && (
-            <span title="Дата регистрации">рег. {formatShortDate(u.createdAt)}</span>
-          )}
           {u.lastLoginAt && (
             <span title="Последний вход">{formatDate(u.lastLoginAt)}</span>
           )}
@@ -215,39 +303,35 @@ function UserRow({ u, isSelf, onChangeRole, onToggleBan, onOpenCoins }) {
       </div>
 
       {/* Действия */}
-      <div className="flex gap-0.5">
-        <button
-          onClick={onOpenCoins}
-          className="rounded-lg p-1.5 text-amber-500 hover:bg-[var(--bg-elevated)] transition"
-          title="Монеты"
-        >
-          <Coins className="h-4 w-4" />
-        </button>
-        {!isSelf && (
-          <>
-            <select
-              value={u.role}
-              onChange={(e) => onChangeRole(e.target.value)}
-              className={`rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-1.5 py-1 text-xs font-semibold outline-none ${
-                u.role === "admin" ? "text-blue-500" : u.role === "moderator" ? "text-red-500" : "text-green-600"
-              }`}
-            >
-              <option value="user">Пользователь</option>
-              <option value="moderator">Модератор</option>
-              <option value="admin">Админ</option>
-            </select>
-            <button
-              onClick={onToggleBan}
-              className={`rounded-lg p-1.5 transition ${
-                u.banned
-                  ? "text-red-500 hover:text-red-600"
-                  : "text-[var(--text-muted)] hover:text-red-500"
-              }`}
-              title={u.banned ? "Разбанить" : "Забанить"}
-            >
-              <Ban className="h-4 w-4" />
-            </button>
-          </>
+      <div className="flex items-center gap-0.5">
+        {canManageCoins && (
+          <button
+            onClick={onOpenCoins}
+            className="rounded-lg p-1.5 text-amber-500 hover:bg-[var(--bg-elevated)] transition"
+            title="Монеты"
+          >
+            <Coins className="h-4 w-4" />
+          </button>
+        )}
+        {!isSelf && canAssignRoles && (
+          <RolePicker
+            currentRoleIds={u.roleIds || []}
+            allRoles={allRoles}
+            onChange={onChangeRoles}
+          />
+        )}
+        {!isSelf && canBan && (
+          <button
+            onClick={onToggleBan}
+            className={`rounded-lg p-1.5 transition ${
+              u.banned
+                ? "text-red-500 hover:text-red-600"
+                : "text-[var(--text-muted)] hover:text-red-500"
+            }`}
+            title={u.banned ? "Разбанить" : "Забанить"}
+          >
+            <Ban className="h-4 w-4" />
+          </button>
         )}
       </div>
     </div>
@@ -279,7 +363,7 @@ function CoinsModal({ u, onSave, onClose }) {
 
         <input
           type="number"
-          placeholder="Кол-во (− для списания)"
+          placeholder="Кол-во (- для списания)"
           className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none mb-4"
           value={delta}
           onChange={(e) => setDelta(e.target.value)}
@@ -307,11 +391,6 @@ function CoinsModal({ u, onSave, onClose }) {
       </div>
     </div>
   );
-}
-
-function formatShortDate(d) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatDate(d) {

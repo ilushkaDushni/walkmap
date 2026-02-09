@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/mongodb";
 import { signAccessToken, generateRefreshToken } from "@/lib/tokens";
 import { NextResponse } from "next/server";
+import { getAllRoles, buildUserResponse } from "@/lib/permissions";
 
 export async function POST(request) {
   const { email, code } = await request.json();
@@ -20,12 +21,18 @@ export async function POST(request) {
     return NextResponse.json({ error: "Неверный или просроченный код" }, { status: 400 });
   }
 
+  // Найти default роль
+  const allRoles = await getAllRoles();
+  const defaultRole = allRoles.find((r) => r.isDefault);
+  const userRoles = defaultRole ? [defaultRole._id] : [];
+
   // Создаём пользователя
   const result = await db.collection("users").insertOne({
     username: pending.username,
     email: pending.email,
     passwordHash: pending.passwordHash,
     role: "user",
+    roles: userRoles,
     coins: 0,
     banned: false,
     createdAt: new Date(),
@@ -36,8 +43,7 @@ export async function POST(request) {
   await db.collection("pending_verifications").deleteMany({ email });
 
   const userId = result.insertedId.toString();
-
-  const accessToken = await signAccessToken({ userId, role: "user" });
+  const accessToken = await signAccessToken({ userId });
   const refreshToken = generateRefreshToken();
 
   await db.collection("refresh_tokens").insertOne({
@@ -47,13 +53,11 @@ export async function POST(request) {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
+  // Получаем свежего юзера для buildUserResponse
+  const newUser = await db.collection("users").findOne({ _id: result.insertedId });
+
   const res = NextResponse.json({
-    user: {
-      id: userId,
-      username: pending.username,
-      email: pending.email,
-      role: "user",
-    },
+    user: await buildUserResponse(newUser),
     accessToken,
   });
 

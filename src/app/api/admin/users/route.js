@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requirePermission } from "@/lib/adminAuth";
+import { getAllRoles } from "@/lib/permissions";
 
 // GET /api/admin/users?q=search&sort=createdAt&order=desc
 export async function GET(request) {
-  const { error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "users.view");
   if (error) return error;
 
   const { searchParams } = new URL(request.url);
@@ -46,25 +47,47 @@ export async function GET(request) {
     completedMap[s._id] = s.count;
   }
 
-  // Сортировка по роли: moderator → admin → user
-  const rolePriority = { moderator: 0, admin: 1, user: 2 };
-  users.sort((a, b) => {
-    const ra = rolePriority[a.role] ?? 2;
-    const rb = rolePriority[b.role] ?? 2;
-    return ra - rb;
+  // Загружаем роли для маппинга
+  const allRoles = await getAllRoles();
+  const rolesMap = {};
+  for (const r of allRoles) {
+    rolesMap[r._id.toString()] = {
+      id: r._id.toString(),
+      name: r.name,
+      slug: r.slug,
+      color: r.color,
+      position: r.position,
+    };
+  }
+
+  const result = users.map((u) => {
+    // Резолвим роли юзера
+    const userRoles = (u.roles || [])
+      .map((rid) => rolesMap[rid.toString()])
+      .filter(Boolean)
+      .sort((a, b) => b.position - a.position);
+
+    return {
+      _id: u._id.toString(),
+      username: u.username || u.email || "—",
+      email: u.email,
+      role: u.role || "user",
+      roles: userRoles,
+      roleIds: (u.roles || []).map((r) => r.toString()),
+      coins: u.coins || 0,
+      banned: u.banned || false,
+      completedRoutes: completedMap[u._id.toString()] || 0,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt || null,
+    };
   });
 
-  const result = users.map((u) => ({
-    _id: u._id.toString(),
-    username: u.username || u.email || "—",
-    email: u.email,
-    role: u.role || "user",
-    coins: u.coins || 0,
-    banned: u.banned || false,
-    completedRoutes: completedMap[u._id.toString()] || 0,
-    createdAt: u.createdAt,
-    lastLoginAt: u.lastLoginAt || null,
-  }));
+  // Сортировка: юзеры с ролями выше — первые
+  result.sort((a, b) => {
+    const posA = a.roles.length > 0 ? a.roles[0].position : -1;
+    const posB = b.roles.length > 0 ? b.roles[0].position : -1;
+    return posB - posA;
+  });
 
   return NextResponse.json(result);
 }

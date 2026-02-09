@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requirePermission } from "@/lib/adminAuth";
 import { put, del } from "@vercel/blob";
 import { randomBytes } from "crypto";
 
@@ -18,7 +18,7 @@ const ALLOWED = {
 
 // POST /api/upload — загрузка файла (admin only)
 export async function POST(request) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "upload.files");
   if (error) return error;
 
   const formData = await request.formData();
@@ -58,7 +58,7 @@ export async function POST(request) {
 
 // DELETE /api/upload — удаление файла (admin only)
 export async function DELETE(request) {
-  const { payload, error } = await requireAdmin(request);
+  const { error } = await requirePermission(request, "upload.files");
   if (error) return error;
 
   const { url } = await request.json();

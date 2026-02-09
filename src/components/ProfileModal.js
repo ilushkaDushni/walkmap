@@ -164,14 +164,24 @@ export default function ProfileModal({ isOpen, onClose }) {
           </div>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">{user.username}</h2>
           <p className="text-sm text-[var(--text-muted)]">{user.email}</p>
-          {(user.role === "admin" || user.role === "moderator") && (
-            <span className={`mt-1 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              user.role === "admin" ? "bg-blue-500/20 text-blue-500" : "bg-red-500/20 text-red-500"
-            }`}>
-              <Shield className="h-3 w-3" />
-              {user.role === "admin" ? "Админ" : "Модератор"}
-            </span>
-          )}
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {user.isSuperadmin && (
+              <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-500">
+                <Shield className="h-3 w-3" />
+                Суперадмин
+              </span>
+            )}
+            {(user.roles || []).map((role) => (
+              <span
+                key={role.id || role.slug}
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{ backgroundColor: `${role.color}20`, color: role.color }}
+              >
+                <Shield className="h-3 w-3" />
+                {role.name}
+              </span>
+            ))}
+          </div>
         </div>
         <button onClick={handleLogout} className={`${btnOutline} mt-4`}>
           <LogOut className="h-4 w-4" />

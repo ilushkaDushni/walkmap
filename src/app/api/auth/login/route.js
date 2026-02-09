@@ -2,6 +2,7 @@ import { getDb } from "@/lib/mongodb";
 import { signAccessToken, generateRefreshToken } from "@/lib/tokens";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { buildUserResponse, isSuperadmin } from "@/lib/permissions";
 
 export async function POST(request) {
   const { username, password } = await request.json();
@@ -22,7 +23,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
-  if (user.banned) {
+  if (user.banned && !isSuperadmin(user)) {
     return NextResponse.json({ error: "Аккаунт заблокирован" }, { status: 403 });
   }
 
@@ -34,7 +35,7 @@ export async function POST(request) {
     { $set: { lastLoginAt: new Date() } }
   );
 
-  const accessToken = await signAccessToken({ userId, role: user.role });
+  const accessToken = await signAccessToken({ userId });
   const refreshToken = generateRefreshToken();
 
   await db.collection("refresh_tokens").insertOne({
@@ -45,12 +46,7 @@ export async function POST(request) {
   });
 
   const res = NextResponse.json({
-    user: {
-      id: userId,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
+    user: await buildUserResponse(user),
     accessToken,
   });
 
