@@ -1,24 +1,47 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Shield, Route, Users, BarChart3, Crown } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown, Database } from "lucide-react";
 import { useUser } from "./UserProvider";
 
 export default function AdminModal({ isOpen, onClose }) {
   const router = useRouter();
-  const { hasPermission, hasAnyPermission } = useUser();
+  const { user, hasPermission, hasAnyPermission, authFetch } = useUser();
+  const [migrateStatus, setMigrateStatus] = useState(null); // null | "loading" | "done" | "error"
+  const [migrateLog, setMigrateLog] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
+      setMigrateStatus(null);
+      setMigrateLog([]);
     }
     return () => {
       document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  const handleMigrate = async () => {
+    if (!confirm("Запустить миграцию? Будут созданы роли и обновлены пользователи.")) return;
+    setMigrateStatus("loading");
+    try {
+      const res = await authFetch("/api/admin/migrate", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setMigrateStatus("done");
+        setMigrateLog(data.log || []);
+      } else {
+        setMigrateStatus("error");
+        setMigrateLog([data.error || "Ошибка"]);
+      }
+    } catch {
+      setMigrateStatus("error");
+      setMigrateLog(["Ошибка сети"]);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -98,6 +121,34 @@ export default function AdminModal({ isOpen, onClose }) {
                 </div>
               </button>
             ))}
+
+            {/* Миграция — только для суперадмина */}
+            {user?.isSuperadmin && (
+              <div className="pt-2 border-t border-[var(--border-color)]">
+                <button
+                  onClick={handleMigrate}
+                  disabled={migrateStatus === "loading" || migrateStatus === "done"}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-4 text-left transition hover:opacity-80 disabled:opacity-50"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/20">
+                    <Database className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {migrateStatus === "loading" ? "Миграция..." : migrateStatus === "done" ? "Миграция завершена" : "Запустить миграцию"}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">Создание ролей и обновление пользователей</p>
+                  </div>
+                </button>
+                {migrateLog.length > 0 && (
+                  <div className="mt-2 rounded-xl bg-[var(--bg-elevated)] p-3 text-xs text-[var(--text-muted)] space-y-0.5">
+                    {migrateLog.map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
