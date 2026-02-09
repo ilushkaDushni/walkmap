@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
-import { PERMISSION_REGISTRY, ALL_PERMISSIONS, invalidateRolesCache, getMaxPosition, isSuperadmin } from "@/lib/permissions";
+import { PERMISSION_REGISTRY, ALL_PERMISSIONS, invalidateRolesCache, getTopPosition, isSuperadmin } from "@/lib/permissions";
 
 // GET /api/admin/roles — список всех ролей + userCount
 export async function GET(request) {
@@ -9,7 +9,7 @@ export async function GET(request) {
   if (error) return error;
 
   const db = await getDb();
-  const roles = await db.collection("roles").find({}).sort({ position: -1 }).toArray();
+  const roles = await db.collection("roles").find({}).sort({ position: 1 }).toArray();
 
   // Считаем юзеров на каждую роль
   const users = await db.collection("users").find(
@@ -63,9 +63,9 @@ export async function POST(request) {
   const perms = (permissions || []).filter((p) => ALL_PERMISSIONS.includes(p));
 
   // Позиция: не выше своего максимума (кроме суперадмина)
-  const callerMaxPos = await getMaxPosition(user);
-  const pos = Number(position) || 0;
-  if (pos >= callerMaxPos && !isSuperadmin(user)) {
+  const callerTopPos = await getTopPosition(user);
+  const pos = Number(position) || 5;
+  if (pos <= callerTopPos && !isSuperadmin(user)) {
     return NextResponse.json({ error: "Позиция слишком высокая" }, { status: 403 });
   }
 

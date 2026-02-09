@@ -65,7 +65,7 @@ export async function GET(request) {
     const userRoles = (u.roles || [])
       .map((rid) => rolesMap[rid.toString()])
       .filter(Boolean)
-      .sort((a, b) => b.position - a.position);
+      .sort((a, b) => a.position - b.position);
 
     return {
       _id: u._id.toString(),
@@ -82,11 +82,11 @@ export async function GET(request) {
     };
   });
 
-  // Сортировка: юзеры с ролями выше — первые
+  // Сортировка: юзеры с ролями выше (меньшая позиция) — первые
   result.sort((a, b) => {
-    const posA = a.roles.length > 0 ? a.roles[0].position : -1;
-    const posB = b.roles.length > 0 ? b.roles[0].position : -1;
-    return posB - posA;
+    const posA = a.roles.length > 0 ? a.roles[0].position : Infinity;
+    const posB = b.roles.length > 0 ? b.roles[0].position : Infinity;
+    return posA - posB;
   });
 
   return NextResponse.json(result);

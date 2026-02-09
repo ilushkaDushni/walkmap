@@ -20,19 +20,19 @@ export async function POST(request) {
   // 1. Seed-роли
   const seedRoles = [
     {
-      name: "Пользователь",
-      slug: "user",
-      color: "#22c55e",
-      position: 0,
-      permissions: [],
-      isDefault: true,
+      name: "Админ",
+      slug: "admin",
+      color: "#3b82f6",
+      position: 1,
+      permissions: [...ALL_PERMISSIONS],
+      isDefault: false,
       isSystem: true,
     },
     {
       name: "Модератор",
       slug: "moderator",
       color: "#ef4444",
-      position: 50,
+      position: 2,
       permissions: [
         "admin.access", "routes.create", "routes.edit", "routes.delete",
         "routes.view_hidden", "folders.create", "folders.edit", "folders.delete",
@@ -42,12 +42,12 @@ export async function POST(request) {
       isSystem: true,
     },
     {
-      name: "Админ",
-      slug: "admin",
-      color: "#3b82f6",
-      position: 100,
-      permissions: [...ALL_PERMISSIONS],
-      isDefault: false,
+      name: "Пользователь",
+      slug: "user",
+      color: "#22c55e",
+      position: 3,
+      permissions: [],
+      isDefault: true,
       isSystem: true,
     },
   ];

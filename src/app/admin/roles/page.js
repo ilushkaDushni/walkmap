@@ -78,7 +78,7 @@ export default function AdminRolesPage() {
       name: "",
       slug: "",
       color: "#6b7280",
-      position: 10,
+      position: 5,
       permissions: [],
       isDefault: false,
     });
@@ -233,7 +233,7 @@ function RoleEditor({ role, saving, onSave, onClose }) {
   const [name, setName] = useState(role.name || "");
   const [slug, setSlug] = useState(role.slug || "");
   const [color, setColor] = useState(role.color || "#6b7280");
-  const [position, setPosition] = useState(role.position ?? 10);
+  const [position, setPosition] = useState(role.position ?? 5);
   const [permissions, setPermissions] = useState(role.permissions || []);
   const [isDefault, setIsDefault] = useState(role.isDefault || false);
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
-import { resolveUserPermissions, isSuperadmin, getMaxPosition, getAllRoles } from "@/lib/permissions";
+import { resolveUserPermissions, isSuperadmin, getTopPosition, getAllRoles } from "@/lib/permissions";
 
 // PUT /api/admin/users/[id] — обновить пользователя (split permissions)
 export async function PUT(request, { params }) {
@@ -46,7 +46,7 @@ export async function PUT(request, { params }) {
 
     // Валидация: все roleIds существуют и их position < callerMaxPosition
     const allRoles = await getAllRoles();
-    const callerMaxPos = await getMaxPosition(caller);
+    const callerTopPos = await getTopPosition(caller);
     const roleIds = [];
 
     for (const rid of body.roles) {
@@ -54,7 +54,7 @@ export async function PUT(request, { params }) {
       if (!role) {
         return NextResponse.json({ error: `Роль ${rid} не найдена` }, { status: 400 });
       }
-      if (role.position >= callerMaxPos && !isSuperadmin(caller)) {
+      if (role.position <= callerTopPos && !isSuperadmin(caller)) {
         return NextResponse.json({ error: `Нельзя назначить роль "${role.name}" — позиция слишком высокая` }, { status: 403 });
       }
       roleIds.push(new ObjectId(rid));
@@ -68,7 +68,7 @@ export async function PUT(request, { params }) {
     } else {
       const topRole = allRoles
         .filter((r) => roleIds.some((rid) => rid.toString() === r._id.toString()))
-        .sort((a, b) => b.position - a.position)[0];
+        .sort((a, b) => a.position - b.position)[0];
       update.role = topRole?.slug || "user";
     }
   }

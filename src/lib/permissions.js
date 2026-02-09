@@ -38,7 +38,7 @@ export async function getAllRoles() {
     return rolesCache;
   }
   const db = await getDb();
-  const roles = await db.collection("roles").find({}).sort({ position: -1 }).toArray();
+  const roles = await db.collection("roles").find({}).sort({ position: 1 }).toArray();
   rolesCache = roles;
   rolesCacheTime = now;
   return roles;
@@ -103,7 +103,7 @@ export async function resolveUserRolesData(user) {
         name: user.role === "admin" ? "Админ" : "Модератор",
         slug: user.role,
         color: user.role === "admin" ? "#3b82f6" : "#ef4444",
-        position: user.role === "admin" ? 100 : 50,
+        position: user.role === "admin" ? 1 : 2,
       }];
     }
     return [];
@@ -126,8 +126,8 @@ export async function resolveUserRolesData(user) {
     }
   }
 
-  // Сортируем по position desc (главная роль первая)
-  result.sort((a, b) => b.position - a.position);
+  // Сортируем по position asc (1 = главная роль первая)
+  result.sort((a, b) => a.position - b.position);
   return result;
 }
 
@@ -151,12 +151,12 @@ export async function buildUserResponse(user) {
 }
 
 /**
- * Максимальная позиция среди ролей юзера
+ * Лучшая (минимальная) позиция среди ролей юзера (1 = самая главная)
  */
-export async function getMaxPosition(user) {
-  if (isSuperadmin(user)) return Infinity;
+export async function getTopPosition(user) {
+  if (isSuperadmin(user)) return 0; // суперадмин выше всех
 
   const rolesData = await resolveUserRolesData(user);
-  if (rolesData.length === 0) return 0;
-  return Math.max(...rolesData.map((r) => r.position));
+  if (rolesData.length === 0) return Infinity;
+  return Math.min(...rolesData.map((r) => r.position));
 }

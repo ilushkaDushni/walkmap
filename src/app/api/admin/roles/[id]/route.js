@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
-import { ALL_PERMISSIONS, invalidateRolesCache, getMaxPosition, isSuperadmin } from "@/lib/permissions";
+import { ALL_PERMISSIONS, invalidateRolesCache, getTopPosition, isSuperadmin } from "@/lib/permissions";
 
 // GET /api/admin/roles/[id]
 export async function GET(request, { params }) {
@@ -75,8 +75,8 @@ export async function PUT(request, { params }) {
 
   if (body.position !== undefined) {
     const pos = Number(body.position);
-    const callerMaxPos = await getMaxPosition(user);
-    if (pos >= callerMaxPos && !isSuperadmin(user)) {
+    const callerTopPos = await getTopPosition(user);
+    if (pos <= callerTopPos && !isSuperadmin(user)) {
       return NextResponse.json({ error: "Позиция слишком высокая" }, { status: 403 });
     }
     update.position = pos;
