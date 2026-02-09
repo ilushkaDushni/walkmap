@@ -1139,7 +1139,7 @@ export default function RouteEditor({ routeId, onSaved }) {
                 Закрыть
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto pb-6">
+            <div className="flex-1 overflow-y-auto pb-24 sm:pb-6">
               <RouteMapLeaflet route={route} />
             </div>
           </div>
