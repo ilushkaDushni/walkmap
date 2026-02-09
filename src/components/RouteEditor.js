@@ -10,6 +10,7 @@ import SegmentPanel from "./SegmentPanel";
 import RouteMediaSection from "./RouteMediaSection";
 import SimulationPanel from "./SimulationPanel";
 import { X } from "lucide-react";
+import { projectPointOnPath } from "@/lib/geo";
 
 const RouteMapLeaflet = dynamic(() => import("./RouteMapLeaflet"), { ssr: false });
 
@@ -311,12 +312,37 @@ export default function RouteEditor({ routeId, onSaved }) {
   // Обновление чекпоинта
   const handleCheckpointUpdate = useCallback(
     (id, updates) => {
-      updateRoute((prev) => ({
-        ...prev,
-        checkpoints: prev.checkpoints.map((cp) =>
+      updateRoute((prev) => {
+        const updatedCheckpoints = prev.checkpoints.map((cp) =>
           cp.id === id ? { ...cp, ...updates } : cp
-        ),
-      }));
+        );
+        let next = { ...prev, checkpoints: updatedCheckpoints };
+
+        // При включении isDivider — вставить точку чекпоинта в path (физический сплит)
+        if (updates.isDivider === true && prev.path.length >= 2) {
+          const cp = updatedCheckpoints.find((c) => c.id === id);
+          if (cp) {
+            const proj = projectPointOnPath(cp.position, prev.path);
+            if (proj && proj.fraction > 0.01 && proj.fraction < 0.99) {
+              const insertIdx = proj.pathIndex + 1;
+              const newPath = [...prev.path];
+              newPath.splice(insertIdx, 0, {
+                lat: proj.position.lat,
+                lng: proj.position.lng,
+                order: 0,
+              });
+              const reindexedPath = newPath.map((p, i) => ({ ...p, order: i }));
+              // Сдвигаем pathIndex сегментов после точки вставки
+              const newSegments = (prev.segments || []).map((s) =>
+                s.pathIndex >= insertIdx ? { ...s, pathIndex: s.pathIndex + 1 } : s
+              );
+              next = { ...next, path: reindexedPath, segments: newSegments };
+            }
+          }
+        }
+
+        return next;
+      });
     },
     [updateRoute]
   );
