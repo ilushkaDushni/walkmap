@@ -24,7 +24,7 @@ export async function POST(request) {
   }
 
   if (user.banned && !isSuperadmin(user)) {
-    return NextResponse.json({ error: "Аккаунт заблокирован" }, { status: 403 });
+    return NextResponse.json({ error: "Аккаунт заблокирован", banned: true, username: user.username }, { status: 403 });
   }
 
   const userId = user._id.toString();

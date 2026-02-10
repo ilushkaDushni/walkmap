@@ -148,6 +148,7 @@ export async function buildUserResponse(user) {
     roles,
     permissions,
     isSuperadmin: isSuperadmin(user),
+    banned: !!user.banned,
   };
 }
 

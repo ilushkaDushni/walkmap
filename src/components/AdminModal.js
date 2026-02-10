@@ -71,8 +71,8 @@ export default function AdminModal({ isOpen, onClose }) {
       icon: BarChart3,
       title: "Статистика",
       description: "Просмотр активности и аналитики",
-      action: null,
-      visible: true,
+      action: () => { router.push("/admin/stats"); onClose(); },
+      visible: hasPermission("admin.access"),
     },
   ].filter((s) => s.visible);
 

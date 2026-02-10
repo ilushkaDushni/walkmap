@@ -13,6 +13,8 @@ export function useUser() {
 export default function UserProvider({ children }) {
   const [realUser, setRealUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isBanned, setIsBanned] = useState(false);
+  const [bannedUsername, setBannedUsername] = useState(null);
   const accessTokenRef = useRef(null);
 
   // Preview mode state
@@ -49,11 +51,19 @@ export default function UserProvider({ children }) {
     try {
       const res = await fetch("/api/auth/refresh", { method: "POST" });
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403 && data.banned) {
+          setIsBanned(true);
+          setBannedUsername(data.username || null);
+        }
         accessTokenRef.current = null;
         setRealUser(null);
         return null;
       }
       const data = await res.json();
+      if (data.user?.banned) {
+        setIsBanned(true);
+      }
       accessTokenRef.current = data.accessToken;
       setRealUser(data.user);
       return data.accessToken;
@@ -100,7 +110,14 @@ export default function UserProvider({ children }) {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Ошибка входа");
+    if (!res.ok) {
+      if (res.status === 403 && data.banned) {
+        setIsBanned(true);
+        setBannedUsername(data.username || username);
+        return null;
+      }
+      throw new Error(data.error || "Ошибка входа");
+    }
 
     accessTokenRef.current = data.accessToken;
     setRealUser(data.user);
@@ -139,6 +156,8 @@ export default function UserProvider({ children }) {
     accessTokenRef.current = null;
     setRealUser(null);
     setPreview(null);
+    setIsBanned(false);
+    setBannedUsername(null);
   }, []);
 
   // Проверка прав: ALL (AND) — проверяет по реальным правам если в preview, чтобы hasPermission("roles.preview") работал корректно
@@ -161,7 +180,7 @@ export default function UserProvider({ children }) {
 
   return (
     <UserContext.Provider value={{
-      user, loading, login, register, verify, logout, authFetch,
+      user, loading, isBanned, bannedUsername, login, register, verify, logout, authFetch,
       hasPermission, hasAnyPermission, hasRealPermission,
       startPreview, stopPreview, isPreviewMode, previewRole: preview?.role || null,
     }}>

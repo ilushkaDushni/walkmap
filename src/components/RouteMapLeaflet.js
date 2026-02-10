@@ -128,7 +128,7 @@ export default function RouteMapLeaflet({ route }) {
     if (currentEvent.type !== "segment") return null;
 
     const i = currentEvent.data.pathIndex;
-    if (i < 0 || i >= path.length - 1) return null;
+    if (i == null || i < 0 || i >= path.length - 1) return null;
 
     const segStart = { lat: path[i].lat, lng: path[i].lng };
     const segEnd = { lat: path[i + 1].lat, lng: path[i + 1].lng };
@@ -543,13 +543,19 @@ export default function RouteMapLeaflet({ route }) {
 
               {/* Финиш */}
               {currentEvent.type === "finish" && (
-                <div className="text-center py-2">
+                <div className="text-center py-2 space-y-3">
                   <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
                   {currentEvent.data.coinsReward > 0 && (
-                    <p className="mt-1 text-sm text-green-600">
+                    <p className="text-sm text-green-600">
                       +{currentEvent.data.coinsReward} монет за финиш
                     </p>
                   )}
+                  <a
+                    href="/routes"
+                    className="inline-block rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                  >
+                    Выйти
+                  </a>
                 </div>
               )}
 

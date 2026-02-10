@@ -213,7 +213,7 @@ export function buildRouteEvents(path, checkpoints = [], segments = [], finish =
 
   // Сегменты → sortKey = pathIndex + 0.01 (начало ребра)
   for (const seg of segments) {
-    if (seg.pathIndex < 0 || seg.pathIndex >= path.length - 1) continue;
+    if (seg.pathIndex == null || seg.pathIndex < 0 || seg.pathIndex >= path.length - 1) continue;
     if (!seg.title && !seg.text && !seg.audio?.length) continue;
     events.push({ type: "segment", data: seg, sortKey: seg.pathIndex + 0.01 });
   }

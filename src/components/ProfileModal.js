@@ -56,7 +56,8 @@ export default function ProfileModal({ isOpen, onClose }) {
     setError("");
     setSubmitting(true);
     try {
-      await login(loginUsername, loginPassword);
+      const result = await login(loginUsername, loginPassword);
+      if (!result) return; // забанен — BanModal покажется сам
       onClose();
       router.push("/");
     } catch (e) {

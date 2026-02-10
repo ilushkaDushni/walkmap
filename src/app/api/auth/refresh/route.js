@@ -2,7 +2,7 @@ import { getDb } from "@/lib/mongodb";
 import { signAccessToken, generateRefreshToken } from "@/lib/tokens";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
-import { buildUserResponse } from "@/lib/permissions";
+import { buildUserResponse, isSuperadmin } from "@/lib/permissions";
 
 export async function POST(request) {
   const cookieHeader = request.cookies.get("refreshToken");
@@ -35,6 +35,20 @@ export async function POST(request) {
   if (!user) {
     await db.collection("refresh_tokens").deleteOne({ _id: stored._id });
     const res = NextResponse.json({ error: "Пользователь не найден" }, { status: 401 });
+    res.cookies.set("refreshToken", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return res;
+  }
+
+  // Проверка бана (суперадмин не может быть забанен)
+  if (user.banned && !isSuperadmin(user)) {
+    await db.collection("refresh_tokens").deleteMany({ userId: stored.userId });
+    const res = NextResponse.json({ error: "Аккаунт заблокирован", banned: true, username: user.username }, { status: 403 });
     res.cookies.set("refreshToken", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
