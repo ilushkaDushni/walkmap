@@ -46,32 +46,42 @@ export default function UserProvider({ children }) {
     setPreview(null);
   }, []);
 
-  // Refresh access token using httpOnly cookie
+  // Refresh access token using httpOnly cookie (deduplicated)
+  const refreshPromiseRef = useRef(null);
   const refreshSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/refresh", { method: "POST" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 403 && data.banned) {
-          setIsBanned(true);
-          setBannedUsername(data.username || null);
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+
+    const promise = (async () => {
+      try {
+        const res = await fetch("/api/auth/refresh", { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 403 && data.banned) {
+            setIsBanned(true);
+            setBannedUsername(data.username || null);
+          }
+          accessTokenRef.current = null;
+          setRealUser(null);
+          return null;
         }
+        const data = await res.json();
+        if (data.user?.banned) {
+          setIsBanned(true);
+        }
+        accessTokenRef.current = data.accessToken;
+        setRealUser(data.user);
+        return data.accessToken;
+      } catch {
         accessTokenRef.current = null;
         setRealUser(null);
         return null;
+      } finally {
+        refreshPromiseRef.current = null;
       }
-      const data = await res.json();
-      if (data.user?.banned) {
-        setIsBanned(true);
-      }
-      accessTokenRef.current = data.accessToken;
-      setRealUser(data.user);
-      return data.accessToken;
-    } catch {
-      accessTokenRef.current = null;
-      setRealUser(null);
-      return null;
-    }
+    })();
+
+    refreshPromiseRef.current = promise;
+    return promise;
   }, []);
 
   // Restore session on mount via refresh cookie
