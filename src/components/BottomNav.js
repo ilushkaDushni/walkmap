@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { User, MapPin, Settings, Shield, House } from "lucide-react";
 import { useUser } from "./UserProvider";
 import ProfileModal from "./ProfileModal";
@@ -11,6 +11,7 @@ import AdminModal from "./AdminModal";
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, hasPermission } = useUser();
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -42,15 +43,21 @@ export default function BottomNav() {
           </Link>
 
           {/* Маршруты */}
-          <Link
-            href="/routes"
+          <button
+            onClick={() => {
+              if (!user) {
+                window.dispatchEvent(new Event("open-profile-modal"));
+              } else {
+                router.push("/routes");
+              }
+            }}
             className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               isRoutesActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
             <MapPin className="h-6 w-6" strokeWidth={isRoutesActive ? 2.5 : 1.5} />
             <span className="text-[10px] font-medium">Маршруты</span>
-          </Link>
+          </button>
 
           {/* Админ (только для админов) */}
           {isAdmin && (

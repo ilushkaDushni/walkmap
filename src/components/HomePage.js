@@ -127,13 +127,15 @@ function WeatherWidget({ weather }) {
 }
 
 // ─── RouteOfDay ─────────────────────────────────────────────────
-function RouteOfDay({ route }) {
+function RouteOfDay({ route, onClick }) {
   if (!route) return null;
   const dist = formatDist(route.distance || 0);
+  const Tag = onClick ? "button" : Link;
+  const tagProps = onClick ? { onClick, type: "button" } : { href: `/routes/${route._id}` };
   return (
-    <Link
-      href={`/routes/${route._id}`}
-      className="block rounded-2xl bg-gradient-to-r from-orange-500/15 to-amber-500/10 border border-orange-500/20 p-4 transition hover:from-orange-500/20 active:scale-[0.99]"
+    <Tag
+      {...tagProps}
+      className="block w-full text-left rounded-2xl bg-gradient-to-r from-orange-500/15 to-amber-500/10 border border-orange-500/20 p-4 transition hover:from-orange-500/20 active:scale-[0.99]"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/20 shrink-0">
@@ -150,7 +152,7 @@ function RouteOfDay({ route }) {
         {route.duration > 0 && <span>{route.duration} мин</span>}
         {route.checkpoints?.length > 0 && <span>{route.checkpoints.length} точек</span>}
       </div>
-    </Link>
+    </Tag>
   );
 }
 
@@ -223,7 +225,7 @@ function GuestView({ publicStats, weather, routeOfDay }) {
       </div>
 
       {/* Маршрут дня */}
-      <RouteOfDay route={routeOfDay} />
+      <RouteOfDay route={routeOfDay} onClick={() => window.dispatchEvent(new Event("open-profile-modal"))} />
 
       {/* CTA */}
       <button
