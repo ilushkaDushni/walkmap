@@ -16,7 +16,6 @@ import {
   X,
   ChevronDown,
   EllipsisVertical,
-  ShieldOff,
   Shield,
   Star,
 } from "lucide-react";
@@ -225,6 +224,7 @@ export default function AdminRoutesPage() {
               onEditRoute={setEditingRouteId}
               onDeleteRoute={handleDelete}
               onRouteField={handleRouteField}
+              onFolderUpdate={handleFolderUpdate}
               featuredId={featuredId}
               onSetFeatured={handleSetFeatured}
             />
@@ -370,9 +370,16 @@ function FolderSettingsModal({ folder, routes, onSave, onClose }) {
 function FolderSection({
   folder, routes, allFolders,
   onRename, onSortOrder, onDelete, onOpenSettings,
-  onEditRoute, onDeleteRoute, onRouteField,
+  onEditRoute, onDeleteRoute, onRouteField, onFolderUpdate,
   featuredId, onSetFeatured,
 }) {
+  const handleToggleException = (folderId, routeId) => {
+    const exceptions = folder.exceptions || [];
+    const next = exceptions.includes(routeId)
+      ? exceptions.filter((id) => id !== routeId)
+      : [...exceptions, routeId];
+    onFolderUpdate(folderId, { exceptions: next });
+  };
   const [name, setName] = useState(folder.name);
   const [order, setOrder] = useState(folder.sortOrder ?? 0);
   const [open, setOpen] = useState(true);
@@ -445,6 +452,7 @@ function FolderSection({
               onEdit={() => onEditRoute(route._id)}
               onDelete={() => onDeleteRoute(route._id)}
               onFieldChange={onRouteField}
+              onToggleException={handleToggleException}
               featuredId={featuredId}
               onSetFeatured={onSetFeatured}
             />
@@ -520,10 +528,11 @@ function FolderPicker({ route, folders, onFieldChange }) {
 }
 
 // === Строка маршрута ===
-function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, featuredId, onSetFeatured }) {
+function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, onToggleException, featuredId, onSetFeatured }) {
   const [order, setOrder] = useState(route.sortOrder ?? 0);
   const isFeatured = featuredId === route._id;
   const hiddenByFolder = folder?.adminOnly && !folder.exceptions?.includes(route._id);
+  const isException = folder?.adminOnly && folder.exceptions?.includes(route._id);
 
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 transition">
@@ -547,9 +556,6 @@ function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, fea
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{route.title}</p>
-          {hiddenByFolder && !route.adminOnly ? (
-            <Shield className="h-3 w-3 text-orange-400 shrink-0" title="Скрыт папкой" />
-          ) : null}
         </div>
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
           {route.status === "published" ? (
@@ -580,17 +586,23 @@ function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, fea
 
       <FolderPicker route={route} folders={folders} onFieldChange={onFieldChange} />
 
-      <button
-        onClick={() => onFieldChange(route._id, "adminOnly", !route.adminOnly)}
-        className={`rounded-lg p-1.5 transition ${
-          route.adminOnly
-            ? "text-red-400 hover:text-red-500"
-            : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-red-400"
-        }`}
-        title={route.adminOnly ? "Только админ — нажмите чтобы показать всем" : "Виден всем — нажмите чтобы скрыть"}
-      >
-        <Shield className="h-4 w-4" fill={route.adminOnly ? "currentColor" : "none"} />
-      </button>
+      {folder?.adminOnly ? (
+        <button
+          onClick={() => onToggleException?.(folder._id, route._id)}
+          className={`rounded-lg p-1.5 transition ${
+            isException
+              ? "text-green-500 hover:text-green-600"
+              : hiddenByFolder
+                ? "text-red-400 hover:text-green-500"
+                : "text-[var(--text-muted)] hover:text-red-400"
+          }`}
+          title={isException ? "Исключение — виден несмотря на скрытую папку" : hiddenByFolder ? "Скрыт папкой — нажмите чтобы добавить в исключения" : ""}
+        >
+          <Shield className="h-4 w-4" fill={hiddenByFolder || isException ? "currentColor" : "none"} />
+        </button>
+      ) : (
+        <div className="w-7" />
+      )}
 
       <div className="flex gap-0.5">
         <button
