@@ -858,7 +858,7 @@ export default function RouteEditor({ routeId, onSaved }) {
           onContextMenu={(e) => { e.preventDefault(); setPathPointMenu(null); }}
         >
           <div
-            className="fixed z-50 min-w-[180px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xl py-1"
+            className="fixed z-50 w-fit min-w-[180px] rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-xl py-1"
             style={{ left: pathPointMenu.x, top: pathPointMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
