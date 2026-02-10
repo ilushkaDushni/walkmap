@@ -1,7 +1,7 @@
 {
-  "name": "Прогулочные маршруты",
-  "short_name": "Маршруты",
-  "description": "PWA-приложение для прогулочных маршрутов с интерактивной картой",
+  "name": "Ростов GO",
+  "short_name": "Ростов GO",
+  "description": "Больше, чем просто прогулка",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

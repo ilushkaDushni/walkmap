@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, MapPin, Settings, Shield } from "lucide-react";
+import { User, MapPin, Settings, Shield, House } from "lucide-react";
 import { useUser } from "./UserProvider";
 import ProfileModal from "./ProfileModal";
 import SettingsModal from "./SettingsModal";
@@ -16,6 +16,13 @@ export default function BottomNav() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
+  useEffect(() => {
+    const handler = () => setProfileOpen(true);
+    window.addEventListener("open-profile-modal", handler);
+    return () => window.removeEventListener("open-profile-modal", handler);
+  }, []);
+
+  const isHome = pathname === "/";
   const isRoutesActive = pathname === "/routes" || pathname.startsWith("/routes/");
   const isAdmin = hasPermission("admin.access");
 
@@ -23,18 +30,29 @@ export default function BottomNav() {
     <>
       <nav className="fixed bottom-4 left-4 right-4 z-50">
         <div className="mx-auto flex max-w-md items-center justify-around rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-6 py-3 shadow-2xl transition-colors">
-          {/* Профиль — модал */}
-          <button
-            onClick={() => setProfileOpen(true)}
+          {/* Главная */}
+          <Link
+            href="/"
             className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
-              profileOpen ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              isHome ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            <User className="h-6 w-6" strokeWidth={profileOpen ? 2.5 : 1.5} />
-            <span className="text-[10px] font-medium">Профиль</span>
-          </button>
+            <House className="h-6 w-6" strokeWidth={isHome ? 2.5 : 1.5} />
+            <span className="text-[10px] font-medium">Главная</span>
+          </Link>
 
-          {/* Админ — модал (только для админов) */}
+          {/* Маршруты */}
+          <Link
+            href="/routes"
+            className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+              isRoutesActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            }`}
+          >
+            <MapPin className="h-6 w-6" strokeWidth={isRoutesActive ? 2.5 : 1.5} />
+            <span className="text-[10px] font-medium">Маршруты</span>
+          </Link>
+
+          {/* Админ (только для админов) */}
           {isAdmin && (
             <button
               onClick={() => setAdminOpen(true)}
@@ -47,18 +65,18 @@ export default function BottomNav() {
             </button>
           )}
 
-          {/* Маршруты — страница */}
-          <Link
-            href="/routes"
+          {/* Профиль */}
+          <button
+            onClick={() => setProfileOpen(true)}
             className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
-              isRoutesActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              profileOpen ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            <MapPin className="h-6 w-6" strokeWidth={isRoutesActive ? 2.5 : 1.5} />
-            <span className="text-[10px] font-medium">Маршруты</span>
-          </Link>
+            <User className="h-6 w-6" strokeWidth={profileOpen ? 2.5 : 1.5} />
+            <span className="text-[10px] font-medium">Профиль</span>
+          </button>
 
-          {/* Настройки — модал */}
+          {/* Настройки */}
           <button
             onClick={() => setSettingsOpen(true)}
             className={`flex flex-col items-center gap-1 px-4 py-1 transition ${

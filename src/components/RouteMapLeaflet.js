@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
+import useGpsNavigation from "@/hooks/useGpsNavigation";
+import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, buildRouteEventsWithBranches, splitPathByCheckpoints, projectPointOnPath, computeForkDirection } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
@@ -62,6 +64,24 @@ function useRouteBounds(route) {
   }, [route]);
 }
 
+// Генерация GeoJSON-круга для accuracy
+function accuracyCircleGeoJson(center, radiusMeters) {
+  if (!center || radiusMeters <= 10) return null;
+  const points = 32;
+  const coords = [];
+  const km = radiusMeters / 1000;
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI;
+    const dlat = (km / 111.32) * Math.cos(angle);
+    const dlng = (km / (111.32 * Math.cos((center.lat * Math.PI) / 180))) * Math.sin(angle);
+    coords.push([center.lng + dlng, center.lat + dlat]);
+  }
+  return {
+    type: "Feature",
+    geometry: { type: "Polygon", coordinates: [coords] },
+  };
+}
+
 export default function RouteMapLeaflet({ route }) {
   const [started, setStarted] = useState(false);
   const [eventIndex, setEventIndex] = useState(0);
@@ -69,8 +89,96 @@ export default function RouteMapLeaflet({ route }) {
   const [branchEventIndex, setBranchEventIndex] = useState(0);
   const mapRef = useRef(null);
 
-  const { download, downloading, progress, done } = useOfflineDownload(route);
+  // GPS mode state machine: preview | gps_requesting | gps_active | gps_finished
+  const [gpsMode, setGpsMode] = useState(null); // null = не GPS
+  const [gpsError, setGpsError] = useState(null);
+  const [autoFollow, setAutoFollow] = useState(true);
+  const [completeSent, setCompleteSent] = useState(false);
+  const userDragRef = useRef(false);
+  const dashStepRef = useRef(0);
+  const dashIntervalRef = useRef(null);
+
+  const { authFetch, user } = useUser();
+  const { download, downloading, progress: dlProgress, done } = useOfflineDownload(route);
   const routeBounds = useRouteBounds(route);
+
+  const gps = useGpsNavigation({
+    route,
+    active: gpsMode === "gps_active",
+  });
+
+  // Следим за GPS-статусом для state machine
+  useEffect(() => {
+    if (gpsMode !== "gps_requesting") return;
+    if (gps.gpsStatus === "watching" && gps.position) {
+      setGpsMode("gps_active");
+      setGpsError(null);
+    } else if (gps.gpsStatus === "denied") {
+      setGpsMode(null);
+      setGpsError("Доступ к GPS запрещён. Разрешите геолокацию в настройках браузера.");
+    } else if (gps.gpsStatus === "unavailable") {
+      setGpsMode(null);
+      setGpsError("GPS недоступен на этом устройстве.");
+    } else if (gps.gpsStatus === "error") {
+      setGpsMode(null);
+      setGpsError("Ошибка GPS. Попробуйте ещё раз.");
+    }
+  }, [gpsMode, gps.gpsStatus, gps.position]);
+
+  // Авто-следование за юзером
+  useEffect(() => {
+    if (gpsMode !== "gps_active" || !gps.position || !autoFollow) return;
+    const map = mapRef.current;
+    if (!map) return;
+    map.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 500 });
+  }, [gpsMode, gps.position, autoFollow]);
+
+  // Анимация пунктирной линии
+  useEffect(() => {
+    if (gpsMode !== "gps_active") {
+      if (dashIntervalRef.current) {
+        clearInterval(dashIntervalRef.current);
+        dashIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const patterns = [[0, 4, 3], [1, 4, 2], [2, 4, 1], [3, 4, 0]];
+    dashIntervalRef.current = setInterval(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      dashStepRef.current = (dashStepRef.current + 1) % patterns.length;
+      try {
+        if (map.getLayer("remaining-route-animated")) {
+          map.setPaintProperty("remaining-route-animated", "line-dasharray", patterns[dashStepRef.current]);
+        }
+      } catch {
+        // layer может ещё не существовать
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(dashIntervalRef.current);
+      dashIntervalRef.current = null;
+    };
+  }, [gpsMode]);
+
+  // Финиш GPS-режима
+  useEffect(() => {
+    if (gpsMode !== "gps_active" || !gps.finishReached) return;
+    setGpsMode("gps_finished");
+  }, [gpsMode, gps.finishReached]);
+
+  // Автоматическая запись прохождения
+  useEffect(() => {
+    if (gpsMode !== "gps_finished" || completeSent || !user) return;
+    setCompleteSent(true);
+    authFetch(`/api/routes/${route._id}/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coins: gps.totalCoins }),
+    }).catch(() => {});
+  }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins]);
 
   // Упорядоченные события маршрута (с ветками)
   const { mainEvents, branchEvents } = useMemo(() => {
@@ -144,7 +252,6 @@ export default function RouteMapLeaflet({ route }) {
       .sort((a, b) => a.fraction - b.fraction);
 
     if (splitsOnEdge.length === 0) {
-      // Нет разделителей — подсвечиваем весь отрезок
       return {
         type: "Feature",
         geometry: {
@@ -154,7 +261,6 @@ export default function RouteMapLeaflet({ route }) {
       };
     }
 
-    // Подсвечиваем от начала ребра до первого разделителя
     const firstSplit = splitsOnEdge[0];
     return {
       type: "Feature",
@@ -189,6 +295,12 @@ export default function RouteMapLeaflet({ route }) {
     };
   }, [currentEvent, started, route.path]);
 
+  // GPS accuracy circle GeoJSON
+  const accuracyGeoJson = useMemo(() => {
+    if (gpsMode !== "gps_active" || !gps.position) return null;
+    return accuracyCircleGeoJson(gps.position, gps.accuracy || 0);
+  }, [gpsMode, gps.position, gps.accuracy]);
+
   const center = route.mapCenter || { lat: 47.2357, lng: 39.7015 };
   const zoom = route.mapZoom || 14;
 
@@ -196,19 +308,51 @@ export default function RouteMapLeaflet({ route }) {
     mapRef.current = e.target;
   }, []);
 
+  // Обнаружение ручного перетаскивания карты
+  const onMoveStart = useCallback((e) => {
+    // originalEvent есть только при user interaction
+    if (e.originalEvent && gpsMode === "gps_active") {
+      userDragRef.current = true;
+      setAutoFollow(false);
+    }
+  }, [gpsMode]);
+
+  const handleRecenter = useCallback(() => {
+    setAutoFollow(true);
+    userDragRef.current = false;
+    if (gps.position && mapRef.current) {
+      mapRef.current.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 500 });
+    }
+  }, [gps.position]);
+
   const handleStart = () => {
     setStarted(true);
   };
 
+  const handleStartGps = () => {
+    setGpsError(null);
+    setGpsMode("gps_requesting");
+    setAutoFollow(true);
+    setCompleteSent(false);
+    userDragRef.current = false;
+    gps.startGps();
+  };
+
+  const handleStopGps = () => {
+    gps.stopGps();
+    setGpsMode(null);
+    setGpsError(null);
+    setAutoFollow(true);
+    setCompleteSent(false);
+    userDragRef.current = false;
+  };
+
   const handleNext = () => {
     if (activeBranchId) {
-      // На ветке
       const bEvents = branchEvents[activeBranchId] || [];
       const nextBranchEvent = bEvents[branchEventIndex + 1];
       if (nextBranchEvent?.type === "merge") {
-        // Возвращаемся на main
         setActiveBranchId(null);
-        // Находим следующее событие после fork
         const forkIdx = mainEvents.findIndex((e) => e.type === "fork" && e.data.id === activeBranchId);
         if (forkIdx >= 0 && forkIdx + 1 < mainEvents.length) {
           setEventIndex(forkIdx + 1);
@@ -228,7 +372,6 @@ export default function RouteMapLeaflet({ route }) {
     if (activeBranchId) {
       if (branchEventIndex > 0) setBranchEventIndex((i) => i - 1);
       else {
-        // Возвращаемся к fork на main
         setActiveBranchId(null);
         setBranchEventIndex(0);
       }
@@ -237,23 +380,29 @@ export default function RouteMapLeaflet({ route }) {
     }
   };
 
-  // Выбор ветки на fork
   const handleChooseBranch = (branchId) => {
     setActiveBranchId(branchId);
     setBranchEventIndex(0);
   };
 
   const handleStayMain = () => {
-    // Просто идём дальше по main
     setEventIndex((i) => i + 1);
   };
+
+  // GPS-режим и ручной режим взаимоисключающие
+  const isGpsActive = gpsMode === "gps_active" || gpsMode === "gps_finished";
+  const showManualMode = started && !gpsMode;
+
+  // Текущее GPS-событие для карточки
+  const gpsActiveEvent = gps.activeCheckpoint || gps.activeSegment || null;
 
   return (
     <div className="space-y-4">
       {/* Карта */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm relative">
         <Map
           onLoad={onLoad}
+          onMoveStart={onMoveStart}
           initialViewState={
             routeBounds
               ? { bounds: routeBounds, fitBoundsOptions: { padding: 40 } }
@@ -261,12 +410,12 @@ export default function RouteMapLeaflet({ route }) {
           }
           maxBounds={ROSTOV_BOUNDS}
           minZoom={10}
-          style={{ height: started ? "350px" : "300px", width: "100%" }}
+          style={{ height: (started || isGpsActive) ? "350px" : "300px", width: "100%" }}
           mapStyle={STYLE}
           attributionControl={true}
         >
-          {/* Путь — чередующиеся цвета по чекпоинтам */}
-          {pathSegmentsGeoJson && (
+          {/* === ОБЫЧНЫЙ РЕЖИМ: путь чередующимися цветами === */}
+          {!isGpsActive && pathSegmentsGeoJson && (
             <Source id="route-path" type="geojson" data={pathSegmentsGeoJson}>
               <Layer
                 id="route-path-line-0"
@@ -291,8 +440,71 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
+          {/* === GPS-РЕЖИМ: пройденный путь (серый) === */}
+          {isGpsActive && gps.passedGeoJson && (
+            <Source id="passed-route" type="geojson" data={gps.passedGeoJson}>
+              <Layer
+                id="passed-route-line"
+                type="line"
+                paint={{
+                  "line-color": "#808080",
+                  "line-width": 4,
+                  "line-opacity": 0.5,
+                }}
+              />
+            </Source>
+          )}
+
+          {/* === GPS-РЕЖИМ: оставшийся путь (анимированные пунктиры) === */}
+          {isGpsActive && gps.remainingGeoJson && (
+            <Source id="remaining-route" type="geojson" data={gps.remainingGeoJson}>
+              <Layer
+                id="remaining-route-base"
+                type="line"
+                paint={{
+                  "line-color": "#3b82f6",
+                  "line-width": 4,
+                  "line-opacity": 0.3,
+                }}
+              />
+              <Layer
+                id="remaining-route-animated"
+                type="line"
+                paint={{
+                  "line-color": "#3b82f6",
+                  "line-width": 4,
+                  "line-opacity": 0.8,
+                  "line-dasharray": [0, 4, 3],
+                }}
+              />
+            </Source>
+          )}
+
+          {/* === GPS-РЕЖИМ: круг точности === */}
+          {isGpsActive && accuracyGeoJson && (
+            <Source id="accuracy-circle" type="geojson" data={accuracyGeoJson}>
+              <Layer
+                id="accuracy-circle-fill"
+                type="fill"
+                paint={{
+                  "fill-color": "#4285f4",
+                  "fill-opacity": 0.1,
+                }}
+              />
+              <Layer
+                id="accuracy-circle-border"
+                type="line"
+                paint={{
+                  "line-color": "#4285f4",
+                  "line-opacity": 0.3,
+                  "line-width": 1,
+                }}
+              />
+            </Source>
+          )}
+
           {/* Ветки — пунктир */}
-          {branchesGeoJson && (
+          {!isGpsActive && branchesGeoJson && (
             <Source id="branches-view" type="geojson" data={branchesGeoJson}>
               <Layer
                 id="branches-view-line"
@@ -308,7 +520,7 @@ export default function RouteMapLeaflet({ route }) {
           )}
 
           {/* Fork маркеры */}
-          {(route.branches || []).map((branch) =>
+          {!isGpsActive && (route.branches || []).map((branch) =>
             branch.fork?.position ? (
               <Marker
                 key={`fork-${branch.id}`}
@@ -329,8 +541,8 @@ export default function RouteMapLeaflet({ route }) {
             ) : null
           )}
 
-          {/* Подсветка активного отрезка */}
-          {activeSegmentGeoJson && (
+          {/* Подсветка активного отрезка (ручной режим) */}
+          {!isGpsActive && activeSegmentGeoJson && (
             <Source id="active-segment" type="geojson" data={activeSegmentGeoJson}>
               <Layer
                 id="active-segment-line"
@@ -344,8 +556,8 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
-          {/* Подсветка после isDivider чекпоинта */}
-          {activeAfterDividerGeoJson && (
+          {/* Подсветка после isDivider чекпоинта (ручной режим) */}
+          {!isGpsActive && activeAfterDividerGeoJson && (
             <Source id="active-after-divider" type="geojson" data={activeAfterDividerGeoJson}>
               <Layer
                 id="active-after-divider-line"
@@ -359,9 +571,20 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
-          {/* Чекпоинты — скрываем isEmpty и transparent для пользователя */}
+          {/* Чекпоинты */}
           {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
-            const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
+            const isTriggeredGps = isGpsActive && gps.triggeredIds.has(cp.id);
+            const isActive = !isGpsActive && started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
+            const isGpsActiveCheckpoint = isGpsActive && gps.activeCheckpoint?.id === cp.id;
+
+            const color = isTriggeredGps
+              ? "#22c55e" // зелёный — пройден в GPS
+              : isActive || isGpsActiveCheckpoint
+                ? "#ef4444" // красный — активный
+                : (cp.color || "#f59e0b");
+            const label = isTriggeredGps ? "✓" : (cp.order + 1);
+            const size = (isActive || isGpsActiveCheckpoint) ? 18 : 14;
+
             return (
               <Marker
                 key={cp.id}
@@ -369,10 +592,10 @@ export default function RouteMapLeaflet({ route }) {
                 latitude={cp.position.lat}
               >
                 <Dot
-                  color={isActive ? "#ef4444" : (cp.color || "#f59e0b")}
-                  size={isActive ? 18 : 14}
-                  label={cp.order + 1}
-                  pulse={isActive}
+                  color={color}
+                  size={size}
+                  label={label}
+                  pulse={isActive || isGpsActiveCheckpoint}
                 />
               </Marker>
             );
@@ -391,27 +614,52 @@ export default function RouteMapLeaflet({ route }) {
                   borderRadius: 3,
                   background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 10px 10px",
                   border: "2px solid white",
-                  boxShadow: started && currentEvent?.type === "finish"
+                  boxShadow: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
                     ? "0 0 10px #ef444488"
                     : "0 1px 4px rgba(0,0,0,.3)",
-                  animation: started && currentEvent?.type === "finish" ? "pulse 2s infinite" : "none",
+                  animation: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
+                    ? "pulse 2s infinite" : "none",
                 }}
               />
             </Marker>
           )}
+
+          {/* === GPS-РЕЖИМ: маркер пользователя === */}
+          {isGpsActive && gps.position && (
+            <Marker
+              longitude={gps.position.lng}
+              latitude={gps.position.lat}
+            >
+              <div className="gps-dot">
+                <div className="gps-dot-pulse" />
+                <div className="gps-dot-core" />
+              </div>
+            </Marker>
+          )}
         </Map>
+
+        {/* Кнопка перецентрировать */}
+        {isGpsActive && !autoFollow && (
+          <button
+            onClick={handleRecenter}
+            className="absolute bottom-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
+          >
+            <Locate className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
-      {/* До начала */}
-      {!started && (
+      {/* === PREVIEW (до начала) === */}
+      {!started && !gpsMode && (
         <>
           {/* GPS + Оффлайн */}
           <div className="flex gap-2">
             <button
-              disabled
-              className="flex-1 rounded-xl px-4 py-3 text-sm font-medium border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-muted)] opacity-50 cursor-not-allowed"
+              onClick={handleStartGps}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium border border-blue-500 bg-[var(--bg-surface)] text-blue-600 transition hover:bg-blue-50"
             >
-              GPS (скоро)
+              <Navigation className="h-4 w-4" />
+              GPS навигация
             </button>
 
             <button
@@ -422,12 +670,20 @@ export default function RouteMapLeaflet({ route }) {
               {done ? (
                 <><Check className="h-4 w-4 text-green-600" /> Готово</>
               ) : downloading ? (
-                <>{progress}%</>
+                <>{dlProgress}%</>
               ) : (
                 <><Download className="h-4 w-4" /> Оффлайн</>
               )}
             </button>
           </div>
+
+          {/* GPS ошибка */}
+          {gpsError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+              <span className="shrink-0 mt-0.5">⚠</span>
+              <span>{gpsError}</span>
+            </div>
+          )}
 
           {/* Intro текст + аудио маршрута */}
           {(route.intro || route.audio?.length > 0) && (
@@ -454,8 +710,179 @@ export default function RouteMapLeaflet({ route }) {
         </>
       )}
 
-      {/* После начала — пошаговый просмотр */}
-      {started && (
+      {/* === GPS REQUESTING === */}
+      {gpsMode === "gps_requesting" && (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 text-blue-600">
+            <Navigation className="h-5 w-5 animate-pulse" />
+            <span className="text-sm font-medium">Определяем местоположение...</span>
+          </div>
+          <button
+            onClick={handleStopGps}
+            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+          >
+            Отмена
+          </button>
+        </div>
+      )}
+
+      {/* === GPS ACTIVE: инфо-панель === */}
+      {gpsMode === "gps_active" && (
+        <>
+          {/* GPS статус-бар */}
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-3">
+            {/* Прогресс-бар */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-[var(--text-muted)]">
+                <span>{Math.round(gps.progress * 100)}%</span>
+                <span>{gps.distanceRemaining > 1000
+                  ? `${(gps.distanceRemaining / 1000).toFixed(1)} км`
+                  : `${Math.round(gps.distanceRemaining)} м`
+                }</span>
+              </div>
+              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                  style={{ width: `${Math.round(gps.progress * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Предупреждения */}
+            {gps.isOffRoute && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 text-center">
+                Вы отклонились от маршрута
+              </div>
+            )}
+            {gps.accuracy > 100 && (
+              <p className="text-[10px] text-[var(--text-muted)] text-center">
+                Низкая точность GPS ({Math.round(gps.accuracy)}м)
+              </p>
+            )}
+
+            {/* Кнопка остановки */}
+            <button
+              onClick={handleStopGps}
+              className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+            >
+              <X className="h-4 w-4" />
+              Остановить навигацию
+            </button>
+          </div>
+
+          {/* Карточка активного события (GPS) */}
+          {gpsActiveEvent && (
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3 animate-slide-up">
+              {/* Чекпоинт */}
+              {gps.activeCheckpoint && !gps.activeCheckpoint.isEmpty && (
+                <>
+                  <div className="flex items-center gap-2">
+                    {gps.activeCheckpoint.color !== "transparent" && (
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: gps.activeCheckpoint.color || "#f59e0b" }}>
+                        {gps.activeCheckpoint.order + 1}
+                      </div>
+                    )}
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">
+                      {gps.activeCheckpoint.title || `Точка #${gps.activeCheckpoint.order + 1}`}
+                    </h3>
+                  </div>
+                  {gps.activeCheckpoint.description && (
+                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                      {gps.activeCheckpoint.description}
+                    </div>
+                  )}
+                  {gps.activeCheckpoint.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {gps.activeCheckpoint.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {gps.activeCheckpoint.audio?.length > 0 && (
+                    <AudioPlayer
+                      key={`gps-cp-${gps.activeCheckpoint.id}`}
+                      urls={gps.activeCheckpoint.audio}
+                      autoPlay
+                      variant="full"
+                    />
+                  )}
+                  {gps.activeCheckpoint.coinsReward > 0 && (
+                    <p className="text-sm font-medium text-amber-600">
+                      +{gps.activeCheckpoint.coinsReward} монет
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Сегмент */}
+              {gps.activeSegment && !gps.activeCheckpoint && (
+                <>
+                  {gps.activeSegment.title && (
+                    <h3 className="text-base font-bold text-[var(--text-primary)] text-center">
+                      {gps.activeSegment.title}
+                    </h3>
+                  )}
+                  {gps.activeSegment.text && (
+                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                      {gps.activeSegment.text}
+                    </div>
+                  )}
+                  {gps.activeSegment.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {gps.activeSegment.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {gps.activeSegment.audio?.length > 0 && (
+                    <AudioPlayer
+                      key={`gps-seg-${gps.activeSegment.id}`}
+                      urls={gps.activeSegment.audio}
+                      autoPlay
+                      variant="full"
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Кнопка «Понятно» */}
+              <button
+                onClick={gps.dismissEvent}
+                className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Понятно
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* === GPS FINISHED === */}
+      {gpsMode === "gps_finished" && (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 text-center space-y-3 animate-slide-up">
+          <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
+          {gps.totalCoins > 0 && (
+            <p className="text-sm text-green-600">+{gps.totalCoins} монет</p>
+          )}
+          <div className="flex gap-2 justify-center">
+            <a
+              href="/routes"
+              className="inline-block rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              К маршрутам
+            </a>
+            <button
+              onClick={handleStopGps}
+              className="rounded-xl border border-[var(--border-color)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)]"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === РУЧНОЙ РЕЖИМ: после начала — пошаговый просмотр === */}
+      {showManualMode && (
         <>
           {/* Карточка текущего события */}
           {currentEvent && (

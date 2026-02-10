@@ -18,6 +18,7 @@ import {
   EllipsisVertical,
   ShieldOff,
   Shield,
+  Star,
 } from "lucide-react";
 
 // Хелпер: получить folderIds из маршрута (совместимость со старым folderId)
@@ -40,6 +41,7 @@ export default function AdminRoutesPage() {
   });
   const [loadingData, setLoadingData] = useState(true);
   const [settingsFolder, setSettingsFolder] = useState(null);
+  const [featuredId, setFeaturedId] = useState(null);
 
   useEffect(() => {
     if (!loading && !hasPermission("admin.access")) {
@@ -48,14 +50,32 @@ export default function AdminRoutesPage() {
   }, [user, loading, router, hasPermission]);
 
   const fetchData = useCallback(async () => {
-    const [rRes, fRes] = await Promise.all([
+    const [rRes, fRes, featRes] = await Promise.all([
       authFetch("/api/routes"),
       authFetch("/api/folders"),
+      fetch("/api/routes/featured").then((r) => r.json()).catch(() => null),
     ]);
     if (rRes.ok) setRoutes(await rRes.json());
     if (fRes.ok) setFolders(await fRes.json());
+    if (featRes?.manual && featRes.route) {
+      setFeaturedId(featRes.route._id);
+    }
     setLoadingData(false);
   }, [authFetch]);
+
+  const handleSetFeatured = async (routeId, isAlready) => {
+    if (isAlready) {
+      await authFetch("/api/routes/featured?type=day", { method: "DELETE" });
+      setFeaturedId(null);
+    } else {
+      const res = await authFetch("/api/routes/featured", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ routeId, type: "day" }),
+      });
+      if (res.ok) setFeaturedId(routeId);
+    }
+  };
 
   useEffect(() => {
     if (hasPermission("admin.access")) fetchData();
@@ -205,6 +225,8 @@ export default function AdminRoutesPage() {
               onEditRoute={setEditingRouteId}
               onDeleteRoute={handleDelete}
               onRouteField={handleRouteField}
+              featuredId={featuredId}
+              onSetFeatured={handleSetFeatured}
             />
           ))}
 
@@ -224,6 +246,8 @@ export default function AdminRoutesPage() {
                     onEdit={() => setEditingRouteId(route._id)}
                     onDelete={() => handleDelete(route._id)}
                     onFieldChange={handleRouteField}
+                    featuredId={featuredId}
+                    onSetFeatured={handleSetFeatured}
                   />
                 ))}
               </div>
@@ -347,6 +371,7 @@ function FolderSection({
   folder, routes, allFolders,
   onRename, onSortOrder, onDelete, onOpenSettings,
   onEditRoute, onDeleteRoute, onRouteField,
+  featuredId, onSetFeatured,
 }) {
   const [name, setName] = useState(folder.name);
   const [order, setOrder] = useState(folder.sortOrder ?? 0);
@@ -410,6 +435,8 @@ function FolderSection({
               onEdit={() => onEditRoute(route._id)}
               onDelete={() => onDeleteRoute(route._id)}
               onFieldChange={onRouteField}
+              featuredId={featuredId}
+              onSetFeatured={onSetFeatured}
             />
           ))}
           {routes.length === 0 && (
@@ -482,8 +509,9 @@ function FolderPicker({ route, folders, onFieldChange }) {
 }
 
 // === Строка маршрута ===
-function RouteRow({ route, folders, onEdit, onDelete, onFieldChange }) {
+function RouteRow({ route, folders, onEdit, onDelete, onFieldChange, featuredId, onSetFeatured }) {
   const [order, setOrder] = useState(route.sortOrder ?? 0);
+  const isFeatured = featuredId === route._id;
 
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 transition">
@@ -553,6 +581,17 @@ function RouteRow({ route, folders, onEdit, onDelete, onFieldChange }) {
       </button>
 
       <div className="flex gap-0.5">
+        <button
+          onClick={() => onSetFeatured(route._id, isFeatured)}
+          className={`rounded-lg p-1.5 transition ${
+            isFeatured
+              ? "text-orange-500 hover:text-orange-600"
+              : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-orange-500"
+          }`}
+          title={isFeatured ? "Убрать из маршрута дня" : "Сделать маршрутом дня"}
+        >
+          <Star className="h-4 w-4" fill={isFeatured ? "currentColor" : "none"} />
+        </button>
         <button
           onClick={onEdit}
           className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-blue-500 transition"

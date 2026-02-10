@@ -65,5 +65,36 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
     }
   }, [userPosition, checkpoints, segments, finish, triggeredIds, triggeredSegmentIds, finishReached, playAudio]);
 
-  return { triggeredIds, activeCheckpoint, finishReached, totalCoins, triggeredSegmentIds, activeSegment };
+  const dismissActiveCheckpoint = useCallback(() => {
+    setActiveCheckpoint(null);
+  }, []);
+
+  const dismissActiveSegment = useCallback(() => {
+    setActiveSegment(null);
+  }, []);
+
+  const reset = useCallback(() => {
+    setTriggeredIds(new Set());
+    setActiveCheckpoint(null);
+    setFinishReached(false);
+    setTotalCoins(0);
+    setTriggeredSegmentIds(new Set());
+    setActiveSegment(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  }, []);
+
+  return {
+    triggeredIds,
+    activeCheckpoint,
+    finishReached,
+    totalCoins,
+    triggeredSegmentIds,
+    activeSegment,
+    dismissActiveCheckpoint,
+    dismissActiveSegment,
+    reset,
+  };
 }

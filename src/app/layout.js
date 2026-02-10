@@ -13,13 +13,13 @@ const geistSans = Geist({
 });
 
 export const metadata = {
-  title: "Прогулочные маршруты",
-  description: "PWA-приложение для прогулочных маршрутов с интерактивной картой",
+  title: "Ростов GO",
+  description: "Больше, чем просто прогулка",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Маршруты",
+    title: "Ростов GO",
   },
 };
 
@@ -50,7 +50,7 @@ export default function RootLayout({ children }) {
               <div className="flex items-center px-4 py-3">
                 <a href="/" className="flex items-center gap-2 text-lg font-bold text-[var(--text-primary)]">
                   <Map className="h-6 w-6" />
-                  Маршруты
+                  Ростов GO
                 </a>
               </div>
             </header>

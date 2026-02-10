@@ -410,6 +410,54 @@ export function computeForkDirection(mainPath, branch) {
   return { mainDir, branchDir };
 }
 
+/**
+ * Разделяет путь на пройденную и оставшуюся часть по проекции.
+ * @param {{ lat: number, lng: number }[]} path
+ * @param {{ pathIndex: number, fraction: number }} projection — результат projectPointOnPath
+ * @returns {{ passed: [number,number][], remaining: [number,number][] }} координаты [lng, lat]
+ */
+export function splitPathAtProjection(path, projection) {
+  if (!path || path.length < 2 || !projection) {
+    const coords = (path || []).map((p) => [p.lng, p.lat]);
+    return { passed: [], remaining: coords };
+  }
+
+  const { pathIndex, fraction } = projection;
+  const splitPoint = [
+    path[pathIndex].lng + fraction * (path[pathIndex + 1].lng - path[pathIndex].lng),
+    path[pathIndex].lat + fraction * (path[pathIndex + 1].lat - path[pathIndex].lat),
+  ];
+
+  const passed = [];
+  for (let i = 0; i <= pathIndex; i++) {
+    passed.push([path[i].lng, path[i].lat]);
+  }
+  passed.push(splitPoint);
+
+  const remaining = [splitPoint];
+  for (let i = pathIndex + 1; i < path.length; i++) {
+    remaining.push([path[i].lng, path[i].lat]);
+  }
+
+  return { passed, remaining };
+}
+
+/**
+ * Рассчитывает прогресс (0-1) по проекции на путь.
+ * @param {{ pathIndex: number, fraction: number }} projection
+ * @param {number[]} cumDist — кумулятивные расстояния (от cumulativeDistances)
+ * @returns {number} 0-1
+ */
+export function progressFromProjection(projection, cumDist) {
+  if (!projection || !cumDist || cumDist.length < 2) return 0;
+  const total = cumDist[cumDist.length - 1];
+  if (total === 0) return 0;
+  const { pathIndex, fraction } = projection;
+  const i = Math.min(pathIndex, cumDist.length - 2);
+  const edgeDist = cumDist[i + 1] - cumDist[i];
+  return Math.min(1, (cumDist[i] + fraction * edgeDist) / total);
+}
+
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2 || !checkpoints?.length) return [path];
 
