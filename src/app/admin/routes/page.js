@@ -425,12 +425,22 @@ function FolderSection({
         </button>
       </div>
 
-      {open && (
+      {open && (() => {
+        const exceptions = folder.exceptions || [];
+        const sorted = [...routes].sort((a, b) => {
+          const aEx = exceptions.includes(a._id);
+          const bEx = exceptions.includes(b._id);
+          if (aEx && !bEx) return -1;
+          if (!aEx && bEx) return 1;
+          return 0;
+        });
+        return (
         <div className="space-y-2 mt-2">
-          {routes.map((route) => (
+          {sorted.map((route) => (
             <RouteRow
               key={route._id}
               route={route}
+              folder={folder}
               folders={allFolders}
               onEdit={() => onEditRoute(route._id)}
               onDelete={() => onDeleteRoute(route._id)}
@@ -439,11 +449,12 @@ function FolderSection({
               onSetFeatured={onSetFeatured}
             />
           ))}
-          {routes.length === 0 && (
+          {sorted.length === 0 && (
             <p className="text-xs text-[var(--text-muted)] pl-8 py-2">Пусто</p>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -509,9 +520,10 @@ function FolderPicker({ route, folders, onFieldChange }) {
 }
 
 // === Строка маршрута ===
-function RouteRow({ route, folders, onEdit, onDelete, onFieldChange, featuredId, onSetFeatured }) {
+function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, featuredId, onSetFeatured }) {
   const [order, setOrder] = useState(route.sortOrder ?? 0);
   const isFeatured = featuredId === route._id;
+  const hiddenByFolder = folder?.adminOnly && !folder.exceptions?.includes(route._id);
 
   return (
     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 transition">
@@ -535,9 +547,11 @@ function RouteRow({ route, folders, onEdit, onDelete, onFieldChange, featuredId,
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{route.title}</p>
-          {route.adminOnly && (
+          {route.adminOnly ? (
             <Shield className="h-3 w-3 text-red-400 shrink-0" title="Только админ" />
-          )}
+          ) : hiddenByFolder ? (
+            <Shield className="h-3 w-3 text-orange-400 shrink-0" title="Скрыт папкой" />
+          ) : null}
         </div>
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
           {route.status === "published" ? (
