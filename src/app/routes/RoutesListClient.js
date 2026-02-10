@@ -10,6 +10,8 @@ export default function RoutesListClient({ routes: initialRoutes }) {
   const [routes, setRoutes] = useState(initialRoutes);
 
   const visible = isAdmin ? routes : routes.filter((r) => !r._hidden);
+  const published = visible.filter((r) => !r._hidden);
+  const hidden = visible.filter((r) => r._hidden);
 
   const handleToggleHidden = async (routeId, hide) => {
     // Оптимистичное обновление
@@ -37,7 +39,7 @@ export default function RoutesListClient({ routes: initialRoutes }) {
 
   return (
     <div className="grid gap-4 pb-24">
-      {visible.map((route) => (
+      {published.map((route) => (
         <RouteCard
           key={route._id}
           route={route}
@@ -45,6 +47,19 @@ export default function RoutesListClient({ routes: initialRoutes }) {
           onToggleHidden={handleToggleHidden}
         />
       ))}
+      {isAdmin && hidden.length > 0 && (
+        <>
+          <p className="text-xs text-[var(--text-muted)] mt-2">Скрытые маршруты</p>
+          {hidden.map((route) => (
+            <RouteCard
+              key={route._id}
+              route={route}
+              isAdmin={isAdmin}
+              onToggleHidden={handleToggleHidden}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }
