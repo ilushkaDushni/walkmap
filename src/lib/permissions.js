@@ -17,6 +17,7 @@ export const PERMISSION_REGISTRY = {
   "users.manage_coins": { label: "Управление монетами",         group: "Пользователи" },
   "users.assign_roles": { label: "Назначение ролей",            group: "Пользователи" },
   "roles.manage":       { label: "Управление ролями",           group: "Роли" },
+  "roles.preview":      { label: "Просмотр от имени роли",      group: "Роли" },
   "upload.files":       { label: "Загрузка файлов",             group: "Файлы" },
 };
 

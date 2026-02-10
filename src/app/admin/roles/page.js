@@ -13,6 +13,7 @@ import {
   Users,
   Check,
   Shield,
+  Eye,
 } from "lucide-react";
 
 const PERMISSION_REGISTRY = {
@@ -30,6 +31,7 @@ const PERMISSION_REGISTRY = {
   "users.manage_coins": { label: "Управление монетами",         group: "Пользователи" },
   "users.assign_roles": { label: "Назначение ролей",            group: "Пользователи" },
   "roles.manage":       { label: "Управление ролями",           group: "Роли" },
+  "roles.preview":      { label: "Просмотр от имени роли",      group: "Роли" },
   "upload.files":       { label: "Загрузка файлов",             group: "Файлы" },
 };
 
@@ -49,7 +51,7 @@ function getPermissionGroups() {
 }
 
 export default function AdminRolesPage() {
-  const { user, loading, authFetch, hasPermission } = useUser();
+  const { user, loading, authFetch, hasPermission, hasRealPermission, startPreview } = useUser();
   const router = useRouter();
   const [roles, setRoles] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -193,6 +195,18 @@ export default function AdminRolesPage() {
 
               {/* Действия */}
               <div className="flex gap-0.5">
+                {hasRealPermission("roles.preview") && (
+                  <button
+                    onClick={() => {
+                      startPreview(role);
+                      router.push("/");
+                    }}
+                    className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-purple-500 transition"
+                    title="Просмотр от имени роли"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleEdit(role)}
                   className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-blue-500 transition"

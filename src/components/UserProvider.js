@@ -11,9 +11,38 @@ export function useUser() {
 }
 
 export default function UserProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [realUser, setRealUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const accessTokenRef = useRef(null);
+
+  // Preview mode state
+  const [preview, setPreview] = useState(null); // { role, permissions, roles }
+
+  // Computed user: подменяем permissions/roles в preview mode
+  const user = useMemo(() => {
+    if (!realUser) return null;
+    if (!preview) return realUser;
+    return {
+      ...realUser,
+      permissions: preview.permissions,
+      roles: preview.roles,
+      isSuperadmin: false,
+    };
+  }, [realUser, preview]);
+
+  const isPreviewMode = !!preview;
+
+  const startPreview = useCallback((role) => {
+    setPreview({
+      role,
+      permissions: role.permissions || [],
+      roles: [{ id: role._id || role.id, name: role.name, slug: role.slug, color: role.color, position: role.position }],
+    });
+  }, []);
+
+  const stopPreview = useCallback(() => {
+    setPreview(null);
+  }, []);
 
   // Refresh access token using httpOnly cookie
   const refreshSession = useCallback(async () => {
@@ -21,16 +50,16 @@ export default function UserProvider({ children }) {
       const res = await fetch("/api/auth/refresh", { method: "POST" });
       if (!res.ok) {
         accessTokenRef.current = null;
-        setUser(null);
+        setRealUser(null);
         return null;
       }
       const data = await res.json();
       accessTokenRef.current = data.accessToken;
-      setUser(data.user);
+      setRealUser(data.user);
       return data.accessToken;
     } catch {
       accessTokenRef.current = null;
-      setUser(null);
+      setRealUser(null);
       return null;
     }
   }, []);
@@ -74,7 +103,7 @@ export default function UserProvider({ children }) {
     if (!res.ok) throw new Error(data.error || "Ошибка входа");
 
     accessTokenRef.current = data.accessToken;
-    setUser(data.user);
+    setRealUser(data.user);
     return data.user;
   }, []);
 
@@ -101,17 +130,18 @@ export default function UserProvider({ children }) {
     if (!res.ok) throw new Error(data.error || "Ошибка верификации");
 
     accessTokenRef.current = data.accessToken;
-    setUser(data.user);
+    setRealUser(data.user);
     return data.user;
   }, []);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     accessTokenRef.current = null;
-    setUser(null);
+    setRealUser(null);
+    setPreview(null);
   }, []);
 
-  // Проверка прав: ALL (AND)
+  // Проверка прав: ALL (AND) — проверяет по реальным правам если в preview, чтобы hasPermission("roles.preview") работал корректно
   const hasPermission = useCallback((...perms) => {
     if (!user?.permissions) return false;
     return perms.every((p) => user.permissions.includes(p));
@@ -123,8 +153,18 @@ export default function UserProvider({ children }) {
     return perms.some((p) => user.permissions.includes(p));
   }, [user]);
 
+  // Проверка прав по РЕАЛЬНОМУ юзеру (нужно для кнопки preview на странице ролей)
+  const hasRealPermission = useCallback((...perms) => {
+    if (!realUser?.permissions) return false;
+    return perms.every((p) => realUser.permissions.includes(p));
+  }, [realUser]);
+
   return (
-    <UserContext.Provider value={{ user, loading, login, register, verify, logout, authFetch, hasPermission, hasAnyPermission }}>
+    <UserContext.Provider value={{
+      user, loading, login, register, verify, logout, authFetch,
+      hasPermission, hasAnyPermission, hasRealPermission,
+      startPreview, stopPreview, isPreviewMode, previewRole: preview?.role || null,
+    }}>
       {children}
     </UserContext.Provider>
   );

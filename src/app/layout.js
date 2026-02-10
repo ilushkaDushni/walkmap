@@ -1,6 +1,7 @@
 import { Geist } from "next/font/google";
 import { Map } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import PreviewBanner from "@/components/PreviewBanner";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} min-h-screen font-sans antialiased`}>
         <ThemeProvider>
           <UserProvider>
+            <PreviewBanner />
             {/* Шапка */}
             <header className="sticky top-0 z-50 bg-[var(--bg-header)] border-b border-[var(--border-color)] transition-colors">
               <div className="flex items-center px-4 py-3">
