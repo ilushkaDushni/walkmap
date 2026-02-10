@@ -29,11 +29,11 @@ export default function BottomNav() {
   return (
     <>
       <nav className="fixed bottom-4 left-4 right-4 z-50">
-        <div className="mx-auto flex max-w-md items-center justify-around rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-6 py-3 shadow-2xl transition-colors">
+        <div className="mx-auto flex max-w-md items-center justify-around rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-2 py-3 shadow-2xl transition-colors">
           {/* Главная */}
           <Link
             href="/"
-            className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               isHome ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -44,7 +44,7 @@ export default function BottomNav() {
           {/* Маршруты */}
           <Link
             href="/routes"
-            className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               isRoutesActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -56,7 +56,7 @@ export default function BottomNav() {
           {isAdmin && (
             <button
               onClick={() => setAdminOpen(true)}
-              className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+              className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
                 adminOpen ? "text-amber-500" : "text-[var(--text-muted)] hover:text-amber-500"
               }`}
             >
@@ -68,7 +68,7 @@ export default function BottomNav() {
           {/* Профиль */}
           <button
             onClick={() => setProfileOpen(true)}
-            className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               profileOpen ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -79,7 +79,7 @@ export default function BottomNav() {
           {/* Настройки */}
           <button
             onClick={() => setSettingsOpen(true)}
-            className={`flex flex-col items-center gap-1 px-4 py-1 transition ${
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               settingsOpen ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
