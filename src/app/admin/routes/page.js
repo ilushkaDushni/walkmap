@@ -547,9 +547,7 @@ function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, fea
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{route.title}</p>
-          {route.adminOnly ? (
-            <Shield className="h-3 w-3 text-red-400 shrink-0" title="Только админ" />
-          ) : hiddenByFolder ? (
+          {hiddenByFolder && !route.adminOnly ? (
             <Shield className="h-3 w-3 text-orange-400 shrink-0" title="Скрыт папкой" />
           ) : null}
         </div>
@@ -587,11 +585,11 @@ function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, fea
         className={`rounded-lg p-1.5 transition ${
           route.adminOnly
             ? "text-red-400 hover:text-red-500"
-            : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-red-400"
         }`}
         title={route.adminOnly ? "Только админ — нажмите чтобы показать всем" : "Виден всем — нажмите чтобы скрыть"}
       >
-        {route.adminOnly ? <ShieldOff className="h-4 w-4" /> : <Shield className="h-4 w-4" />}
+        <Shield className="h-4 w-4" fill={route.adminOnly ? "currentColor" : "none"} />
       </button>
 
       <div className="flex gap-0.5">
