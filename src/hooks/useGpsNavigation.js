@@ -9,8 +9,9 @@ import {
   cumulativeDistances,
   progressFromProjection,
   splitPathAtProjection,
-  haversineDistance,
 } from "@/lib/geo";
+
+const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = без сглаживания
 
 /**
  * Центральный хук GPS-навигации.
@@ -19,7 +20,26 @@ import {
  * active — хук работает только когда true (GPS-режим включён)
  */
 export default function useGpsNavigation({ route, active }) {
-  const { position, accuracy, status: gpsStatus, startTracking, stopTracking } = useUserLocation();
+  const { position: rawPosition, accuracy, status: gpsStatus, startTracking, stopTracking } = useUserLocation();
+
+  // Сглаживание позиции (EMA)
+  const smoothedRef = useRef(null);
+  const [smoothedPosition, setSmoothedPosition] = useState(null);
+
+  useEffect(() => {
+    if (!active || !rawPosition) return;
+
+    if (!smoothedRef.current) {
+      // Первая позиция — принимаем как есть
+      smoothedRef.current = { ...rawPosition };
+    } else {
+      smoothedRef.current = {
+        lat: smoothedRef.current.lat + SMOOTH_FACTOR * (rawPosition.lat - smoothedRef.current.lat),
+        lng: smoothedRef.current.lng + SMOOTH_FACTOR * (rawPosition.lng - smoothedRef.current.lng),
+      };
+    }
+    setSmoothedPosition({ ...smoothedRef.current });
+  }, [active, rawPosition]);
 
   // Блокировка обратного хода
   const maxProgressRef = useRef(0);
@@ -51,6 +71,8 @@ export default function useGpsNavigation({ route, active }) {
     });
   }, [segments, path]);
 
+  // Для триггеров используем raw-позицию (точнее для определения радиуса),
+  // для визуала — сглаженную
   const {
     triggeredIds,
     activeCheckpoint,
@@ -65,14 +87,14 @@ export default function useGpsNavigation({ route, active }) {
     checkpoints,
     segments: segmentsWithPositions,
     finish,
-    userPosition: active ? position : null,
+    userPosition: active ? rawPosition : null,
   });
 
-  // Обновляем проекцию при изменении GPS-позиции
+  // Обновляем проекцию при изменении сглаженной позиции
   useEffect(() => {
-    if (!active || !position || path.length < 2) return;
+    if (!active || !smoothedPosition || path.length < 2) return;
 
-    const proj = projectPointOnPath(position, path);
+    const proj = projectPointOnPath(smoothedPosition, path);
     if (!proj) return;
 
     setProjection(proj);
@@ -84,8 +106,7 @@ export default function useGpsNavigation({ route, active }) {
     maxProgressRef.current = clamped;
     setProgress(clamped);
 
-    // Разделяем путь по зафиксированному прогрессу (не по raw)
-    // Находим projection, соответствующий maxProgress
+    // Разделяем путь по зафиксированному прогрессу
     const clampedProjection = clamped === rawProgress
       ? proj
       : progressToProjection(clamped, cumDist, path);
@@ -93,10 +114,12 @@ export default function useGpsNavigation({ route, active }) {
     const { passed, remaining } = splitPathAtProjection(path, clampedProjection);
     setPassedCoords(passed);
     setRemainingCoords(remaining);
-  }, [active, position, path, cumDist]);
+  }, [active, smoothedPosition, path, cumDist]);
 
   const startGps = useCallback(() => {
     maxProgressRef.current = 0;
+    smoothedRef.current = null;
+    setSmoothedPosition(null);
     setProgress(0);
     setProjection(null);
     setIsOffRoute(false);
@@ -109,6 +132,8 @@ export default function useGpsNavigation({ route, active }) {
   const stopGps = useCallback(() => {
     stopTracking();
     maxProgressRef.current = 0;
+    smoothedRef.current = null;
+    setSmoothedPosition(null);
     setProgress(0);
     setProjection(null);
     setIsOffRoute(false);
@@ -142,7 +167,8 @@ export default function useGpsNavigation({ route, active }) {
   }, [remainingCoords]);
 
   return {
-    position,
+    position: smoothedPosition,
+    rawPosition,
     accuracy,
     gpsStatus,
     projection,

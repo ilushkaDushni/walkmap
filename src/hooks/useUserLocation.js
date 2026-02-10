@@ -4,14 +4,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Хук для отслеживания GPS-позиции пользователя.
- *
- * @returns {{
- *   position: { lat: number, lng: number } | null,
- *   accuracy: number | null,
- *   status: 'idle' | 'watching' | 'denied' | 'unavailable' | 'error',
- *   startTracking: () => void,
- *   stopTracking: () => void,
- * }}
  */
 export default function useUserLocation() {
   const [position, setPosition] = useState(null);
@@ -53,8 +45,8 @@ export default function useUserLocation() {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 10000,
-        timeout: 15000,
+        maximumAge: 2000,
+        timeout: 10000,
       }
     );
   }, []);
