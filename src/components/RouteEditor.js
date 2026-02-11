@@ -9,13 +9,12 @@ import CheckpointPanel from "./CheckpointPanel";
 import SegmentPanel from "./SegmentPanel";
 import RouteMediaSection from "./RouteMediaSection";
 import SimulationPanel from "./SimulationPanel";
-import BranchSwitcher from "./BranchSwitcher";
 import { X } from "lucide-react";
-import { projectPointOnPath, getPathContext, haversineDistance } from "@/lib/geo";
+import { projectPointOnPath, haversineDistance } from "@/lib/geo";
 
 const RouteMapLeaflet = dynamic(() => import("./RouteMapLeaflet"), { ssr: false });
 
-const MODE_KEYS = { "1": "view", "2": "drawPath", "3": "addCheckpoint", "4": "addSegment", "5": "simulate", "6": "addBranch", "7": "setMerge" };
+const MODE_KEYS = { "1": "view", "2": "drawPath", "3": "addCheckpoint", "4": "addSegment", "5": "simulate" };
 
 function validateRoute(route) {
   const errors = [];
@@ -37,7 +36,6 @@ export default function RouteEditor({ routeId, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [activeBranchId, setActiveBranchId] = useState(null);
   const historyRef = useRef([]);
   const handleSaveRef = useRef(null);
   const [pathPointMenu, setPathPointMenu] = useState(null);
@@ -87,34 +85,16 @@ export default function RouteEditor({ routeId, onSaved }) {
     setIsDirty(true);
   }, []);
 
-  // Контекст активной ветки или main
-  const activeContext = useMemo(() => {
-    if (!route) return { path: [], checkpoints: [], segments: [] };
-    return getPathContext(route, activeBranchId);
-  }, [route, activeBranchId]);
-
-  // Обновление данных внутри контекста (main или ветки)
-  const updateActiveContext = useCallback(
+  // Хелпер: обновить path/checkpoints/segments в route (main only)
+  const updateMainContext = useCallback(
     (updater) => {
       updateRoute((prev) => {
-        if (!activeBranchId) {
-          // Обновляем main
-          const ctx = { path: prev.path, checkpoints: prev.checkpoints, segments: prev.segments || [] };
-          const next = typeof updater === "function" ? updater(ctx) : { ...ctx, ...updater };
-          return { ...prev, ...next };
-        }
-        // Обновляем ветку
-        const branches = [...(prev.branches || [])];
-        const idx = branches.findIndex((b) => b.id === activeBranchId);
-        if (idx === -1) return prev;
-        const branch = branches[idx];
-        const ctx = { path: branch.path || [], checkpoints: branch.checkpoints || [], segments: branch.segments || [] };
+        const ctx = { path: prev.path, checkpoints: prev.checkpoints, segments: prev.segments || [] };
         const next = typeof updater === "function" ? updater(ctx) : { ...ctx, ...updater };
-        branches[idx] = { ...branch, ...next };
-        return { ...prev, branches };
+        return { ...prev, ...next };
       });
     },
-    [activeBranchId, updateRoute]
+    [updateRoute]
   );
 
   const handleUndo = useCallback(() => {
@@ -209,7 +189,7 @@ export default function RouteEditor({ routeId, onSaved }) {
         return;
       }
 
-      // 1-6 — переключение режимов
+      // 1-5 — переключение режимов
       const modeId = MODE_KEYS[e.key];
       if (modeId) {
         setMode(modeId);
@@ -220,62 +200,19 @@ export default function RouteEditor({ routeId, onSaved }) {
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo, selectedCheckpointId, selectedSegmentIndex]);
 
-  // Создание ветки — клик по пути в режиме addBranch
-  const handleBranchClick = useCallback(
-    (pathIndex, fraction, position) => {
-      const branchId = crypto.randomUUID();
-      const branch = {
-        id: branchId,
-        parentId: activeBranchId || null,
-        name: `Ветка ${(route?.branches || []).length + 1}`,
-        color: ["#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"][((route?.branches || []).length) % 6],
-        fork: { pathIndex, fraction, position },
-        merge: null,
-        path: [{ lat: position.lat, lng: position.lng, order: 0 }],
-        checkpoints: [],
-        segments: [],
-        finish: null,
-      };
-      updateRoute((prev) => ({
-        ...prev,
-        branches: [...(prev.branches || []), branch],
-      }));
-      setActiveBranchId(branchId);
-      setMode("drawPath");
-    },
-    [route, activeBranchId, updateRoute]
-  );
-
-  // Установка merge point — клик по пути в режиме setMerge
-  const handleMergeClick = useCallback(
-    (targetBranchId, pathIndex, fraction, position) => {
-      if (!activeBranchId) return;
-      updateRoute((prev) => ({
-        ...prev,
-        branches: (prev.branches || []).map((b) =>
-          b.id === activeBranchId
-            ? { ...b, merge: { targetId: targetBranchId, pathIndex, fraction, position } }
-            : b
-        ),
-      }));
-      setMode("view");
-    },
-    [activeBranchId, updateRoute]
-  );
-
   // Клик по карте
   const handleMapClick = useCallback(
     (latlng, clickMode) => {
       setPathPointMenu(null);
       setPathLineMenu(null);
       if (clickMode === "drawPath") {
-        updateActiveContext((ctx) => ({
+        updateMainContext((ctx) => ({
           ...ctx,
           path: [...ctx.path, { lat: latlng.lat, lng: latlng.lng, order: ctx.path.length }],
         }));
       } else if (clickMode === "addCheckpoint") {
         const id = crypto.randomUUID();
-        updateActiveContext((ctx) => ({
+        updateMainContext((ctx) => ({
           ...ctx,
           checkpoints: [
             ...ctx.checkpoints,
@@ -293,21 +230,17 @@ export default function RouteEditor({ routeId, onSaved }) {
           ],
         }));
         setSelectedCheckpointId(id);
-      } else if (clickMode === "addBranch") {
-        // Создание ветки — обрабатывается в handleBranchClick
-      } else if (clickMode === "setMerge") {
-        // Установка merge — обрабатывается в handleMergeClick
       } else if (clickMode === "simulate") {
         setSimulatedPosition({ lat: latlng.lat, lng: latlng.lng });
       }
     },
-    [updateRoute, updateActiveContext]
+    [updateMainContext]
   );
 
   // Вставка точки в середину пути
   const handlePathInsert = useCallback(
     (insertIndex, latlng) => {
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const newPath = [...ctx.path];
         newPath.splice(insertIndex, 0, { lat: latlng.lat, lng: latlng.lng, order: 0 });
         const reindexed = newPath.map((p, i) => ({ ...p, order: i }));
@@ -332,19 +265,19 @@ export default function RouteEditor({ routeId, onSaved }) {
         return { ...prev, finishPointIndex: fp, startPointIndex: sp };
       });
     },
-    [updateActiveContext, updateRoute]
+    [updateMainContext, updateRoute]
   );
 
   // Клик по отрезку линии (режим addSegment)
   const handleSegmentLineClick = useCallback(
     (pathIndex) => {
-      const segments = activeContext.segments || [];
+      const segments = route?.segments || [];
       const existing = segments.find((s) => s.pathIndex === pathIndex);
       if (existing) {
         setSelectedSegmentIndex(pathIndex);
       } else {
         const id = crypto.randomUUID();
-        updateActiveContext((ctx) => ({
+        updateMainContext((ctx) => ({
           ...ctx,
           segments: [
             ...(ctx.segments || []),
@@ -354,13 +287,13 @@ export default function RouteEditor({ routeId, onSaved }) {
         setSelectedSegmentIndex(pathIndex);
       }
     },
-    [activeContext, updateActiveContext]
+    [route, updateMainContext]
   );
 
   // Перетаскивание точки пути
   const handlePathPointDrag = useCallback(
     (index, newPos) => {
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const newPath = [...ctx.path];
         newPath[index] = { ...newPath[index], lat: newPos.lat, lng: newPos.lng };
         // Двигаем привязанный чекпоинт
@@ -377,13 +310,13 @@ export default function RouteEditor({ routeId, onSaved }) {
         return prev;
       });
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // Удаление точки пути (правый клик) — с фиксом segment indices, start/finish, bound checkpoints
   const handlePathPointRightClick = useCallback(
     (index) => {
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const newPath = ctx.path.filter((_, i) => i !== index).map((p, i) => ({ ...p, order: i }));
         const newSegments = (ctx.segments || [])
           .filter((s) => s.pathIndex !== index)
@@ -411,7 +344,7 @@ export default function RouteEditor({ routeId, onSaved }) {
         return { ...prev, finishPointIndex: fp, startPointIndex: sp, finish };
       });
     },
-    [updateActiveContext, updateRoute]
+    [updateMainContext, updateRoute]
   );
 
   // Клик по чекпоинту
@@ -422,14 +355,14 @@ export default function RouteEditor({ routeId, onSaved }) {
   // Перетаскивание чекпоинта
   const handleCheckpointDrag = useCallback(
     (id, newPos) => {
-      updateActiveContext((ctx) => ({
+      updateMainContext((ctx) => ({
         ...ctx,
         checkpoints: ctx.checkpoints.map((cp) =>
           cp.id === id ? { ...cp, position: newPos } : cp
         ),
       }));
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // --- Контекстное меню точки пути ---
@@ -440,14 +373,15 @@ export default function RouteEditor({ routeId, onSaved }) {
 
   const handleSetAsFinish = useCallback(
     (index) => {
+      const routePath = route?.path || [];
       updateRoute((prev) => ({
         ...prev,
         finishPointIndex: index,
-        finish: { position: activeContext.path[index], coinsReward: prev.finish?.coinsReward || 0 },
+        finish: { position: routePath[index], coinsReward: prev.finish?.coinsReward || 0 },
       }));
       setPathPointMenu(null);
     },
-    [updateRoute, activeContext.path]
+    [updateRoute, route]
   );
 
   const handleClearFinish = useCallback(() => {
@@ -470,10 +404,10 @@ export default function RouteEditor({ routeId, onSaved }) {
 
   const handleMakeCheckpointAtPoint = useCallback(
     (index) => {
-      const point = activeContext.path[index];
+      const point = route?.path?.[index];
       if (!point) return;
       const id = crypto.randomUUID();
-      updateActiveContext((ctx) => ({
+      updateMainContext((ctx) => ({
         ...ctx,
         checkpoints: [
           ...ctx.checkpoints,
@@ -494,13 +428,13 @@ export default function RouteEditor({ routeId, onSaved }) {
       setPathPointMenu(null);
       setSelectedCheckpointId(id);
     },
-    [activeContext.path, updateActiveContext]
+    [route, updateMainContext]
   );
 
   const handleMergeAtPoint = useCallback(
     (index) => {
       setPathPointMenu(null);
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const { path: p, segments: segs } = ctx;
         if (index <= 0 || index >= p.length - 1) return ctx;
 
@@ -546,7 +480,7 @@ export default function RouteEditor({ routeId, onSaved }) {
         return { ...ctx, path: newPath, checkpoints: newCheckpoints, segments: newSegments };
       });
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // --- Контекстное меню линии пути ---
@@ -558,7 +492,7 @@ export default function RouteEditor({ routeId, onSaved }) {
   const handleAddJunction = useCallback(() => {
     if (!pathLineMenu) return;
     const { insertIndex, lat, lng } = pathLineMenu;
-    updateActiveContext((ctx) => {
+    updateMainContext((ctx) => {
       const newPath = [...ctx.path];
       newPath.splice(insertIndex, 0, { lat, lng, order: 0, isJunction: true });
       const reindexed = newPath.map((p, i) => ({ ...p, order: i }));
@@ -581,24 +515,26 @@ export default function RouteEditor({ routeId, onSaved }) {
       return { ...prev, finishPointIndex: fp, startPointIndex: sp };
     });
     setPathLineMenu(null);
-  }, [pathLineMenu, updateActiveContext, updateRoute]);
+  }, [pathLineMenu, updateMainContext, updateRoute]);
 
   // Обновление чекпоинта
   const handleCheckpointUpdate = useCallback(
     (id, updates) => {
+      const routePath = route?.path || [];
+      const routeCheckpoints = route?.checkpoints || [];
       // Предвычисляем insertIdx если isDivider
       let dividerInsertIdx = null;
-      if (updates.isDivider === true && activeContext.path.length >= 2) {
-        const cp = activeContext.checkpoints.find((c) => c.id === id);
+      if (updates.isDivider === true && routePath.length >= 2) {
+        const cp = routeCheckpoints.find((c) => c.id === id);
         if (cp) {
-          const proj = projectPointOnPath(cp.position, activeContext.path);
+          const proj = projectPointOnPath(cp.position, routePath);
           if (proj && proj.fraction > 0.01 && proj.fraction < 0.99) {
             dividerInsertIdx = proj.pathIndex + 1;
           }
         }
       }
 
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const updatedCheckpoints = ctx.checkpoints.map((cp) =>
           cp.id === id ? { ...cp, ...updates } : cp
         );
@@ -647,13 +583,13 @@ export default function RouteEditor({ routeId, onSaved }) {
         });
       }
     },
-    [updateActiveContext, updateRoute, activeContext.path, activeContext.checkpoints]
+    [updateMainContext, updateRoute, route]
   );
 
   // Удаление чекпоинта
   const handleCheckpointDelete = useCallback(
     (id) => {
-      updateActiveContext((ctx) => ({
+      updateMainContext((ctx) => ({
         ...ctx,
         checkpoints: ctx.checkpoints
           .filter((cp) => cp.id !== id)
@@ -661,7 +597,7 @@ export default function RouteEditor({ routeId, onSaved }) {
       }));
       setSelectedCheckpointId(null);
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // Refs for hotkey access
@@ -672,33 +608,33 @@ export default function RouteEditor({ routeId, onSaved }) {
   // Обновление сегмента (по pathIndex)
   const handleSegmentUpdate = useCallback(
     (pathIndex, updates) => {
-      updateActiveContext((ctx) => ({
+      updateMainContext((ctx) => ({
         ...ctx,
         segments: (ctx.segments || []).map((s) =>
           s.pathIndex === pathIndex ? { ...s, ...updates } : s
         ),
       }));
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // Удаление сегмента (по pathIndex)
   const handleSegmentDelete = useCallback(
     (pathIndex) => {
-      updateActiveContext((ctx) => ({
+      updateMainContext((ctx) => ({
         ...ctx,
         segments: (ctx.segments || []).filter((s) => s.pathIndex !== pathIndex),
       }));
       setSelectedSegmentIndex(null);
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
   handleSegmentDeleteRef.current = handleSegmentDelete;
 
   // Переупорядочивание чекпоинтов (стрелками)
   const handleCheckpointReorder = useCallback(
     (id, direction) => {
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const cps = [...ctx.checkpoints];
         const idx = cps.findIndex((cp) => cp.id === id);
         if (idx === -1) return ctx;
@@ -711,13 +647,13 @@ export default function RouteEditor({ routeId, onSaved }) {
         return { ...ctx, checkpoints: cps };
       });
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // Переупорядочивание чекпоинтов (по номеру)
   const handleCheckpointReorderTo = useCallback(
     (id, newOrder) => {
-      updateActiveContext((ctx) => {
+      updateMainContext((ctx) => {
         const sorted = [...ctx.checkpoints].sort((a, b) => a.order - b.order);
         const currentIdx = sorted.findIndex((cp) => cp.id === id);
         if (currentIdx === -1) return ctx;
@@ -728,7 +664,7 @@ export default function RouteEditor({ routeId, onSaved }) {
         return { ...ctx, checkpoints: reordered };
       });
     },
-    [updateActiveContext]
+    [updateMainContext]
   );
 
   // Валидация при публикации
@@ -748,17 +684,21 @@ export default function RouteEditor({ routeId, onSaved }) {
 
   // Массив pathIndex у сегментов с контентом
   const segmentIndicesWithContent = useMemo(() => {
-    const segs = activeContext.segments;
+    const segs = route?.segments;
     if (!segs) return [];
     return segs
       .filter((s) => (s.title || s.text || s.audio?.length) && s.pathIndex != null)
       .map((s) => s.pathIndex);
-  }, [activeContext.segments]);
+  }, [route?.segments]);
 
   if (!route) return null;
 
-  const selectedCheckpoint = activeContext.checkpoints.find((cp) => cp.id === selectedCheckpointId);
-  const selectedSegment = (activeContext.segments || []).find((s) => s.pathIndex === selectedSegmentIndex);
+  const routePath = route.path || [];
+  const routeCheckpoints = route.checkpoints || [];
+  const routeSegments = route.segments || [];
+
+  const selectedCheckpoint = routeCheckpoints.find((cp) => cp.id === selectedCheckpointId);
+  const selectedSegment = routeSegments.find((s) => s.pathIndex === selectedSegmentIndex);
 
   return (
     <div className="space-y-4">
@@ -798,14 +738,10 @@ export default function RouteEditor({ routeId, onSaved }) {
           center={route.mapCenter}
           zoom={route.mapZoom}
           mode={mode}
-          path={activeContext.path}
-          checkpoints={activeContext.checkpoints}
-          segments={activeContext.segments || []}
+          path={routePath}
+          checkpoints={routeCheckpoints}
+          segments={routeSegments}
           finish={route.finish}
-          branches={route.branches || []}
-          activeBranchId={activeBranchId}
-          mainPath={route.path}
-          mainCheckpoints={route.checkpoints}
           startPointIndex={route.startPointIndex}
           finishPointIndex={route.finishPointIndex}
           onMapClick={handleMapClick}
@@ -822,8 +758,6 @@ export default function RouteEditor({ routeId, onSaved }) {
           selectedSegmentIndex={selectedSegmentIndex}
           segmentIndicesWithContent={segmentIndicesWithContent}
           simulatedPosition={simulatedPosition}
-          onBranchClick={handleBranchClick}
-          onMergeClick={handleMergeClick}
         />
         <RouteEditorToolbar
           mode={mode}
@@ -834,7 +768,6 @@ export default function RouteEditor({ routeId, onSaved }) {
           onUndo={handleUndo}
           canUndo={historyRef.current.length > 0}
           onPreview={() => setShowPreview(true)}
-          activeBranchId={activeBranchId}
         />
         {/* Toast */}
         {saveMessage && (
@@ -897,7 +830,7 @@ export default function RouteEditor({ routeId, onSaved }) {
               </button>
             )}
             {/* Сделать поинтом — если нет привязанного чекпоинта */}
-            {!activeContext.checkpoints.some((cp) => cp.boundToPathIndex === pathPointMenu.index) && (
+            {!routeCheckpoints.some((cp) => cp.boundToPathIndex === pathPointMenu.index) && (
               <button
                 onClick={() => handleMakeCheckpointAtPoint(pathPointMenu.index)}
                 className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
@@ -906,7 +839,7 @@ export default function RouteEditor({ routeId, onSaved }) {
               </button>
             )}
             {/* Объединить — только для внутренних точек */}
-            {pathPointMenu.index > 0 && pathPointMenu.index < activeContext.path.length - 1 && (
+            {pathPointMenu.index > 0 && pathPointMenu.index < routePath.length - 1 && (
               <button
                 onClick={() => handleMergeAtPoint(pathPointMenu.index)}
                 className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
@@ -957,21 +890,11 @@ export default function RouteEditor({ routeId, onSaved }) {
         </div>
       )}
 
-      {/* Переключатель веток */}
-      <BranchSwitcher
-        branches={route.branches || []}
-        activeBranchId={activeBranchId}
-        onSwitch={(id) => { setActiveBranchId(id); setSelectedCheckpointId(null); setSelectedSegmentIndex(null); }}
-        onRename={(id, name) => updateRoute((prev) => ({ ...prev, branches: (prev.branches || []).map((b) => b.id === id ? { ...b, name } : b) }))}
-        onDelete={(id) => { updateRoute((prev) => ({ ...prev, branches: (prev.branches || []).filter((b) => b.id !== id && b.parentId !== id) })); if (activeBranchId === id) setActiveBranchId(null); }}
-        onColorChange={(id, color) => updateRoute((prev) => ({ ...prev, branches: (prev.branches || []).map((b) => b.id === id ? { ...b, color } : b) }))}
-      />
-
       {/* Инфо */}
       <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
-        <span>Точек пути: {activeContext.path.length}</span>
-        <span>Чекпоинтов: {activeContext.checkpoints.length}</span>
-        <span>Отрезков: {(activeContext.segments || []).length} (с контентом: {segmentIndicesWithContent.length})</span>
+        <span>Точек пути: {routePath.length}</span>
+        <span>Чекпоинтов: {routeCheckpoints.length}</span>
+        <span>Отрезков: {routeSegments.length} (с контентом: {segmentIndicesWithContent.length})</span>
         {route.distance > 0 && (
           <span>
             Дистанция:{" "}
@@ -1003,11 +926,11 @@ export default function RouteEditor({ routeId, onSaved }) {
                 onChange={(e) => {
                   if (e.target.value === "checkpoint") {
                     setSelectedSegmentIndex(null);
-                    const first = activeContext.checkpoints[0];
+                    const first = routeCheckpoints[0];
                     if (first) setSelectedCheckpointId(first.id);
                   } else {
                     setSelectedCheckpointId(null);
-                    const segs = activeContext.segments || [];
+                    const segs = routeSegments;
                     if (segs.length > 0) setSelectedSegmentIndex(segs[0].pathIndex);
                   }
                 }}
@@ -1029,12 +952,12 @@ export default function RouteEditor({ routeId, onSaved }) {
                 className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-2 py-1.5 text-xs font-medium text-[var(--text-primary)] focus:outline-none"
               >
                 {selectedCheckpoint
-                  ? activeContext.checkpoints.map((cp) => (
+                  ? routeCheckpoints.map((cp) => (
                       <option key={cp.id} value={cp.id}>
                         #{cp.order + 1}{cp.title ? ` — ${cp.title}` : ""}
                       </option>
                     ))
-                  : (activeContext.segments || []).map((s) => (
+                  : routeSegments.map((s) => (
                       <option key={s.pathIndex} value={s.pathIndex}>
                         #{s.pathIndex + 1}{s.title ? ` — ${s.title}` : ""}
                       </option>
@@ -1060,7 +983,7 @@ export default function RouteEditor({ routeId, onSaved }) {
                   onClose={() => setSelectedCheckpointId(null)}
                   onReorder={handleCheckpointReorder}
                   onReorderTo={handleCheckpointReorderTo}
-                  totalCheckpoints={activeContext.checkpoints.length}
+                  totalCheckpoints={routeCheckpoints.length}
                 />
               )}
               {selectedSegment && (

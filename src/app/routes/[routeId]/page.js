@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import RouteMap from "@/components/RouteMap";
+import RouteComments from "@/components/RouteComments";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,8 @@ export default async function RouteDetailPage({ params }) {
       </div>
 
       <RouteMap route={serialized} />
+
+      <RouteComments routeId={serialized._id} />
     </div>
   );
 }

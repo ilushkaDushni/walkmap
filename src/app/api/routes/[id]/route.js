@@ -34,17 +34,9 @@ export async function PUT(request, { params }) {
   const body = await request.json();
   const db = await getDb();
 
-  // Авто-расчёт distance и duration (main + ветки)
+  // Авто-расчёт distance и duration
   if (body.path && body.path.length >= 2) {
-    let dist = totalPathDistance(body.path);
-    if (body.branches?.length) {
-      for (const branch of body.branches) {
-        if (branch.path?.length >= 2) {
-          dist += totalPathDistance(branch.path);
-        }
-      }
-    }
-    body.distance = Math.round(dist);
+    body.distance = Math.round(totalPathDistance(body.path));
     // ~4 km/h пешком = ~67 м/мин
     body.duration = Math.max(1, Math.round(body.distance / 67));
   }

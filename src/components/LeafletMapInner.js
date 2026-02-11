@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useMemo, useState } from "react";
+import { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { projectPointOnPath, splitPathByCheckpoints, haversineDistance } from "@/lib/geo";
@@ -248,10 +248,6 @@ export default function LeafletMapInner({
   checkpoints = [],
   segments = [],
   finish = null,
-  branches = [],
-  activeBranchId = null,
-  mainPath = [],
-  mainCheckpoints = [],
   startPointIndex = null,
   finishPointIndex = null,
   onMapClick,
@@ -268,13 +264,31 @@ export default function LeafletMapInner({
   selectedSegmentIndex,
   segmentIndicesWithContent = [],
   simulatedPosition = null,
-  onBranchClick,
-  onMergeClick,
 }) {
   const mapRef = useRef(null);
+  const dashStepRef = useRef(0);
+  const dashIntervalRef = useRef(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
   const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
-  const [branchGhostDot, setBranchGhostDot] = useState(null); // { lat, lng } для превью fork point
+
+  // Анимация пунктирной линии
+  useEffect(() => {
+    const patterns = [[0, 4, 3], [1, 4, 2], [2, 4, 1], [3, 4, 0]];
+    dashIntervalRef.current = setInterval(() => {
+      const map = mapRef.current?.getMap();
+      if (!map) return;
+      dashStepRef.current = (dashStepRef.current + 1) % patterns.length;
+      try {
+        if (map.getLayer("route-path-animated")) {
+          map.setPaintProperty("route-path-animated", "line-dasharray", patterns[dashStepRef.current]);
+        }
+      } catch { /* layer может ещё не существовать */ }
+    }, 100);
+    return () => {
+      clearInterval(dashIntervalRef.current);
+      dashIntervalRef.current = null;
+    };
+  }, []);
 
   // fitBounds к маршруту если есть достаточно точек
   const routeBounds = useMemo(() => {
@@ -282,10 +296,6 @@ export default function LeafletMapInner({
     path.forEach((p) => points.push([p.lng, p.lat]));
     checkpoints.forEach((cp) => points.push([cp.position.lng, cp.position.lat]));
     if (finish?.position) points.push([finish.position.lng, finish.position.lat]);
-    // Включаем точки веток
-    branches.forEach((b) => {
-      (b.path || []).forEach((p) => points.push([p.lng, p.lat]));
-    });
     if (points.length < 2) return null;
     let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
     for (const [lng, lat] of points) {
@@ -296,38 +306,7 @@ export default function LeafletMapInner({
     }
     const PAD = 0.005;
     return [[minLng - PAD, minLat - PAD], [maxLng + PAD, maxLat + PAD]];
-  }, [path, checkpoints, finish, branches]);
-
-  // GeoJSON для неактивных веток (пунктир)
-  const inactiveBranchesGeoJson = useMemo(() => {
-    const features = [];
-    for (const branch of branches) {
-      if (branch.id === activeBranchId) continue;
-      if (!branch.path || branch.path.length < 2) continue;
-      features.push({
-        type: "Feature",
-        properties: { color: branch.color || "#10b981", branchId: branch.id },
-        geometry: {
-          type: "LineString",
-          coordinates: branch.path.map((p) => [p.lng, p.lat]),
-        },
-      });
-    }
-    return features.length > 0 ? { type: "FeatureCollection", features } : null;
-  }, [branches, activeBranchId]);
-
-  // Main path GeoJSON (приглушённый когда редактируем ветку)
-  const mainPathGeoJson = useMemo(() => {
-    if (!activeBranchId || mainPath.length < 2) return null;
-    return {
-      type: "Feature",
-      properties: {},
-      geometry: {
-        type: "LineString",
-        coordinates: mainPath.map((p) => [p.lng, p.lat]),
-      },
-    };
-  }, [activeBranchId, mainPath]);
+  }, [path, checkpoints, finish]);
 
   // GeoJSON для каждого отрезка пути — для hit-слоя вставки точек
   const pathSegmentHitGeoJson = useMemo(() => {
@@ -398,46 +377,9 @@ export default function LeafletMapInner({
         return;
       }
 
-      // В режиме addBranch — проецируем клик на текущий path и создаём ветку
-      if (mode === "addBranch") {
-        const clickPos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-        if (path.length >= 2) {
-          const proj = projectPointOnPath(clickPos, path);
-          if (proj && proj.distance < 100) {
-            onBranchClick?.(proj.pathIndex, proj.fraction, proj.position);
-            setBranchGhostDot(null);
-            return;
-          }
-        }
-        return;
-      }
-
-      // В режиме setMerge — проецируем клик на main path (или любой другой) и устанавливаем merge
-      if (mode === "setMerge") {
-        const clickPos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-        // Сначала проверяем main path
-        if (mainPath.length >= 2) {
-          const proj = projectPointOnPath(clickPos, mainPath);
-          if (proj && proj.distance < 100) {
-            onMergeClick?.(null, proj.pathIndex, proj.fraction, proj.position);
-            return;
-          }
-        }
-        // Проверяем другие ветки
-        for (const branch of branches) {
-          if (!branch.path || branch.path.length < 2) continue;
-          const proj = projectPointOnPath(clickPos, branch.path);
-          if (proj && proj.distance < 100) {
-            onMergeClick?.(branch.id, proj.pathIndex, proj.fraction, proj.position);
-            return;
-          }
-        }
-        return;
-      }
-
       onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }, mode);
     },
-    [mode, onMapClick, onSegmentLineClick, onPathInsert, path, mainPath, branches, onBranchClick, onMergeClick]
+    [mode, onMapClick, onSegmentLineClick, onPathInsert, path]
   );
 
   // GeoJSON для линии пути — разбитый по чекпоинтам на чередующиеся сегменты
@@ -484,7 +426,28 @@ export default function LeafletMapInner({
     return { type: "FeatureCollection", features };
   }, [path]);
 
-  // Обработчики hover на слое сегментов + ghost dot для addCheckpoint/addBranch
+  // GeoJSON для цветных сегментов (рёбра с пользовательским цветом)
+  const coloredSegmentsGeoJson = useMemo(() => {
+    if (path.length < 2 || segments.length === 0) return null;
+    const features = [];
+    for (const seg of segments) {
+      if (!seg.color || seg.pathIndex == null) continue;
+      const i = seg.pathIndex;
+      if (i >= path.length - 1) continue;
+      features.push({
+        type: "Feature",
+        properties: { color: seg.color },
+        geometry: {
+          type: "LineString",
+          coordinates: [[path[i].lng, path[i].lat], [path[i + 1].lng, path[i + 1].lat]],
+        },
+      });
+    }
+    if (features.length === 0) return null;
+    return { type: "FeatureCollection", features };
+  }, [path, segments]);
+
+  // Обработчики hover на слое сегментов + ghost dot для addCheckpoint
   const handleMouseMove = useCallback(
     (e) => {
       if (mode === "addSegment") {
@@ -510,19 +473,6 @@ export default function LeafletMapInner({
           setGhostDot(null);
         }
       }
-      if (mode === "addBranch") {
-        const cursorPos = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-        if (path.length >= 2) {
-          const proj = projectPointOnPath(cursorPos, path);
-          if (proj && proj.distance < 100) {
-            setBranchGhostDot(proj.position);
-          } else {
-            setBranchGhostDot(null);
-          }
-        } else {
-          setBranchGhostDot(null);
-        }
-      }
     },
     [mode, path, checkpoints]
   );
@@ -530,7 +480,6 @@ export default function LeafletMapInner({
   const handleMouseLeave = useCallback(() => {
     setHoveredSegmentIndex(null);
     setGhostDot(null);
-    setBranchGhostDot(null);
   }, []);
 
   // Фильтры для слоёв
@@ -583,6 +532,7 @@ export default function LeafletMapInner({
       onContextMenu={(e) => {
         e.preventDefault();
         // ПКМ по линии пути → контекстное меню
+        if (!pathSegmentHitGeoJson) return;
         const features = mapRef.current?.queryRenderedFeatures(e.point, {
           layers: ["path-segment-hit-line"],
         });
@@ -623,6 +573,32 @@ export default function LeafletMapInner({
               "line-color": PATH_COLORS[1],
               "line-width": 3,
               "line-opacity": 0.8,
+            }}
+          />
+          {/* Анимированный пунктир поверх линий */}
+          <Layer
+            id="route-path-animated"
+            type="line"
+            paint={{
+              "line-color": "#ffffff",
+              "line-width": 3,
+              "line-opacity": 0.4,
+              "line-dasharray": [0, 4, 3],
+            }}
+          />
+        </Source>
+      )}
+
+      {/* Цветные сегменты поверх базового пути */}
+      {coloredSegmentsGeoJson && (
+        <Source id="colored-segments" type="geojson" data={coloredSegmentsGeoJson}>
+          <Layer
+            id="colored-segments-line"
+            type="line"
+            paint={{
+              "line-color": ["get", "color"],
+              "line-width": 4,
+              "line-opacity": 0.9,
             }}
           />
         </Source>
@@ -770,103 +746,6 @@ export default function LeafletMapInner({
             }}
           />
         </Marker>
-      )}
-
-      {/* Ghost dot для addBranch — ромбик */}
-      {mode === "addBranch" && branchGhostDot && (
-        <Marker longitude={branchGhostDot.lng} latitude={branchGhostDot.lat}>
-          <div
-            style={{
-              width: 14,
-              height: 14,
-              background: "#10b981",
-              border: "2px solid white",
-              boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-              opacity: 0.6,
-              pointerEvents: "none",
-              transform: "rotate(45deg)",
-            }}
-          />
-        </Marker>
-      )}
-
-      {/* Приглушённый main path когда редактируем ветку */}
-      {mainPathGeoJson && (
-        <Source id="main-path-dim" type="geojson" data={mainPathGeoJson}>
-          <Layer
-            id="main-path-dim-line"
-            type="line"
-            paint={{
-              "line-color": "#3b82f6",
-              "line-width": 3,
-              "line-opacity": 0.3,
-            }}
-          />
-        </Source>
-      )}
-
-      {/* Неактивные ветки — пунктир */}
-      {inactiveBranchesGeoJson && (
-        <Source id="inactive-branches" type="geojson" data={inactiveBranchesGeoJson}>
-          <Layer
-            id="inactive-branches-line"
-            type="line"
-            paint={{
-              "line-color": ["get", "color"],
-              "line-width": 3,
-              "line-opacity": 0.4,
-              "line-dasharray": [4, 3],
-            }}
-          />
-        </Source>
-      )}
-
-      {/* Fork маркеры (ромбики) */}
-      {branches.map((branch) =>
-        branch.fork?.position ? (
-          <Marker
-            key={`fork-${branch.id}`}
-            longitude={branch.fork.position.lng}
-            latitude={branch.fork.position.lat}
-          >
-            <div
-              style={{
-                width: 12,
-                height: 12,
-                background: branch.color || "#10b981",
-                border: "2px solid white",
-                boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-                transform: "rotate(45deg)",
-                cursor: "pointer",
-              }}
-              title={`Развилка: ${branch.name}`}
-            />
-          </Marker>
-        ) : null
-      )}
-
-      {/* Merge маркеры (круги) */}
-      {branches.map((branch) =>
-        branch.merge?.position ? (
-          <Marker
-            key={`merge-${branch.id}`}
-            longitude={branch.merge.position.lng}
-            latitude={branch.merge.position.lat}
-          >
-            <div
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
-                background: branch.color || "#10b981",
-                border: "2px solid white",
-                boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-                cursor: "pointer",
-              }}
-              title={`Слияние: ${branch.name}`}
-            />
-          </Marker>
-        ) : null
       )}
 
       {/* Симулированная позиция пользователя */}

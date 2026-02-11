@@ -11,10 +11,11 @@ export async function GET(request) {
     const db = await getDb();
     const userId = auth.user._id;
 
+    const gpsFilter = { userId: userId.toString(), gpsVerified: true };
     const [completedRoutes, distAgg] = await Promise.all([
-      db.collection("completed_routes").countDocuments({ userId: userId.toString() }),
+      db.collection("completed_routes").countDocuments(gpsFilter),
       db.collection("completed_routes").aggregate([
-        { $match: { userId: userId.toString() } },
+        { $match: gpsFilter },
         { $addFields: { routeObjId: { $toObjectId: "$routeId" } } },
         { $lookup: { from: "routes", localField: "routeObjId", foreignField: "_id", as: "route" } },
         { $unwind: "$route" },
@@ -26,6 +27,7 @@ export async function GET(request) {
       completedRoutes,
       totalDistanceM: distAgg[0]?.total || 0,
       coins: auth.user.coins || 0,
+      achievements: (auth.user.achievements || []).map((a) => a.slug),
     });
   } catch (e) {
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });

@@ -12,7 +12,7 @@ import { haversineDistance } from "@/lib/geo";
  * @param {Object|null} params.finish
  * @param {{ lat: number, lng: number }|null} params.userPosition
  */
-export default function useCheckpointTrigger({ checkpoints = [], segments = [], finish = null, userPosition }) {
+export default function useCheckpointTrigger({ checkpoints = [], segments = [], finish = null, userPosition, onCheckpointTriggered, onFinishTriggered }) {
   const [triggeredIds, setTriggeredIds] = useState(new Set());
   const [activeCheckpoint, setActiveCheckpoint] = useState(null);
   const [finishReached, setFinishReached] = useState(false);
@@ -40,6 +40,7 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
         setActiveCheckpoint(cp);
         setTotalCoins((prev) => prev + (cp.coinsReward || 0));
         playAudio(cp.audio);
+        onCheckpointTriggered?.(cp, Math.round(dist));
         break; // один за раз
       }
     }
@@ -61,6 +62,7 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       if (dist <= 30) {
         setFinishReached(true);
         setTotalCoins((prev) => prev + (finish.coinsReward || 0));
+        onFinishTriggered?.();
       }
     }
   }, [userPosition, checkpoints, segments, finish, triggeredIds, triggeredSegmentIds, finishReached, playAudio]);

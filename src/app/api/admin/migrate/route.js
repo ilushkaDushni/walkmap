@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
 import { ALL_PERMISSIONS, invalidateRolesCache, isSuperadmin } from "@/lib/permissions";
+import { checkAndGrantAchievements } from "@/lib/achievementEngine";
 
 // POST /api/admin/migrate — seed ролей + маппинг user.role → user.roles
 export async function POST(request) {
@@ -95,7 +96,15 @@ export async function POST(request) {
 
   invalidateRolesCache();
 
-  // 3. Создаём уникальные индексы
+  // 3. Ретроактивная выдача достижений (без начисления монет)
+  let achievementsGranted = 0;
+  for (const u of allUsers) {
+    const { newAchievements } = await checkAndGrantAchievements(u._id, { grantReward: false });
+    achievementsGranted += newAchievements.length;
+  }
+  log.push(`Выдано ${achievementsGranted} достижений ретроактивно (без монет)`);
+
+  // 4. Создаём уникальные индексы
   await db.collection("roles").createIndex({ slug: 1 }, { unique: true });
   await db.collection("roles").createIndex({ name: 1 }, { unique: true });
   log.push("Индексы созданы");

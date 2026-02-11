@@ -19,7 +19,7 @@ const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = 
  * @param {{ route: Object, active: boolean }}
  * active — хук работает только когда true (GPS-режим включён)
  */
-export default function useGpsNavigation({ route, active }) {
+export default function useGpsNavigation({ route, active, onCheckpointTriggered, onFinishTriggered }) {
   const { position: rawPosition, accuracy, status: gpsStatus, startTracking, stopTracking } = useUserLocation();
 
   // Сглаживание позиции (EMA)
@@ -88,6 +88,8 @@ export default function useGpsNavigation({ route, active }) {
     segments: segmentsWithPositions,
     finish,
     userPosition: active ? rawPosition : null,
+    onCheckpointTriggered,
+    onFinishTriggered,
   });
 
   // Обновляем проекцию при изменении сглаженной позиции

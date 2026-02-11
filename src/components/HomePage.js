@@ -10,6 +10,10 @@ import {
 import Link from "next/link";
 import { useUser } from "@/components/UserProvider";
 import CountUp from "@/components/CountUp";
+import UserAvatar from "@/components/UserAvatar";
+import { ACHIEVEMENT_REGISTRY, COLOR_CLASSES } from "@/lib/achievements";
+
+const ICON_MAP = { Footprints, Coins, Compass, Ruler, Map, Trophy };
 
 // ─── useInView ──────────────────────────────────────────────────
 function useInView() {
@@ -63,14 +67,7 @@ function getLevelProgress(c) {
   return { pct: Math.round(((c - prev) / (LEVELS[idx].min - prev)) * 100), next: LEVELS[idx] };
 }
 
-const ACHIEVEMENTS = [
-  { icon: Footprints, title: "Первые шаги", desc: "Пройти 1 маршрут", check: (s) => s.completedRoutes >= 1, color: "text-blue-500", bg: "bg-blue-500/10" },
-  { icon: Coins, title: "Коллекционер", desc: "50 монет", check: (s) => s.coins >= 50, color: "text-yellow-500", bg: "bg-yellow-500/10" },
-  { icon: Compass, title: "Путник", desc: "5 маршрутов", check: (s) => s.completedRoutes >= 5, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  { icon: Ruler, title: "Марафонец", desc: "5 км", check: (s) => s.totalDistanceM >= 5000, color: "text-orange-500", bg: "bg-orange-500/10" },
-  { icon: Map, title: "Знаток", desc: "10 маршрутов", check: (s) => s.completedRoutes >= 10, color: "text-purple-500", bg: "bg-purple-500/10" },
-  { icon: Trophy, title: "Богач", desc: "500 монет", check: (s) => s.coins >= 500, color: "text-red-500", bg: "bg-red-500/10" },
-];
+// Достижения теперь из реестра (src/lib/achievements.js)
 
 function getWeatherIcon(code) {
   if (code <= 1) return { Icon: Sun, color: "text-yellow-400", gradient: "from-yellow-500/20 to-orange-500/10" };
@@ -249,7 +246,12 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
   const dist = formatDist(userStats.totalDistanceM);
   const level = getUserLevel(userStats.completedRoutes);
   const progress = getLevelProgress(userStats.completedRoutes);
-  const unlockedCount = ACHIEVEMENTS.filter((a) => a.check(userStats)).length;
+  const dbSlugs = new Set(userStats.achievements || []);
+  const unlockedSlugs = new Set([
+    ...dbSlugs,
+    ...ACHIEVEMENT_REGISTRY.filter((a) => a.check(userStats)).map((a) => a.slug),
+  ]);
+  const unlockedCount = unlockedSlugs.size;
 
   return (
     <div className="space-y-5 px-4 pt-5 pb-4">
@@ -322,15 +324,21 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
         <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4">
           <div className="flex items-center justify-between mb-3">
             <SectionTitle>Достижения</SectionTitle>
-            <span className="text-sm font-bold text-[var(--text-primary)]">{unlockedCount}<span className="text-[var(--text-muted)]">/{ACHIEVEMENTS.length}</span></span>
+            <span className="text-sm font-bold text-[var(--text-primary)]">{unlockedCount}<span className="text-[var(--text-muted)]">/{ACHIEVEMENT_REGISTRY.length}</span></span>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {ACHIEVEMENTS.map((a, i) => {
-              const ok = a.check(userStats);
+            {ACHIEVEMENT_REGISTRY.map((a) => {
+              const Icon = ICON_MAP[a.icon] || Trophy;
+              const colors = COLOR_CLASSES[a.color] || COLOR_CLASSES.blue;
+              const prog = a.progress(userStats);
+              const ok = unlockedSlugs.has(a.slug) || prog.current >= prog.target;
               return (
-                <div key={i} className={`flex flex-col items-center rounded-xl py-2.5 px-1 transition ${ok ? a.bg : "bg-[var(--bg-elevated)] opacity-50"}`} title={`${a.title}: ${a.desc}`}>
-                  <a.icon className={`h-5 w-5 ${ok ? a.color : "text-[var(--text-muted)]"}`} />
-                  <span className={`text-[9px] font-medium mt-1 text-center leading-tight ${ok ? a.color : "text-[var(--text-muted)]"}`}>{a.title}</span>
+                <div key={a.slug} className={`flex flex-col items-center rounded-xl py-2.5 px-1 transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"}`} title={`${a.title}: ${a.desc}`}>
+                  <Icon className={`h-5 w-5 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />
+                  <span className={`text-[9px] font-medium mt-1 text-center leading-tight ${ok ? colors.text : "text-[var(--text-muted)]"}`}>{a.title}</span>
+                  <span className={`text-[8px] mt-0.5 ${ok ? colors.text : "text-[var(--text-muted)]"}`}>
+                    {prog.current}/{prog.target}{prog.unit ? ` ${prog.unit}` : ""}
+                  </span>
                 </div>
               );
             })}
@@ -354,7 +362,10 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--bg-surface)]">
                       <LeaderIcon className={`h-4 w-4 ${colors[i]}`} />
                     </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{l.username}</span>
+                    <UserAvatar username={l.username} avatarUrl={l.avatarUrl} size="sm" />
+                    <Link href={`/users/${l.username}`} className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 hover:underline">
+                      {l.username}
+                    </Link>
                     <span className="text-sm font-bold text-[var(--text-muted)]">{l.count}</span>
                   </div>
                 );
@@ -423,7 +434,7 @@ export default function HomePage() {
   return (
     <AuthenticatedView
       user={user}
-      userStats={userStats || { completedRoutes: 0, totalDistanceM: 0, coins: 0 }}
+      userStats={userStats || { completedRoutes: 0, totalDistanceM: 0, coins: 0, achievements: [] }}
       publicStats={publicStats}
       weather={weather}
       routeOfDay={routeOfDay}

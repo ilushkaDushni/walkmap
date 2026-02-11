@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { interpolateAlongPath, buildRouteEvents, buildRouteEventsWithBranches, cumulativeDistances, sortKeyToProgress, computeForkDirection } from "@/lib/geo";
+import { interpolateAlongPath, buildRouteEvents, cumulativeDistances, sortKeyToProgress } from "@/lib/geo";
 import { MapPin, Play, Pause, RotateCcw, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -14,12 +14,9 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
   const rafRef = useRef(null);
   const lastTimeRef = useRef(null);
 
-  // Упорядоченные события маршрута (с ветками)
+  // Упорядоченные события маршрута
   const events = useMemo(() => {
     if (!route.path || route.path.length < 2) return [];
-    if (route.branches?.length) {
-      return buildRouteEventsWithBranches(route).mainEvents;
-    }
     return buildRouteEvents(
       route.path,
       route.checkpoints || [],
@@ -281,22 +278,6 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
                 )}
               </div>
             )}
-
-            {/* Fork */}
-            {currentEvent.type === "fork" && (() => {
-              const { mainDir, branchDir } = computeForkDirection(route.path, currentEvent.data);
-              const dirLabel = { left: "← Налево", right: "→ Направо", straight: "↑ Прямо" };
-              return (
-                <div className="space-y-1">
-                  <p className="text-xs font-medium" style={{ color: currentEvent.data.color || "#10b981" }}>
-                    Развилка
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Main: {dirLabel[mainDir]} · {currentEvent.data.name || "Ветка"}: {dirLabel[branchDir]}
-                  </p>
-                </div>
-              );
-            })()}
           </div>
         )}
 

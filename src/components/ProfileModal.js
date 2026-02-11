@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X, User, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Camera } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
+import UserAvatar from "./UserAvatar";
+import AvatarCropper from "./AvatarCropper";
 
 export default function ProfileModal({ isOpen, onClose }) {
-  const { user, login, register, verify, logout } = useUser();
+  const { user, login, register, verify, logout, authFetch, updateUser } = useUser();
   const router = useRouter();
-  // "profile" | "login" | "register" | "verify"
+  // "profile" | "login" | "register" | "verify" | "edit"
   const [screen, setScreen] = useState("profile");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +29,12 @@ export default function ProfileModal({ isOpen, onClose }) {
   // Verify fields
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyEmail, setVerifyEmail] = useState("");
+
+  // Edit fields
+  const [editBio, setEditBio] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,12 +61,19 @@ export default function ProfileModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
+  // Заполнить bio при открытии экрана edit
+  useEffect(() => {
+    if (screen === "edit" && user) {
+      setEditBio(user.bio || "");
+    }
+  }, [screen, user]);
+
   const handleLogin = async () => {
     setError("");
     setSubmitting(true);
     try {
       const result = await login(loginUsername, loginPassword);
-      if (!result) return; // забанен — BanModal покажется сам
+      if (!result) return;
       onClose();
       router.push("/");
     } catch (e) {
@@ -108,6 +124,68 @@ export default function ProfileModal({ isOpen, onClose }) {
     onClose();
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result);
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCroppedUpload = async (blob) => {
+    setCropImageSrc(null);
+    setError("");
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
+      const res = await authFetch("/api/users/avatar", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+      updateUser({ avatarUrl: data.avatarUrl });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setError("");
+    setUploadingAvatar(true);
+    try {
+      const res = await authFetch("/api/users/avatar", { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка удаления");
+      updateUser({ avatarUrl: null });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSaveBio = async () => {
+    setError("");
+    setSubmitting(true);
+    try {
+      const res = await authFetch("/api/users/bio", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: editBio }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка сохранения");
+      updateUser({ bio: data.bio });
+      setScreen("profile");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const backdrop = (
@@ -154,17 +232,99 @@ export default function ProfileModal({ isOpen, onClose }) {
   const btnPrimary = "flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--text-primary)] px-4 py-3 text-sm font-semibold text-[var(--bg-surface)] transition hover:opacity-90 disabled:opacity-50";
   const btnOutline = "flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]";
 
+  const primaryRoleColor = user?.roles?.[0]?.color || null;
+
+  // === Экран: Редактирование профиля ===
+  if (user && screen === "edit") {
+    // Cropper sub-screen
+    if (cropImageSrc) {
+      return modalShell(
+        <>
+          <div className="flex flex-col items-center">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Настройте аватар</h2>
+            <AvatarCropper
+              imageSrc={cropImageSrc}
+              onCrop={handleCroppedUpload}
+              onCancel={() => setCropImageSrc(null)}
+            />
+          </div>
+        </>
+      );
+    }
+
+    return modalShell(
+      <>
+        {backBtn("profile")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <div className="relative mb-3">
+            <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="xl" />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-surface)] shadow-lg transition hover:opacity-90 disabled:opacity-50"
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+          {uploadingAvatar && (
+            <p className="text-xs text-[var(--text-muted)] mb-2">Загрузка...</p>
+          )}
+          {user.avatarUrl && (
+            <button
+              onClick={handleRemoveAvatar}
+              disabled={uploadingAvatar}
+              className="text-xs text-red-400 hover:underline disabled:opacity-50 mb-1"
+            >
+              Удалить аватар
+            </button>
+          )}
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Редактирование</h2>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">О себе</label>
+            <textarea
+              value={editBio}
+              onChange={(e) => setEditBio(e.target.value.slice(0, 200))}
+              placeholder="Расскажите о себе..."
+              rows={3}
+              className={`${inputCls} resize-none`}
+            />
+            <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+              {editBio.length}/200
+            </div>
+          </div>
+          {errorMsg}
+          <button onClick={handleSaveBio} disabled={submitting} className={btnPrimary}>
+            {submitting ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
   // === Экран: Профиль (залогинен) ===
   if (user) {
     return modalShell(
       <>
         {closeBtn}
         <div className="flex flex-col items-center">
-          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
-            <User className="h-8 w-8 text-[var(--text-secondary)]" />
+          <div className="mb-3">
+            <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="lg" />
           </div>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">{user.username}</h2>
-          <p className="text-sm text-[var(--text-muted)]">{user.email}</p>
+          {user.bio && (
+            <p className="text-sm text-[var(--text-secondary)] text-center mt-1 max-w-[260px]">{user.bio}</p>
+          )}
+          <p className="text-xs text-[var(--text-muted)] mt-1">{user.email}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1">
             {user.isSuperadmin && (
               <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-500">
@@ -184,10 +344,23 @@ export default function ProfileModal({ isOpen, onClose }) {
             ))}
           </div>
         </div>
-        <button onClick={handleLogout} className={`${btnOutline} mt-4`}>
-          <LogOut className="h-4 w-4" />
-          Выйти
-        </button>
+        <div className="mt-4 space-y-2">
+          <button onClick={() => { setScreen("edit"); setError(""); }} className={btnOutline}>
+            <Pencil className="h-4 w-4" />
+            Редактировать профиль
+          </button>
+          <Link
+            href={`/users/${user.username}`}
+            onClick={onClose}
+            className={`${btnOutline} no-underline`}
+          >
+            Открыть профиль
+          </Link>
+          <button onClick={handleLogout} className={`${btnOutline} text-red-400 border-red-400/30 hover:bg-red-400/10`}>
+            <LogOut className="h-4 w-4" />
+            Выйти
+          </button>
+        </div>
       </>
     );
   }
@@ -198,8 +371,8 @@ export default function ProfileModal({ isOpen, onClose }) {
       <>
         {closeBtn}
         <div className="flex flex-col items-center">
-          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
-            <User className="h-8 w-8 text-[var(--text-secondary)]" />
+          <div className="mb-3">
+            <UserAvatar username="?" size="lg" />
           </div>
           <h2 className="text-lg font-bold text-[var(--text-primary)]">Профиль</h2>
           <p className="text-sm text-[var(--text-muted)]">Гость</p>

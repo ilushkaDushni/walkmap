@@ -246,171 +246,6 @@ export function buildRouteEvents(path, checkpoints = [], segments = [], finish =
 }
 
 /**
- * Разбивает путь на сегменты по позициям чекпоинтов.
- * Возвращает массив подпутей (каждый — массив {lat, lng}).
- * Чередующиеся цвета отображают разбиение.
- * @param {{ lat: number, lng: number }[]} path
- * @param {Object[]} checkpoints — с полем position
- * @returns {{ lat: number, lng: number }[][] }
- */
-/**
- * Возвращает path/checkpoints/segments для main или ветки.
- * @param {Object} route
- * @param {string|null} branchId — null = main
- * @returns {{ path: Array, checkpoints: Array, segments: Array }}
- */
-export function getPathContext(route, branchId) {
-  if (!branchId) {
-    return {
-      path: route.path || [],
-      checkpoints: route.checkpoints || [],
-      segments: route.segments || [],
-    };
-  }
-  const branch = (route.branches || []).find((b) => b.id === branchId);
-  if (!branch) return { path: [], checkpoints: [], segments: [] };
-  return {
-    path: branch.path || [],
-    checkpoints: branch.checkpoints || [],
-    segments: branch.segments || [],
-  };
-}
-
-/**
- * Возвращает path родителя ветки (main или другая ветка).
- * @param {Object} route
- * @param {Object} branch
- * @returns {Array} path родителя
- */
-export function getParentPath(route, branch) {
-  if (!branch.parentId) return route.path || [];
-  const parent = (route.branches || []).find((b) => b.id === branch.parentId);
-  return parent ? parent.path || [] : route.path || [];
-}
-
-/**
- * GPS-позиция на ребре пути по pathIndex и fraction.
- * @param {Array} path
- * @param {number} pathIndex
- * @param {number} fraction — 0-1
- * @returns {{ lat: number, lng: number }}
- */
-export function forkPositionOnPath(path, pathIndex, fraction) {
-  const i = Math.min(pathIndex, path.length - 2);
-  if (i < 0 || path.length < 2) return path[0] || { lat: 0, lng: 0 };
-  return {
-    lat: path[i].lat + fraction * (path[i + 1].lat - path[i].lat),
-    lng: path[i].lng + fraction * (path[i + 1].lng - path[i].lng),
-  };
-}
-
-/**
- * Собирает события маршрута с учётом веток.
- * @param {Object} route
- * @returns {{ mainEvents: Array, branchEvents: Object<string, Array> }}
- */
-export function buildRouteEventsWithBranches(route) {
-  const mainEvents = buildRouteEvents(
-    route.path || [],
-    route.checkpoints || [],
-    route.segments || [],
-    route.finish
-  );
-
-  // Вставляем fork-события в main
-  const branches = route.branches || [];
-  for (const branch of branches) {
-    if (!branch.fork || branch.parentId) continue; // только ветки от main
-    const forkSortKey = branch.fork.pathIndex + branch.fork.fraction;
-    mainEvents.push({
-      type: "fork",
-      data: branch,
-      sortKey: forkSortKey,
-    });
-  }
-  mainEvents.sort((a, b) => a.sortKey - b.sortKey);
-
-  // События для каждой ветки
-  const branchEvents = {};
-  for (const branch of branches) {
-    const bEvents = buildRouteEvents(
-      branch.path || [],
-      branch.checkpoints || [],
-      branch.segments || [],
-      null
-    );
-    // Добавляем merge-событие в конец ветки если есть
-    if (branch.merge) {
-      bEvents.push({
-        type: "merge",
-        data: branch,
-        sortKey: (branch.path || []).length,
-      });
-    }
-    branchEvents[branch.id] = bEvents;
-  }
-
-  return { mainEvents, branchEvents };
-}
-
-/**
- * Азимут (bearing) от p1 к p2 в градусах (0-360).
- */
-export function bearing(p1, p2) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const toDeg = (r) => (r * 180) / Math.PI;
-  const dLng = toRad(p2.lng - p1.lng);
-  const lat1 = toRad(p1.lat);
-  const lat2 = toRad(p2.lat);
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
-/**
- * Определяет направления на развилке (left/right/straight).
- * @param {Array} mainPath — основной path маршрута
- * @param {Object} branch — ветка с fork { pathIndex, fraction } и path
- * @returns {{ mainDir: string, branchDir: string }} "left"|"right"|"straight"
- */
-export function computeForkDirection(mainPath, branch) {
-  const fork = branch.fork;
-  if (!fork || !mainPath || mainPath.length < 2) {
-    return { mainDir: "straight", branchDir: "straight" };
-  }
-
-  const forkIdx = fork.pathIndex;
-  const forkPos = forkPositionOnPath(mainPath, forkIdx, fork.fraction);
-
-  // Входящее направление: от предыдущей точки main path к fork
-  const prevPoint = forkIdx > 0 ? mainPath[forkIdx] : mainPath[0];
-  const inBearing = bearing(prevPoint, forkPos);
-
-  const normalizeTurn = (out) => {
-    let turn = out - inBearing;
-    while (turn > 180) turn -= 360;
-    while (turn < -180) turn += 360;
-    return turn;
-  };
-
-  const dirFromTurn = (turn) => {
-    if (turn >= -15 && turn <= 15) return "straight";
-    return turn < 0 ? "left" : "right";
-  };
-
-  // Направление main после fork
-  const mainNext = forkIdx + 1 < mainPath.length ? mainPath[forkIdx + 1] : null;
-  const mainDir = mainNext ? dirFromTurn(normalizeTurn(bearing(forkPos, mainNext))) : "straight";
-
-  // Направление ветки: path[0] = fork point, path[1] = следующая точка
-  const branchPath = branch.path || [];
-  const branchNext = branchPath.length > 1 ? branchPath[1] : null;
-  const branchDir = branchNext ? dirFromTurn(normalizeTurn(bearing(forkPos, branchNext))) : "straight";
-
-  return { mainDir, branchDir };
-}
-
-/**
  * Разделяет путь на пройденную и оставшуюся часть по проекции.
  * @param {{ lat: number, lng: number }[]} path
  * @param {{ pathIndex: number, fraction: number }} projection — результат projectPointOnPath
@@ -459,11 +294,10 @@ export function progressFromProjection(projection, cumDist) {
 }
 
 export function splitPathByCheckpoints(path, checkpoints) {
-  if (!path || path.length < 2 || !checkpoints?.length) return [path];
+  if (!path || path.length < 2) return [path];
 
-  // Только isDivider чекпоинты разбивают путь
-  const dividers = checkpoints.filter((cp) => cp.isDivider);
-  if (dividers.length === 0) return [path];
+  // isDivider чекпоинты
+  const dividers = (checkpoints || []).filter((cp) => cp.isDivider);
 
   // Проецируем разделители на путь и сортируем по позиции
   const splits = dividers
@@ -471,14 +305,28 @@ export function splitPathByCheckpoints(path, checkpoints) {
     .filter(Boolean)
     .sort((a, b) => a.pathIndex - b.pathIndex || a.fraction - b.fraction);
 
-  if (splits.length === 0) return [path];
+  // Индексы fork-точек на пути (isForkPoint)
+  const forkIndices = new Set();
+  path.forEach((p, i) => {
+    if (p.isForkPoint && i > 0 && i < path.length - 1) {
+      forkIndices.add(i);
+    }
+  });
+
+  if (splits.length === 0 && forkIndices.size === 0) return [path];
 
   const segments = [];
   let currentSegment = [{ lat: path[0].lat, lng: path[0].lng }];
   let splitIdx = 0;
 
   for (let i = 0; i < path.length - 1; i++) {
-    // Добавляем точки разбиения на этом ребре
+    // Разделение по fork-точке (node i)
+    if (forkIndices.has(i)) {
+      segments.push(currentSegment);
+      currentSegment = [{ lat: path[i].lat, lng: path[i].lng }];
+    }
+
+    // Добавляем точки разбиения на этом ребре (isDivider)
     while (splitIdx < splits.length && splits[splitIdx].pathIndex === i) {
       const sp = splits[splitIdx];
       currentSegment.push({ lat: sp.position.lat, lng: sp.position.lng });
@@ -489,7 +337,6 @@ export function splitPathByCheckpoints(path, checkpoints) {
     currentSegment.push({ lat: path[i + 1].lat, lng: path[i + 1].lng });
   }
 
-  // Добавляем оставшиеся split-точки (если pathIndex === last edge)
   if (currentSegment.length > 0) segments.push(currentSegment);
 
   return segments;

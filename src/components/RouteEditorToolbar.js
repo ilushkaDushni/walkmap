@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Route, MapPin, Save, BookOpen, Play, Undo2, ScanEye, GitBranch, Merge } from "lucide-react";
+import { Eye, Route, MapPin, Save, BookOpen, Play, Undo2, ScanEye } from "lucide-react";
 
 const modes = [
   { id: "view", label: "Обзор", shortcut: "1", icon: Eye },
@@ -8,14 +8,12 @@ const modes = [
   { id: "addCheckpoint", label: "Точки", shortcut: "3", icon: MapPin },
   { id: "addSegment", label: "Текст", shortcut: "4", icon: BookOpen },
   { id: "simulate", label: "Тест", shortcut: "5", icon: Play },
-  { id: "addBranch", label: "Ветка", shortcut: "6", icon: GitBranch },
-  { id: "setMerge", label: "Слияние", shortcut: "7", icon: Merge, branchOnly: true },
 ];
 
-export default function RouteEditorToolbar({ mode, onModeChange, onSave, isDirty, saving, onUndo, canUndo, onPreview, activeBranchId }) {
+export default function RouteEditorToolbar({ mode, onModeChange, onSave, isDirty, saving, onUndo, canUndo, onPreview }) {
   return (
     <div className="absolute right-3 top-3 z-10 flex flex-col gap-1 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)]/90 backdrop-blur p-1.5 shadow-lg">
-      {modes.filter((m) => !m.branchOnly || activeBranchId).map(({ id, label, shortcut, icon: Icon }) => (
+      {modes.map(({ id, label, shortcut, icon: Icon }) => (
         <button
           key={id}
           onClick={() => onModeChange(id)}

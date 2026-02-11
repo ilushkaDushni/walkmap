@@ -3,6 +3,8 @@ import { Map } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import PreviewBanner from "@/components/PreviewBanner";
 import BanModal from "@/components/BanModal";
+import AchievementToast from "@/components/AchievementToast";
+import UpdateModal from "@/components/UpdateModal";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
 import "./globals.css";
@@ -44,6 +46,8 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <UserProvider>
             <BanModal />
+            <AchievementToast />
+            <UpdateModal />
             <PreviewBanner />
             {/* Шапка */}
             <header className="sticky top-0 z-50 bg-[var(--bg-header)] border-b border-[var(--border-color)] transition-colors">

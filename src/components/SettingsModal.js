@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { X, Moon, Sun, Bell, Globe, Info } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { APP_VERSION } from "@/lib/version";
 
 export default function SettingsModal({ isOpen, onClose }) {
   const { theme, toggleTheme } = useTheme();
@@ -83,7 +84,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                 <Info className="h-5 w-5 text-[var(--text-secondary)]" />
                 <span className="text-sm text-[var(--text-secondary)]">Версия</span>
               </div>
-              <span className="text-sm text-[var(--text-muted)]">0.1.0</span>
+              <span className="text-sm text-[var(--text-muted)]">{APP_VERSION}</span>
             </div>
           </div>
         </div>

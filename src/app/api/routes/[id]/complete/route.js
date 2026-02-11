@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
+import { checkAndGrantAchievements } from "@/lib/achievementEngine";
 
 export async function POST(request, { params }) {
   const auth = await requireAuth(request);
@@ -41,11 +42,13 @@ export async function POST(request, { params }) {
     const coins = Math.min(body.coins || 0, maxPossibleCoins);
 
     // Записываем прохождение
+    const gpsVerified = body.gpsVerified === true;
     await db.collection("completed_routes").insertOne({
       userId,
       routeId: id,
       completedAt: new Date(),
       coinsEarned: coins,
+      gpsVerified,
     });
 
     // Начисляем монеты
@@ -56,7 +59,15 @@ export async function POST(request, { params }) {
       );
     }
 
-    return NextResponse.json({ success: true, coins });
+    // Проверяем достижения
+    const { newAchievements, rewardCoins } = await checkAndGrantAchievements(auth.user._id);
+
+    return NextResponse.json({
+      success: true,
+      coins,
+      newAchievements,
+      achievementRewardCoins: rewardCoins,
+    });
   } catch (e) {
     console.error("Route complete error:", e);
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });

@@ -12,7 +12,7 @@ export async function GET() {
       { $addFields: { userObjId: { $toObjectId: "$_id" } } },
       { $lookup: { from: "users", localField: "userObjId", foreignField: "_id", as: "user" } },
       { $unwind: "$user" },
-      { $project: { _id: 0, username: "$user.username", count: 1 } },
+      { $project: { _id: 0, username: "$user.username", avatarUrl: { $ifNull: ["$user.avatarUrl", null] }, count: 1 } },
     ]).toArray();
 
     return NextResponse.json(leaders);

@@ -5,8 +5,9 @@ import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
 import useGpsNavigation from "@/hooks/useGpsNavigation";
+import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
-import { buildRouteEvents, buildRouteEventsWithBranches, splitPathByCheckpoints, projectPointOnPath, computeForkDirection } from "@/lib/geo";
+import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -79,8 +80,6 @@ function accuracyCircleGeoJson(center, radiusMeters) {
 export default function RouteMapLeaflet({ route }) {
   const [started, setStarted] = useState(false);
   const [eventIndex, setEventIndex] = useState(0);
-  const [activeBranchId, setActiveBranchId] = useState(null);
-  const [branchEventIndex, setBranchEventIndex] = useState(0);
   const mapRef = useRef(null);
 
   // GPS
@@ -96,10 +95,27 @@ export default function RouteMapLeaflet({ route }) {
   const { authFetch, user } = useUser();
   const { download, downloading, progress: dlProgress, done } = useOfflineDownload(route);
   const routeBounds = useRouteBounds(route);
+  const { requestPermission, notify } = useNotification();
+
+  const handleCheckpointNotification = useCallback((checkpoint, dist) => {
+    notify(checkpoint.title || "Контрольная точка", {
+      body: `До точки ${dist} м`,
+      tag: `checkpoint-${checkpoint.id}`,
+    });
+  }, [notify]);
+
+  const handleFinishNotification = useCallback(() => {
+    notify("Финиш рядом!", {
+      body: "Вы почти дошли до конца маршрута",
+      tag: "finish",
+    });
+  }, [notify]);
 
   const gps = useGpsNavigation({
     route,
     active: gpsMode === "gps_active",
+    onCheckpointTriggered: handleCheckpointNotification,
+    onFinishTriggered: handleFinishNotification,
   });
 
   // === GPS state machine ===
@@ -131,9 +147,10 @@ export default function RouteMapLeaflet({ route }) {
     map.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 1000 });
   }, [gpsMode, gps.position, autoFollow]);
 
-  // === Анимация пунктирной линии ===
+  // === Анимация пунктирной линии (preview + GPS) ===
   useEffect(() => {
-    if (gpsMode !== "gps_active") {
+    // Анимируем в preview (gpsMode === null) и в GPS-режиме
+    if (gpsMode !== null && gpsMode !== "gps_active") {
       if (dashIntervalRef.current) {
         clearInterval(dashIntervalRef.current);
         dashIntervalRef.current = null;
@@ -146,6 +163,9 @@ export default function RouteMapLeaflet({ route }) {
       if (!map) return;
       dashStepRef.current = (dashStepRef.current + 1) % patterns.length;
       try {
+        if (map.getLayer("route-path-animated")) {
+          map.setPaintProperty("route-path-animated", "line-dasharray", patterns[dashStepRef.current]);
+        }
         if (map.getLayer("remaining-route-animated")) {
           map.setPaintProperty("remaining-route-animated", "line-dasharray", patterns[dashStepRef.current]);
         }
@@ -170,61 +190,57 @@ export default function RouteMapLeaflet({ route }) {
     authFetch(`/api/routes/${route._id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coins: gps.totalCoins }),
-    }).catch(() => {});
+      body: JSON.stringify({ coins: gps.totalCoins, gpsVerified: true }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.newAchievements?.length > 0) {
+          window.dispatchEvent(new CustomEvent("achievement-unlocked", {
+            detail: { slugs: data.newAchievements, rewardCoins: data.achievementRewardCoins },
+          }));
+        }
+      })
+      .catch(() => {});
   }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins]);
 
   // === Events (manual mode) ===
-  const { mainEvents, branchEvents } = useMemo(() => {
-    if (!route.path || route.path.length < 2) return { mainEvents: [], branchEvents: {} };
-    if (route.branches?.length) {
-      return buildRouteEventsWithBranches(route);
-    }
-    return {
-      mainEvents: buildRouteEvents(route.path, route.checkpoints || [], route.segments || [], route.finish),
-      branchEvents: {},
-    };
+  const events = useMemo(() => {
+    if (!route.path || route.path.length < 2) return [];
+    return buildRouteEvents(route.path, route.checkpoints || [], route.segments || [], route.finish);
   }, [route]);
 
-  const events = activeBranchId ? (branchEvents[activeBranchId] || []) : mainEvents;
-  const currentIdx = activeBranchId ? branchEventIndex : eventIndex;
-  const currentEvent = events[currentIdx] || null;
-  const isLast = currentIdx >= events.length - 1;
+  const currentEvent = events[eventIndex] || null;
+  const isLast = eventIndex >= events.length - 1;
 
   // === GPS auto-advance: когда GPS триггерит чекпоинт/сегмент, переключаем карточку ===
   useEffect(() => {
     if (!gps.activeCheckpoint || !started) return;
-    const idx = mainEvents.findIndex(
+    const idx = events.findIndex(
       (e) => e.type === "checkpoint" && e.data.id === gps.activeCheckpoint.id
     );
     if (idx >= 0 && idx !== eventIndex) {
       setEventIndex(idx);
-      setActiveBranchId(null);
-      setBranchEventIndex(0);
     }
-  }, [gps.activeCheckpoint, started, mainEvents, eventIndex]);
+  }, [gps.activeCheckpoint, started, events, eventIndex]);
 
   useEffect(() => {
     if (!gps.activeSegment || !started) return;
-    const idx = mainEvents.findIndex(
+    const idx = events.findIndex(
       (e) => e.type === "segment" && e.data.id === gps.activeSegment.id
     );
     if (idx >= 0 && idx !== eventIndex) {
       setEventIndex(idx);
-      setActiveBranchId(null);
-      setBranchEventIndex(0);
     }
-  }, [gps.activeSegment, started, mainEvents, eventIndex]);
+  }, [gps.activeSegment, started, events, eventIndex]);
 
   // При GPS-финише переключаемся на финишную карточку
   useEffect(() => {
     if (gpsMode !== "gps_finished" || !started) return;
-    const idx = mainEvents.findIndex((e) => e.type === "finish");
+    const idx = events.findIndex((e) => e.type === "finish");
     if (idx >= 0) {
       setEventIndex(idx);
-      setActiveBranchId(null);
     }
-  }, [gpsMode, started, mainEvents]);
+  }, [gpsMode, started, events]);
 
   // === GeoJSON (manual mode layers) ===
   const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
@@ -242,21 +258,28 @@ export default function RouteMapLeaflet({ route }) {
     return { type: "FeatureCollection", features };
   }, [route.path, route.checkpoints]);
 
-  const branchesGeoJson = useMemo(() => {
-    const branches = route.branches || [];
-    if (branches.length === 0) return null;
-    const features = branches
-      .filter((b) => b.path?.length >= 2)
-      .map((b) => ({
+  // GeoJSON для цветных сегментов
+  const coloredSegmentsGeoJson = useMemo(() => {
+    const path = route.path;
+    const segments = route.segments || [];
+    if (!path || path.length < 2 || segments.length === 0) return null;
+    const features = [];
+    for (const seg of segments) {
+      if (!seg.color || seg.pathIndex == null) continue;
+      const i = seg.pathIndex;
+      if (i >= path.length - 1) continue;
+      features.push({
         type: "Feature",
-        properties: { color: b.color || "#10b981" },
+        properties: { color: seg.color },
         geometry: {
           type: "LineString",
-          coordinates: b.path.map((p) => [p.lng, p.lat]),
+          coordinates: [[path[i].lng, path[i].lat], [path[i + 1].lng, path[i + 1].lat]],
         },
-      }));
-    return features.length > 0 ? { type: "FeatureCollection", features } : null;
-  }, [route.branches]);
+      });
+    }
+    if (features.length === 0) return null;
+    return { type: "FeatureCollection", features };
+  }, [route.path, route.segments]);
 
   const activeSegmentGeoJson = useMemo(() => {
     if (!currentEvent || !started || gpsMode === "gps_active") return null;
@@ -354,6 +377,7 @@ export default function RouteMapLeaflet({ route }) {
     userDragRef.current = false;
     lastCameraRef.current = 0;
     gps.startGps();
+    requestPermission();
   };
 
   const handleStopGps = () => {
@@ -367,45 +391,11 @@ export default function RouteMapLeaflet({ route }) {
   };
 
   const handleNext = () => {
-    if (activeBranchId) {
-      const bEvents = branchEvents[activeBranchId] || [];
-      const nextBranchEvent = bEvents[branchEventIndex + 1];
-      if (nextBranchEvent?.type === "merge") {
-        setActiveBranchId(null);
-        const forkIdx = mainEvents.findIndex((e) => e.type === "fork" && e.data.id === activeBranchId);
-        if (forkIdx >= 0 && forkIdx + 1 < mainEvents.length) {
-          setEventIndex(forkIdx + 1);
-        }
-        setBranchEventIndex(0);
-        return;
-      }
-      if (branchEventIndex < bEvents.length - 1) {
-        setBranchEventIndex((i) => i + 1);
-      }
-    } else {
-      if (!isLast) setEventIndex((i) => i + 1);
-    }
+    if (!isLast) setEventIndex((i) => i + 1);
   };
 
   const handlePrev = () => {
-    if (activeBranchId) {
-      if (branchEventIndex > 0) setBranchEventIndex((i) => i - 1);
-      else {
-        setActiveBranchId(null);
-        setBranchEventIndex(0);
-      }
-    } else {
-      if (eventIndex > 0) setEventIndex((i) => i - 1);
-    }
-  };
-
-  const handleChooseBranch = (branchId) => {
-    setActiveBranchId(branchId);
-    setBranchEventIndex(0);
-  };
-
-  const handleStayMain = () => {
-    setEventIndex((i) => i + 1);
+    if (eventIndex > 0) setEventIndex((i) => i - 1);
   };
 
   const isGpsOverlay = gpsMode === "gps_active" || gpsMode === "gps_finished";
@@ -443,6 +433,32 @@ export default function RouteMapLeaflet({ route }) {
                 filter={["==", ["get", "colorIndex"], 1]}
                 paint={{ "line-color": PATH_COLORS[1], "line-width": 3, "line-opacity": 0.8 }}
               />
+              {/* Анимированный пунктир поверх линий */}
+              <Layer
+                id="route-path-animated"
+                type="line"
+                paint={{
+                  "line-color": "#ffffff",
+                  "line-width": 3,
+                  "line-opacity": 0.4,
+                  "line-dasharray": [0, 4, 3],
+                }}
+              />
+            </Source>
+          )}
+
+          {/* Цветные сегменты поверх базового пути */}
+          {!isGpsOverlay && coloredSegmentsGeoJson && (
+            <Source id="colored-segments" type="geojson" data={coloredSegmentsGeoJson}>
+              <Layer
+                id="colored-segments-line"
+                type="line"
+                paint={{
+                  "line-color": ["get", "color"],
+                  "line-width": 4,
+                  "line-opacity": 0.9,
+                }}
+              />
             </Source>
           )}
 
@@ -472,29 +488,6 @@ export default function RouteMapLeaflet({ route }) {
               <Layer id="accuracy-circle-border" type="line"
                 paint={{ "line-color": "#4285f4", "line-opacity": 0.3, "line-width": 1 }} />
             </Source>
-          )}
-
-          {/* Ветки — пунктир (не в GPS) */}
-          {!isGpsOverlay && branchesGeoJson && (
-            <Source id="branches-view" type="geojson" data={branchesGeoJson}>
-              <Layer id="branches-view-line" type="line"
-                paint={{ "line-color": ["get", "color"], "line-width": 3, "line-opacity": 0.5, "line-dasharray": [4, 3] }} />
-            </Source>
-          )}
-
-          {/* Fork маркеры */}
-          {!isGpsOverlay && (route.branches || []).map((branch) =>
-            branch.fork?.position ? (
-              <Marker key={`fork-${branch.id}`} longitude={branch.fork.position.lng} latitude={branch.fork.position.lat}>
-                <div style={{
-                  width: 10, height: 10,
-                  background: branch.color || "#10b981",
-                  border: "2px solid white",
-                  boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-                  transform: "rotate(45deg)",
-                }} />
-              </Marker>
-            ) : null
           )}
 
           {/* Подсветка активного отрезка (только без GPS overlay) */}
@@ -701,7 +694,7 @@ export default function RouteMapLeaflet({ route }) {
         <>
           {currentEvent && (
             <div
-              key={`${activeBranchId || "main"}-${currentIdx}`}
+              key={`main-${eventIndex}`}
               className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3 animate-[fadeIn_0.7s_ease]"
             >
               {/* Сегмент */}
@@ -725,7 +718,7 @@ export default function RouteMapLeaflet({ route }) {
                     </div>
                   )}
                   {currentEvent.data.audio?.length > 0 && (
-                    <AudioPlayer key={`seg-${currentIdx}`} urls={currentEvent.data.audio} autoPlay variant="full" />
+                    <AudioPlayer key={`seg-${eventIndex}`} urls={currentEvent.data.audio} autoPlay variant="full" />
                   )}
                 </>
               )}
@@ -761,7 +754,7 @@ export default function RouteMapLeaflet({ route }) {
                       </div>
                     )}
                     {currentEvent.data.audio?.length > 0 && (
-                      <AudioPlayer key={`cp-${currentIdx}`} urls={currentEvent.data.audio} autoPlay variant="full" />
+                      <AudioPlayer key={`cp-${eventIndex}`} urls={currentEvent.data.audio} autoPlay variant="full" />
                     )}
                     {currentEvent.data.coinsReward > 0 && (
                       <p className="text-sm font-medium text-amber-600">+{currentEvent.data.coinsReward} монет</p>
@@ -782,61 +775,33 @@ export default function RouteMapLeaflet({ route }) {
                   </a>
                 </div>
               )}
-
-              {/* Fork */}
-              {currentEvent.type === "fork" && (() => {
-                const { mainDir, branchDir } = computeForkDirection(route.path, currentEvent.data);
-                const dirLabel = { left: "← Налево", right: "Направо →", straight: "↑ Прямо" };
-                return (
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-[var(--text-primary)] text-center">Развилка</p>
-                    <p className="text-sm text-[var(--text-secondary)] text-center">Выберите путь:</p>
-                    <div className="flex flex-col gap-2">
-                      <button onClick={handleStayMain} className="w-full rounded-xl border border-blue-500 px-4 py-3 text-sm font-medium text-blue-600 transition hover:bg-blue-50">
-                        <span className="block">{dirLabel[mainDir]}</span>
-                        <span className="text-xs opacity-70">Основной маршрут</span>
-                      </button>
-                      <button onClick={() => handleChooseBranch(currentEvent.data.id)} className="w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90" style={{ background: currentEvent.data.color || "#10b981" }}>
-                        <span className="block">{dirLabel[branchDir]}</span>
-                        <span className="text-xs opacity-80">{currentEvent.data.name || "Ветка"}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Merge */}
-              {currentEvent.type === "merge" && (
-                <div className="text-center py-2">
-                  <p className="text-sm text-[var(--text-muted)]">Возврат к основному маршруту</p>
-                </div>
-              )}
             </div>
           )}
 
           {/* Навигация Вперёд/Назад */}
-          {events.length > 0 && currentEvent?.type !== "fork" && (
+          {events.length > 0 && (
             <div className="flex items-center justify-between">
               <button
                 onClick={handlePrev}
-                disabled={currentIdx === 0 && !activeBranchId}
+                disabled={eventIndex === 0}
                 className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-30"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
               <span className="text-xs text-[var(--text-muted)]">
-                {activeBranchId && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] mr-1">ветка</span>
-                )}
-                {currentIdx + 1} / {events.length}
+                {eventIndex + 1} / {events.length}
               </span>
-              <button
-                onClick={handleNext}
-                disabled={isLast}
-                className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600 text-white transition hover:bg-green-700 disabled:opacity-30"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
+              {gpsMode === "gps_active" ? (
+                <div className="h-12 w-12" />
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={isLast}
+                  className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600 text-white transition hover:bg-green-700 disabled:opacity-30"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              )}
             </div>
           )}
         </>

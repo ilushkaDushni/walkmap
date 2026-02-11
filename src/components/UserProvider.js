@@ -46,6 +46,11 @@ export default function UserProvider({ children }) {
     setPreview(null);
   }, []);
 
+  // Update user fields locally (e.g. after avatar/bio change)
+  const updateUser = useCallback((updates) => {
+    setRealUser((prev) => (prev ? { ...prev, ...updates } : null));
+  }, []);
+
   // Refresh access token using httpOnly cookie (deduplicated)
   const refreshPromiseRef = useRef(null);
   const refreshSession = useCallback(async () => {
@@ -191,7 +196,7 @@ export default function UserProvider({ children }) {
   return (
     <UserContext.Provider value={{
       user, loading, isBanned, bannedUsername, login, register, verify, logout, authFetch,
-      hasPermission, hasAnyPermission, hasRealPermission,
+      hasPermission, hasAnyPermission, hasRealPermission, updateUser,
       startPreview, stopPreview, isPreviewMode, previewRole: preview?.role || null,
     }}>
       {children}

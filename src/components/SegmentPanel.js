@@ -5,6 +5,8 @@ import { Trash2, X, Upload } from "lucide-react";
 import { validateFile } from "@/lib/validateFile";
 import AudioPlayer from "@/components/AudioPlayer";
 
+const PRESET_COLORS = ["#f59e0b", "#ef4444", "#3b82f6", "#22c55e", "#8b5cf6", "#ec4899", "#f97316", "#06b6d4"];
+
 export default function SegmentPanel({ segment, onUpdate, onDelete, onClose }) {
   const { authFetch } = useUser();
 
@@ -79,6 +81,56 @@ export default function SegmentPanel({ segment, onUpdate, onDelete, onClose }) {
         rows={8}
         className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-3 py-2 text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-green-500/50 resize-y"
       />
+
+      {/* Цвет */}
+      <div>
+        <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Цвет линии</p>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {/* Без цвета (сброс) */}
+          <button
+            onClick={() => onUpdate({ color: null })}
+            className="rounded-full p-0.5 transition"
+            style={{
+              outline: !segment.color ? "2px solid #9ca3af" : "2px solid transparent",
+              outlineOffset: 1,
+            }}
+            title="Без цвета"
+          >
+            <div
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background: "repeating-conic-gradient(#d1d5db 0% 25%, white 0% 50%) 50% / 11px 11px",
+                border: "1px solid #d1d5db",
+              }}
+            />
+          </button>
+          {PRESET_COLORS.map((c) => (
+            <button
+              key={c}
+              onClick={() => onUpdate({ color: c })}
+              className="rounded-full p-0.5 transition"
+              style={{
+                outline: segment.color === c ? `2px solid ${c}` : "2px solid transparent",
+                outlineOffset: 1,
+              }}
+            >
+              <div
+                style={{ width: 22, height: 22, borderRadius: "50%", background: c }}
+              />
+            </button>
+          ))}
+          <label className="flex items-center">
+            <input
+              type="color"
+              value={segment.color || "#3b82f6"}
+              onChange={(e) => onUpdate({ color: e.target.value })}
+              className="h-7 w-7 cursor-pointer rounded-full border-0 bg-transparent p-0"
+            />
+          </label>
+        </div>
+      </div>
 
       {/* Фото */}
       <div>
