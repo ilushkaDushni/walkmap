@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { resolveUserPermissions, isSuperadmin, getTopPosition, getAllRoles } from "@/lib/permissions";
 import { logCoinTransaction } from "@/lib/coinTransactions";
+import { createNotification } from "@/lib/notifications";
 
 // PUT /api/admin/users/[id] — обновить пользователя (split permissions)
 export async function PUT(request, { params }) {
@@ -120,12 +121,19 @@ export async function PUT(request, { params }) {
   if (body.addCoins !== undefined) {
     const delta = Number(body.addCoins);
     if (!isNaN(delta) && delta !== 0) {
+      const coinMsg = typeof body.coinMessage === "string" ? body.coinMessage.trim().slice(0, 200) : "";
       await logCoinTransaction(db, {
         userId: id,
         type: delta > 0 ? "admin_add" : "admin_subtract",
         amount: delta,
         balance: result?.coins || 0,
-        meta: { adminId: callerId, adminUsername: caller.username },
+        meta: { adminId: callerId, adminUsername: caller.username, ...(coinMsg && { message: coinMsg }) },
+      });
+      // Уведомление пользователю о начислении/списании
+      await createNotification(id, "coin_admin", {
+        amount: delta,
+        adminUsername: caller.username,
+        ...(coinMsg && { message: coinMsg }),
       });
     }
   }

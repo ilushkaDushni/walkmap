@@ -171,8 +171,8 @@ export default function AdminUsersPage() {
       {coinsModal && (
         <CoinsModal
           u={coinsModal}
-          onSave={(delta) => {
-            handleUpdate(coinsModal._id, { addCoins: delta });
+          onSave={(delta, msg) => {
+            handleUpdate(coinsModal._id, { addCoins: delta, coinMessage: msg });
             setCoinsModal(null);
           }}
           onClose={() => setCoinsModal(null)}
@@ -341,6 +341,7 @@ function UserRow({ u, isSelf, allRoles, canAssignRoles, canBan, canManageCoins, 
 // === Модалка монет ===
 function CoinsModal({ u, onSave, onClose }) {
   const [delta, setDelta] = useState("");
+  const [coinMessage, setCoinMessage] = useState("");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
@@ -364,10 +365,18 @@ function CoinsModal({ u, onSave, onClose }) {
         <input
           type="number"
           placeholder="Кол-во (- для списания)"
-          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none mb-4"
+          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none mb-2"
           value={delta}
           onChange={(e) => setDelta(e.target.value)}
           autoFocus
+        />
+        <textarea
+          placeholder="Подпись (необязательно)"
+          className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm text-[var(--text-primary)] outline-none mb-4 resize-none"
+          rows={2}
+          maxLength={200}
+          value={coinMessage}
+          onChange={(e) => setCoinMessage(e.target.value)}
         />
 
         <div className="flex gap-2">
@@ -380,7 +389,7 @@ function CoinsModal({ u, onSave, onClose }) {
           <button
             onClick={() => {
               const n = Number(delta);
-              if (!isNaN(n) && n !== 0) onSave(n);
+              if (!isNaN(n) && n !== 0) onSave(n, coinMessage);
             }}
             disabled={!delta || isNaN(Number(delta)) || Number(delta) === 0}
             className="flex-1 rounded-xl bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"

@@ -72,7 +72,6 @@ export async function DELETE(request) {
     return NextResponse.json({ error: "URL не указан" }, { status: 400 });
   }
 
-  // extract relative path from URL like /api/uploads/photos/xxx.jpg
   const prefix = "/api/uploads/";
   if (!url.includes(prefix)) {
     return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
@@ -81,7 +80,6 @@ export async function DELETE(request) {
   const relativePath = url.split(prefix).pop();
   const filePath = path.resolve(UPLOADS_DIR, relativePath);
 
-  // path traversal protection
   if (!filePath.startsWith(UPLOADS_DIR)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -10,7 +10,8 @@ export async function POST(request) {
   const auth = await requireAuth(request);
   if (auth.error) return auth.error;
 
-  const { friendId, amount } = await request.json();
+  const { friendId, amount, message } = await request.json();
+  const trimmedMessage = typeof message === "string" ? message.trim().slice(0, 200) : "";
 
   if (!friendId || !ObjectId.isValid(friendId)) {
     return NextResponse.json({ error: "Некорректный ID друга" }, { status: 400 });
@@ -66,14 +67,14 @@ export async function POST(request) {
     type: "gift_sent",
     amount: -parsedAmount,
     balance: updatedSender.coins || 0,
-    meta: { friendId, friendUsername: updatedFriend?.username },
+    meta: { friendId, friendUsername: updatedFriend?.username, ...(trimmedMessage && { message: trimmedMessage }) },
   });
   await logCoinTransaction(db, {
     userId: friendId,
     type: "gift_received",
     amount: parsedAmount,
     balance: updatedFriend?.coins || 0,
-    meta: { fromUserId: userId, fromUsername: auth.user.username },
+    meta: { fromUserId: userId, fromUsername: auth.user.username, ...(trimmedMessage && { message: trimmedMessage }) },
   });
 
   // Уведомление получателю
@@ -82,6 +83,7 @@ export async function POST(request) {
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
     amount: parsedAmount,
+    ...(trimmedMessage && { message: trimmedMessage }),
   });
 
   return NextResponse.json({

@@ -54,6 +54,7 @@ export default function ProfileClient({ profile }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [giftAmount, setGiftAmount] = useState("");
+  const [giftMessage, setGiftMessage] = useState("");
   const [giftError, setGiftError] = useState("");
   const [giftSending, setGiftSending] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
@@ -134,7 +135,7 @@ export default function ProfileClient({ profile }) {
       const res = await authFetch("/api/friends/gift-coins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ friendId: profileId, amount: parsed }),
+        body: JSON.stringify({ friendId: profileId, amount: parsed, message: giftMessage }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
@@ -205,7 +206,7 @@ export default function ProfileClient({ profile }) {
           Чат
         </button>
         <button
-          onClick={() => { setGiftOpen(true); setGiftAmount(""); setGiftError(""); }}
+          onClick={() => { setGiftOpen(true); setGiftAmount(""); setGiftMessage(""); setGiftError(""); }}
           className="inline-flex items-center gap-2 rounded-2xl bg-yellow-500/10 px-4 py-2.5 text-sm font-semibold text-yellow-500 border border-yellow-500/30 hover:bg-yellow-500/20 transition"
         >
           <Gift className="h-4 w-4" />
@@ -339,6 +340,14 @@ export default function ProfileClient({ profile }) {
                 placeholder="Количество (1-100)"
                 className="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-primary)] text-center placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)]"
                 autoFocus
+              />
+              <textarea
+                value={giftMessage}
+                onChange={(e) => setGiftMessage(e.target.value)}
+                maxLength={200}
+                rows={2}
+                placeholder="Подпись (необязательно)"
+                className="w-full mt-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)] resize-none"
               />
               {giftError && <p className="text-center text-xs text-red-400 mt-2">{giftError}</p>}
               <div className="flex gap-2 mt-4">

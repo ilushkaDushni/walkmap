@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 /**
  * Создаёт уведомление для пользователя.
  * @param {string|ObjectId} userId — получатель
- * @param {string} type — тип: "achievement" | "admin_broadcast" | "comment_reply" | "friend_request" | "friend_accept" | "lobby_invite" | "coin_gift"
+ * @param {string} type — тип: "achievement" | "admin_broadcast" | "comment_reply" | "friend_request" | "friend_accept" | "lobby_invite" | "coin_gift" | "coin_admin"
  * @param {object} data — данные, зависящие от типа
  */
 export async function createNotification(userId, type, data = {}) {

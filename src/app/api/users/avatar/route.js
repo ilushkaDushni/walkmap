@@ -8,22 +8,20 @@ import path from "path";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-const AVATARS_DIR = path.resolve(process.cwd(), "uploads", "avatars");
+const UPLOADS_DIR = path.resolve(process.cwd(), "uploads", "avatars");
 
 async function deleteOldAvatar(avatarUrl) {
   if (!avatarUrl) return;
-  // extract relative path from URL like /api/uploads/avatars/xxx.jpg
   const prefix = "/api/uploads/";
   if (!avatarUrl.includes(prefix)) return;
   const relativePath = avatarUrl.split(prefix).pop();
   if (!relativePath) return;
   const filePath = path.resolve(process.cwd(), "uploads", relativePath);
-  // safety: must be inside uploads/
   if (!filePath.startsWith(path.resolve(process.cwd(), "uploads"))) return;
   try {
     await unlink(filePath);
   } catch {
-    // ignore — file may already be deleted
+    // ignore
   }
 }
 
@@ -49,15 +47,14 @@ export async function POST(request) {
   const db = await getDb();
   const userId = auth.user._id;
 
-  // Delete old avatar
   await deleteOldAvatar(auth.user.avatarUrl);
 
   const ext = file.name.split(".").pop().toLowerCase();
   const filename = `${randomBytes(12).toString("hex")}.${ext}`;
 
-  await mkdir(AVATARS_DIR, { recursive: true });
+  await mkdir(UPLOADS_DIR, { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(AVATARS_DIR, filename), buffer);
+  await writeFile(path.join(UPLOADS_DIR, filename), buffer);
 
   const url = `/api/uploads/avatars/${filename}`;
 
@@ -75,7 +72,6 @@ export async function DELETE(request) {
 
   const db = await getDb();
 
-  // Delete file from disk
   await deleteOldAvatar(auth.user.avatarUrl);
 
   await db.collection("users").updateOne(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users } from "lucide-react";
+import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users, Coins } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useUnreadCount from "@/hooks/useUnreadCount";
@@ -30,6 +30,7 @@ const ICON_MAP = {
   friend_accept: UserCheck,
   lobby_invite: Users,
   coin_gift: Gift,
+  coin_admin: Coins,
   admin_broadcast: Megaphone,
 };
 
@@ -40,6 +41,7 @@ const COLOR_MAP = {
   friend_accept: "text-green-500",
   lobby_invite: "text-purple-500",
   coin_gift: "text-yellow-500",
+  coin_admin: "text-amber-500",
   admin_broadcast: "text-red-500",
 };
 
@@ -58,6 +60,10 @@ function getNotificationText(n) {
       return `${d.username || "Кто-то"} приглашает в совместное прохождение`;
     case "coin_gift":
       return `${d.username || "Кто-то"} подарил вам ${d.amount || 0} монет`;
+    case "coin_admin":
+      return d.amount > 0
+        ? `Администратор начислил вам ${d.amount} монет`
+        : `Администратор списал ${Math.abs(d.amount)} монет`;
     case "admin_broadcast":
       return d.message || "Объявление от администрации";
     default:
@@ -77,6 +83,8 @@ function getNotificationLink(n) {
       return d.lobbyId ? `/routes/${d.routeId || ""}` : "/friends";
     case "coin_gift":
       return d.username ? `/users/${d.username}` : null;
+    case "coin_admin":
+      return null;
     default:
       return null;
   }
@@ -243,6 +251,18 @@ export default function NotificationBell({ inline = false }) {
         username: n.data?.username,
         avatarUrl: n.data?.avatarUrl,
         amount: n.data?.amount || 0,
+        message: n.data?.message || "",
+      });
+      setOpen(false);
+      return;
+    }
+
+    if (n.type === "coin_admin") {
+      setGiftModalData({
+        username: n.data?.adminUsername || "Администратор",
+        amount: n.data?.amount || 0,
+        message: n.data?.message || "",
+        isAdmin: true,
       });
       setOpen(false);
       return;
@@ -287,7 +307,7 @@ export default function NotificationBell({ inline = false }) {
             {notifications.map((n) => {
               const Icon = ICON_MAP[n.type] || Bell;
               const colorCls = COLOR_MAP[n.type] || "text-[var(--text-secondary)]";
-              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug);
+              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin";
               return (
                 <div
                   key={n.id}
@@ -303,6 +323,9 @@ export default function NotificationBell({ inline = false }) {
                     <p className={`text-sm ${!n.read ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}>
                       {getNotificationText(n)}
                     </p>
+                    {n.data?.message && (n.type === "coin_gift" || n.type === "coin_admin") && (
+                      <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.message}&raquo;</p>
+                    )}
                     <span className="text-[10px] text-[var(--text-muted)] mt-0.5">{timeAgo(n.createdAt)}</span>
                     {n.type === "friend_request" && !n.read && (
                       <div className="flex items-center gap-2 mt-2">
@@ -374,21 +397,47 @@ export default function NotificationBell({ inline = false }) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={() => setGiftModalData(null)} />
       <div className="relative bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-color)] shadow-2xl p-6 w-full max-w-xs text-center animate-scale-in">
-        <div className="flex justify-center mb-4">
-          <UserAvatar
-            username={giftModalData.username}
-            avatarUrl={giftModalData.avatarUrl}
-            size="lg"
-          />
-        </div>
+        {!giftModalData.isAdmin && (
+          <div className="flex justify-center mb-4">
+            <UserAvatar
+              username={giftModalData.username}
+              avatarUrl={giftModalData.avatarUrl}
+              size="lg"
+            />
+          </div>
+        )}
+        {giftModalData.isAdmin && (
+          <div className="flex justify-center mb-4">
+            <div className="h-16 w-16 rounded-full bg-amber-500/15 flex items-center justify-center">
+              <Coins className="h-8 w-8 text-amber-500" />
+            </div>
+          </div>
+        )}
         <p className="text-lg font-bold text-[var(--text-primary)] mb-1">
-          Подарок!
+          {giftModalData.isAdmin
+            ? (giftModalData.amount > 0 ? "Начисление" : "Списание")
+            : "Подарок!"}
         </p>
-        <p className="text-sm text-[var(--text-secondary)] mb-4">
-          <span className="font-semibold text-[var(--text-primary)]">{giftModalData.username}</span>{" "}
-          подарил вам{" "}
-          <span className="font-bold text-yellow-500">{giftModalData.amount} монет</span>
+        <p className="text-sm text-[var(--text-secondary)] mb-2">
+          {giftModalData.isAdmin ? (
+            <>
+              {giftModalData.amount > 0 ? "Вам начислено " : "Списано "}
+              <span className="font-bold text-yellow-500">{Math.abs(giftModalData.amount)} монет</span>
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-[var(--text-primary)]">{giftModalData.username}</span>{" "}
+              подарил вам{" "}
+              <span className="font-bold text-yellow-500">{giftModalData.amount} монет</span>
+            </>
+          )}
         </p>
+        {giftModalData.message && (
+          <p className="text-sm text-[var(--text-primary)] italic bg-[var(--bg-elevated)] rounded-xl px-3 py-2 mb-4">
+            &laquo;{giftModalData.message}&raquo;
+          </p>
+        )}
+        {!giftModalData.message && <div className="mb-2" />}
         <button
           onClick={() => setGiftModalData(null)}
           className="w-full py-2.5 rounded-xl text-sm font-semibold bg-yellow-500/15 text-yellow-500 border border-yellow-500/30 hover:bg-yellow-500/25 transition"
