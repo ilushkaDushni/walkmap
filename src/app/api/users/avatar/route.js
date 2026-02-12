@@ -2,81 +2,84 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/adminAuth";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { randomBytes } from "crypto";
-import { writeFile, unlink, mkdir } from "fs/promises";
-import path from "path";
+import { uploadFile, deleteFile } from "@/lib/storage";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-const UPLOADS_DIR = path.resolve(process.cwd(), "uploads", "avatars");
-
-async function deleteOldAvatar(avatarUrl) {
-  if (!avatarUrl) return;
-  const prefix = "/api/uploads/";
-  if (!avatarUrl.includes(prefix)) return;
-  const relativePath = avatarUrl.split(prefix).pop();
-  if (!relativePath) return;
-  const filePath = path.resolve(process.cwd(), "uploads", relativePath);
-  if (!filePath.startsWith(path.resolve(process.cwd(), "uploads"))) return;
-  try {
-    await unlink(filePath);
-  } catch {
-    // ignore
-  }
-}
+const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(request) {
   const auth = await requireAuth(request);
   if (auth.error) return auth.error;
+  const { user } = auth;
 
-  const formData = await request.formData();
-  const file = formData.get("file");
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "Невалидные данные" }, { status: 400 });
+  }
 
-  if (!file) {
-    return NextResponse.json({ error: "Файл не выбран" }, { status: 400 });
+  const file = formData.get("avatar");
+  if (!file || typeof file === "string") {
+    return NextResponse.json({ error: "Файл не найден" }, { status: 400 });
   }
 
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: "Допустимые форматы: JPEG, PNG, WebP" }, { status: 400 });
+    return NextResponse.json({ error: "Допустимы только JPEG, PNG, WebP" }, { status: 400 });
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Максимальный размер — 5 МБ" }, { status: 400 });
+    return NextResponse.json({ error: "Файл слишком большой (макс. 5 МБ)" }, { status: 400 });
   }
 
-  const db = await getDb();
-  const userId = auth.user._id;
-
-  await deleteOldAvatar(auth.user.avatarUrl);
-
-  const ext = file.name.split(".").pop().toLowerCase();
-  const filename = `${randomBytes(12).toString("hex")}.${ext}`;
-
-  await mkdir(UPLOADS_DIR, { recursive: true });
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(UPLOADS_DIR, filename), buffer);
+  const userId = user._id.toString();
+  const key = `avatars/${userId}_${Date.now()}.webp`;
 
-  const url = `/api/uploads/avatars/${filename}`;
+  try {
+    // Delete old avatar if exists
+    if (user.avatarUrl) {
+      try {
+        await deleteFile(user.avatarUrl);
+      } catch {
+        // ignore delete errors
+      }
+    }
 
-  await db.collection("users").updateOne(
-    { _id: new ObjectId(userId) },
-    { $set: { avatarUrl: url } },
-  );
+    const avatarUrl = await uploadFile(key, buffer, "image/webp");
 
-  return NextResponse.json({ avatarUrl: url });
+    const db = await getDb();
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { avatarUrl } }
+    );
+
+    return NextResponse.json({ avatarUrl });
+  } catch (err) {
+    console.error("Avatar upload error:", err);
+    return NextResponse.json({ error: "Ошибка загрузки" }, { status: 500 });
+  }
 }
 
 export async function DELETE(request) {
   const auth = await requireAuth(request);
   if (auth.error) return auth.error;
+  const { user } = auth;
+
+  if (!user.avatarUrl) {
+    return NextResponse.json({ ok: true });
+  }
+
+  try {
+    await deleteFile(user.avatarUrl);
+  } catch {
+    // ignore
+  }
 
   const db = await getDb();
-
-  await deleteOldAvatar(auth.user.avatarUrl);
-
   await db.collection("users").updateOne(
-    { _id: new ObjectId(auth.user._id) },
-    { $unset: { avatarUrl: "" } },
+    { _id: user._id },
+    { $unset: { avatarUrl: "" } }
   );
 
   return NextResponse.json({ ok: true });

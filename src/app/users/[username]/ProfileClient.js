@@ -42,7 +42,7 @@ function getUserLevel(c) {
 }
 
 export default function ProfileClient({ profile }) {
-  const { id: profileId, username, avatarUrl, bio, createdAt, roles, stats, achievements } = profile;
+  const { id: profileId, username, bio, createdAt, roles, stats, achievements } = profile;
   const { user, authFetch } = useUser();
   const router = useRouter();
   const primaryRoleColor = roles?.[0]?.color || null;
@@ -235,7 +235,7 @@ export default function ProfileClient({ profile }) {
 
       {/* Header */}
       <div className="flex flex-col items-center mb-6">
-        <UserAvatar username={username} avatarUrl={avatarUrl} roleColor={primaryRoleColor} size="xl" />
+        <UserAvatar username={username} avatarUrl={profile.avatarUrl} roleColor={primaryRoleColor} size="xl" />
         <h1 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">{username}</h1>
         <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${level.bg} ${level.color}`}>
           <Trophy className="h-3 w-3" />

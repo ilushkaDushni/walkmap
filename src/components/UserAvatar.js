@@ -17,7 +17,7 @@ export default function UserAvatar({ username, avatarUrl, roleColor, size = "md"
   const avatar = avatarUrl ? (
     <img
       src={avatarUrl}
-      alt={username}
+      alt={username || ""}
       className={`${sizeClass} rounded-full object-cover shrink-0 ${className}`}
     />
   ) : (

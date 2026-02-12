@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Camera, Settings } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
@@ -34,8 +34,8 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   // Edit fields
   const [editBio, setEditBio] = useState("");
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -126,48 +126,6 @@ export default function ProfileModal({ isOpen, onClose }) {
     onClose();
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setCropImageSrc(reader.result);
-    reader.readAsDataURL(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleCroppedUpload = async (blob) => {
-    setCropImageSrc(null);
-    setError("");
-    setUploadingAvatar(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", new File([blob], "avatar.webp", { type: "image/webp" }));
-      const res = await authFetch("/api/users/avatar", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
-      updateUser({ avatarUrl: data.avatarUrl });
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const handleRemoveAvatar = async () => {
-    setError("");
-    setUploadingAvatar(true);
-    try {
-      const res = await authFetch("/api/users/avatar", { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка удаления");
-      updateUser({ avatarUrl: null });
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
   const handleSaveBio = async () => {
     setError("");
     setSubmitting(true);
@@ -185,6 +143,51 @@ export default function ProfileModal({ isOpen, onClose }) {
       setError(e.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Файл слишком большой (макс. 5 МБ)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob) => {
+    setCropImageSrc(null);
+    setUploadingAvatar(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("avatar", blob, "avatar.webp");
+      const res = await authFetch("/api/users/avatar", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+      updateUser({ avatarUrl: data.avatarUrl });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setUploadingAvatar(true);
+    setError("");
+    try {
+      const res = await authFetch("/api/users/avatar", { method: "DELETE" });
+      if (!res.ok) throw new Error("Ошибка удаления");
+      updateUser({ avatarUrl: null });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -243,77 +246,75 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   // === Экран: Редактирование профиля ===
   if (user && screen === "edit") {
-    // Cropper sub-screen
-    if (cropImageSrc) {
-      return modalShell(
-        <>
-          <div className="flex flex-col items-center">
-            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Настройте аватар</h2>
+    return modalShell(
+      <>
+        {backBtn("profile")}
+        {closeBtn}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {cropImageSrc ? (
+          <div className="flex flex-col items-center mb-4">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-3">Обрезка фото</h2>
             <AvatarCropper
               imageSrc={cropImageSrc}
               onCrop={handleCroppedUpload}
               onCancel={() => setCropImageSrc(null)}
             />
           </div>
-        </>
-      );
-    }
-
-    return modalShell(
-      <>
-        {backBtn("profile")}
-        {closeBtn}
-        <div className="flex flex-col items-center mb-4">
-          <div className="relative mb-3">
-            <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="xl" />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAvatar}
-              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--text-primary)] text-[var(--bg-surface)] shadow-lg transition hover:opacity-90 disabled:opacity-50"
-            >
-              <Camera className="h-4 w-4" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </div>
-          {uploadingAvatar && (
-            <p className="text-xs text-[var(--text-muted)] mb-2">Загрузка...</p>
-          )}
-          {user.avatarUrl && (
-            <button
-              onClick={handleRemoveAvatar}
-              disabled={uploadingAvatar}
-              className="text-xs text-red-400 hover:underline disabled:opacity-50 mb-1"
-            >
-              Удалить аватар
-            </button>
-          )}
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">Редактирование</h2>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">О себе</label>
-            <textarea
-              value={editBio}
-              onChange={(e) => setEditBio(e.target.value.slice(0, 200))}
-              placeholder="Расскажите о себе..."
-              rows={3}
-              className={`${inputCls} resize-none`}
-            />
-            <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
-              {editBio.length}/200
+        ) : (
+          <>
+            <div className="flex flex-col items-center mb-4">
+              <div className="relative mb-3">
+                <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="xl" />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-50"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
+              {uploadingAvatar && (
+                <p className="text-xs text-[var(--text-muted)]">Загрузка...</p>
+              )}
+              {user.avatarUrl && !uploadingAvatar && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-500 transition mt-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Удалить фото
+                </button>
+              )}
+              <h2 className="text-lg font-bold text-[var(--text-primary)] mt-2">Редактирование</h2>
             </div>
-          </div>
-          {errorMsg}
-          <button onClick={handleSaveBio} disabled={submitting} className={btnPrimary}>
-            {submitting ? "Сохранение..." : "Сохранить"}
-          </button>
-        </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">О себе</label>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value.slice(0, 200))}
+                  placeholder="Расскажите о себе..."
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
+                <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+                  {editBio.length}/200
+                </div>
+              </div>
+              {errorMsg}
+              <button onClick={handleSaveBio} disabled={submitting} className={btnPrimary}>
+                {submitting ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </>
+        )}
       </>
     );
   }
