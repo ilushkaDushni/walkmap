@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Camera } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Camera, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
+import { useTheme } from "./ThemeProvider";
 import UserAvatar from "./UserAvatar";
 import AvatarCropper from "./AvatarCropper";
+import { APP_VERSION } from "@/lib/version";
 
 export default function ProfileModal({ isOpen, onClose }) {
   const { user, login, register, verify, logout, authFetch, updateUser } = useUser();
   const router = useRouter();
-  // "profile" | "login" | "register" | "verify" | "edit"
+  // "profile" | "login" | "register" | "verify" | "edit" | "settings"
   const [screen, setScreen] = useState("profile");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -234,6 +236,11 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   const primaryRoleColor = user?.roles?.[0]?.color || null;
 
+  // === Экран: Настройки ===
+  if (user && screen === "settings") {
+    return <SettingsScreen modalShell={modalShell} backBtn={backBtn} closeBtn={closeBtn} onClose={onClose} />;
+  }
+
   // === Экран: Редактирование профиля ===
   if (user && screen === "edit") {
     // Cropper sub-screen
@@ -356,6 +363,10 @@ export default function ProfileModal({ isOpen, onClose }) {
           >
             Открыть профиль
           </Link>
+          <button onClick={() => { setScreen("settings"); setError(""); }} className={btnOutline}>
+            <Settings className="h-4 w-4" />
+            Настройки
+          </button>
           <button onClick={handleLogout} className={`${btnOutline} text-red-400 border-red-400/30 hover:bg-red-400/10`}>
             <LogOut className="h-4 w-4" />
             Выйти
@@ -517,4 +528,45 @@ export default function ProfileModal({ isOpen, onClose }) {
   }
 
   return null;
+}
+
+function SettingsScreen({ modalShell, backBtn, closeBtn, onClose }) {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
+
+  return modalShell(
+    <>
+      {backBtn("profile")}
+      {closeBtn}
+      <div className="flex flex-col items-center mb-4">
+        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
+          <Settings className="h-8 w-8 text-[var(--text-secondary)]" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Настройки</h2>
+      </div>
+      <div className="space-y-3">
+        {/* Тёмная тема */}
+        <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+          <span className="text-sm text-[var(--text-secondary)]">Тёмная тема</span>
+          <button onClick={toggleTheme} className="relative">
+            <div className={`h-6 w-10 rounded-full p-0.5 transition-colors ${isDark ? "bg-green-500" : "bg-[var(--bg-main)]"}`}>
+              <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${isDark ? "translate-x-4" : "translate-x-0"}`} />
+            </div>
+          </button>
+        </div>
+
+        {/* Версия */}
+        <button
+          onClick={() => {
+            onClose();
+            window.dispatchEvent(new Event("show-update-modal"));
+          }}
+          className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
+        >
+          <span className="text-sm text-[var(--text-secondary)]">Версия</span>
+          <span className="text-sm text-[var(--text-muted)]">{APP_VERSION}</span>
+        </button>
+      </div>
+    </>
+  );
 }

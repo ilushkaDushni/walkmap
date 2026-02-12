@@ -15,6 +15,10 @@ export default function UpdateModal() {
     if (saved !== APP_VERSION) {
       setShow(true);
     }
+
+    function handleOpen() { setShow(true); }
+    window.addEventListener("show-update-modal", handleOpen);
+    return () => window.removeEventListener("show-update-modal", handleOpen);
   }, []);
 
   function dismiss() {
@@ -22,9 +26,9 @@ export default function UpdateModal() {
     setShow(false);
   }
 
-  if (!show) return null;
-
   const entry = CHANGELOG[0];
+
+  if (!show) return null;
 
   return (
     <>

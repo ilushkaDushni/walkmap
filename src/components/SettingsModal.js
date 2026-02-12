@@ -61,31 +61,35 @@ export default function SettingsModal({ isOpen, onClose }) {
               </button>
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 opacity-60">
               <div className="flex items-center gap-3">
                 <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
                 <span className="text-sm text-[var(--text-secondary)]">Уведомления</span>
               </div>
-              <div className="h-6 w-10 rounded-full bg-[var(--bg-main)] p-0.5">
-                <div className="h-5 w-5 rounded-full bg-[var(--text-muted)] transition" />
-              </div>
+              <span className="rounded-full bg-[var(--bg-main)] px-2 py-0.5 text-xs text-[var(--text-muted)]">Скоро</span>
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 opacity-60">
               <div className="flex items-center gap-3">
                 <Globe className="h-5 w-5 text-[var(--text-secondary)]" />
                 <span className="text-sm text-[var(--text-secondary)]">Язык</span>
               </div>
-              <span className="text-sm font-medium text-[var(--text-primary)]">Русский</span>
+              <span className="rounded-full bg-[var(--bg-main)] px-2 py-0.5 text-xs text-[var(--text-muted)]">Скоро</span>
             </div>
 
-            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+            <button
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new Event("show-update-modal"));
+              }}
+              className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
+            >
               <div className="flex items-center gap-3">
                 <Info className="h-5 w-5 text-[var(--text-secondary)]" />
                 <span className="text-sm text-[var(--text-secondary)]">Версия</span>
               </div>
               <span className="text-sm text-[var(--text-muted)]">{APP_VERSION}</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>

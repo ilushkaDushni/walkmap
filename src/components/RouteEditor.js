@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react";
 import dynamic from "next/dynamic";
 import { useUser } from "@/components/UserProvider";
 import LeafletMap from "./LeafletMap";
@@ -25,7 +25,7 @@ function validateRoute(route) {
   return errors;
 }
 
-export default function RouteEditor({ routeId, onSaved }) {
+export default forwardRef(function RouteEditor({ routeId, onSaved }, ref) {
   const { authFetch } = useUser();
   const [route, setRoute] = useState(null);
   const [mode, setMode] = useState("view");
@@ -132,6 +132,12 @@ export default function RouteEditor({ routeId, onSaved }) {
 
   // Keep ref updated for hotkeys
   handleSaveRef.current = handleSave;
+
+  // Expose isDirty and save for parent (unsaved changes modal)
+  useImperativeHandle(ref, () => ({
+    get isDirty() { return isDirty; },
+    save: handleSave,
+  }), [isDirty, handleSave]);
 
   // Auto-hide save message
   useEffect(() => {
@@ -1073,4 +1079,4 @@ export default function RouteEditor({ routeId, onSaved }) {
       )}
     </div>
   );
-}
+})

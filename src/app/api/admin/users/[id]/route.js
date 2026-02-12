@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { resolveUserPermissions, isSuperadmin, getTopPosition, getAllRoles } from "@/lib/permissions";
+import { logCoinTransaction } from "@/lib/coinTransactions";
 
 // PUT /api/admin/users/[id] — обновить пользователя (split permissions)
 export async function PUT(request, { params }) {
@@ -114,6 +115,20 @@ export async function PUT(request, { params }) {
       { $set: update },
       { returnDocument: "after", projection: { passwordHash: 0 } }
     );
+
+  // Логируем транзакцию монет
+  if (body.addCoins !== undefined) {
+    const delta = Number(body.addCoins);
+    if (!isNaN(delta) && delta !== 0) {
+      await logCoinTransaction(db, {
+        userId: id,
+        type: delta > 0 ? "admin_add" : "admin_subtract",
+        amount: delta,
+        balance: result?.coins || 0,
+        meta: { adminId: callerId, adminUsername: caller.username },
+      });
+    }
+  }
 
   if (!result) {
     return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });

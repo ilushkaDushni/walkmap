@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import RouteEditor from "@/components/RouteEditor";
 import {
   Plus,
@@ -30,6 +31,7 @@ function getFolderIds(route) {
 export default function AdminRoutesPage() {
   const { user, loading, authFetch, hasPermission, hasAnyPermission } = useUser();
   const router = useRouter();
+  const { registerGuard, unregisterGuard } = useNavigationGuard();
   const [routes, setRoutes] = useState([]);
   const [folders, setFolders] = useState([]);
   const [editingRouteId, setEditingRouteId] = useState(() => {
@@ -41,6 +43,8 @@ export default function AdminRoutesPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [settingsFolder, setSettingsFolder] = useState(null);
   const [featuredId, setFeaturedId] = useState(null);
+  const editorRef = useRef(null);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   useEffect(() => {
     if (!loading && !hasPermission("admin.access")) {
@@ -144,19 +148,60 @@ export default function AdminRoutesPage() {
 
   const handleSaved = () => fetchData();
 
+  // Register/unregister navigation guard when editing
+  useEffect(() => {
+    if (editingRouteId) {
+      registerGuard(
+        () => editorRef.current?.isDirty ?? false,
+        () => editorRef.current?.save(),
+        () => setEditingRouteId(null)
+      );
+    } else {
+      unregisterGuard();
+    }
+    return () => unregisterGuard();
+  }, [editingRouteId, registerGuard, unregisterGuard]);
+
+  const handleBackToList = useCallback(() => {
+    if (editorRef.current?.isDirty) {
+      setShowLeaveModal(true);
+    } else {
+      setEditingRouteId(null);
+    }
+  }, []);
+
+  const handleLeaveDiscard = useCallback(() => {
+    setShowLeaveModal(false);
+    setEditingRouteId(null);
+  }, []);
+
+  const handleLeaveSave = useCallback(async () => {
+    await editorRef.current?.save();
+    setShowLeaveModal(false);
+    setEditingRouteId(null);
+  }, []);
+
   if (loading || !hasPermission("admin.access")) return null;
 
   if (editingRouteId) {
     return (
       <div className="mx-auto max-w-4xl px-4 pt-4 pb-24">
         <button
-          onClick={() => setEditingRouteId(null)}
+          onClick={handleBackToList}
           className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
         >
           <ArrowLeft className="h-4 w-4" />
           К списку маршрутов
         </button>
-        <RouteEditor routeId={editingRouteId} onSaved={handleSaved} />
+        <RouteEditor ref={editorRef} routeId={editingRouteId} onSaved={handleSaved} />
+
+        {showLeaveModal && (
+          <UnsavedChangesModal
+            onSave={handleLeaveSave}
+            onDiscard={handleLeaveDiscard}
+            onCancel={() => setShowLeaveModal(false)}
+          />
+        )}
       </div>
     );
   }
@@ -267,6 +312,62 @@ export default function AdminRoutesPage() {
           onClose={() => setSettingsFolder(null)}
         />
       )}
+    </div>
+  );
+}
+
+// === Модалка несохранённых изменений ===
+function UnsavedChangesModal({ onSave, onDiscard, onCancel }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true));
+  }, []);
+
+  const close = (action) => {
+    setVisible(false);
+    setTimeout(action, 200);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={() => close(onCancel)}
+    >
+      <div
+        className={`w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl transition-all duration-200 ${
+          visible ? "scale-100 opacity-100" : "scale-75 opacity-0"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-bold text-[var(--text-primary)] mb-2">
+          Несохранённые изменения
+        </h3>
+        <p className="text-sm text-[var(--text-secondary)] mb-5">
+          У вас есть несохранённые изменения. Хотите сохранить их перед выходом?
+        </p>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => close(onDiscard)}
+            className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-red-500 transition hover:bg-red-500/10"
+          >
+            Не сохранять
+          </button>
+          <button
+            onClick={() => close(onCancel)}
+            className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--bg-surface)]"
+          >
+            Остаться
+          </button>
+          <button
+            onClick={() => close(onSave)}
+            className="flex-1 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700"
+          >
+            Сохранить
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

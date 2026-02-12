@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/adminAuth";
-import { put, del } from "@vercel/blob";
 import { randomBytes } from "crypto";
+import { writeFile, unlink, mkdir } from "fs/promises";
+import path from "path";
+
+const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
 
 const ALLOWED = {
   photo: {
@@ -48,10 +51,12 @@ export async function POST(request) {
   const ext = file.name.split(".").pop().toLowerCase();
   const filename = `${randomBytes(12).toString("hex")}.${ext}`;
 
-  const { url } = await put(`${config.dir}/${filename}`, file, {
-    access: "public",
-    contentType: file.type,
-  });
+  const dirPath = path.join(UPLOADS_DIR, config.dir);
+  await mkdir(dirPath, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await writeFile(path.join(dirPath, filename), buffer);
+
+  const url = `/api/uploads/${config.dir}/${filename}`;
 
   return NextResponse.json({ url });
 }
@@ -67,6 +72,25 @@ export async function DELETE(request) {
     return NextResponse.json({ error: "URL не указан" }, { status: 400 });
   }
 
-  await del(url);
+  // extract relative path from URL like /api/uploads/photos/xxx.jpg
+  const prefix = "/api/uploads/";
+  if (!url.includes(prefix)) {
+    return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
+  }
+
+  const relativePath = url.split(prefix).pop();
+  const filePath = path.resolve(UPLOADS_DIR, relativePath);
+
+  // path traversal protection
+  if (!filePath.startsWith(UPLOADS_DIR)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    await unlink(filePath);
+  } catch {
+    // file may already be deleted
+  }
+
   return NextResponse.json({ ok: true });
 }

@@ -21,6 +21,7 @@ export const PERMISSION_REGISTRY = {
   "roles.preview":      { label: "Просмотр от имени роли",      group: "Роли" },
   "upload.files":       { label: "Загрузка файлов",             group: "Файлы" },
   "comments.manage":    { label: "Управление комментариями",    group: "Комментарии" },
+  "notifications.broadcast": { label: "Рассылка уведомлений",  group: "Уведомления" },
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_REGISTRY);

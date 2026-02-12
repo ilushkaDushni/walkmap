@@ -4,9 +4,12 @@ import BottomNav from "@/components/BottomNav";
 import PreviewBanner from "@/components/PreviewBanner";
 import BanModal from "@/components/BanModal";
 import AchievementToast from "@/components/AchievementToast";
+import NotificationBell from "@/components/NotificationBell";
+import LobbyController from "@/components/LobbyController";
 import UpdateModal from "@/components/UpdateModal";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
+import NavigationGuardProvider from "@/components/NavigationGuardProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,17 +48,23 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} min-h-screen font-sans antialiased`}>
         <ThemeProvider>
           <UserProvider>
+          <NavigationGuardProvider>
             <BanModal />
             <AchievementToast />
             <UpdateModal />
             <PreviewBanner />
             {/* Шапка */}
             <header className="sticky top-0 z-50 bg-[var(--bg-header)] border-b border-[var(--border-color)] transition-colors">
-              <div className="flex items-center px-4 py-3">
+              <div className="flex items-center justify-between px-4 py-3">
                 <a href="/" className="flex items-center gap-2 text-lg font-bold text-[var(--text-primary)]">
                   <Map className="h-6 w-6" />
                   Ростов GO
                 </a>
+                {/* Десктоп: иконки в шапке */}
+                <div className="hidden md:flex items-center gap-1">
+                  <LobbyController inline />
+                  <NotificationBell inline />
+                </div>
               </div>
             </header>
 
@@ -64,8 +73,15 @@ export default function RootLayout({ children }) {
               {children}
             </main>
 
+            {/* Мобильные плавающие иконки */}
+            <div className="md:hidden">
+              <NotificationBell />
+              <LobbyController />
+            </div>
+
             {/* Нижняя навигация */}
             <BottomNav />
+          </NavigationGuardProvider>
           </UserProvider>
         </ThemeProvider>
       </body>

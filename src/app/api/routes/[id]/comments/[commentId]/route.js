@@ -4,7 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { resolveUserPermissions } from "@/lib/permissions";
 
-// DELETE /api/routes/[id]/comments/[commentId]
+// DELETE /api/routes/[id]/comments/[commentId] — каскадное удаление с ответами
 export async function DELETE(request, { params }) {
   const auth = await requireAuth(request);
   if (auth.error) return auth.error;
@@ -31,7 +31,13 @@ export async function DELETE(request, { params }) {
     }
   }
 
+  // Удаляем сам коммент
   await db.collection("comments").deleteOne({ _id: new ObjectId(commentId) });
+
+  // Каскадно удаляем ответы (если это top-level коммент)
+  if (!comment.parentId) {
+    await db.collection("comments").deleteMany({ parentId: commentId });
+  }
 
   return NextResponse.json({ ok: true });
 }

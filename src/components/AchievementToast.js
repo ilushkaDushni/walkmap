@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Footprints, Coins, Compass, Ruler, Map, Trophy } from "lucide-react";
+import {
+  Footprints, Coins, Compass, Ruler, Map, Trophy,
+  Shield, Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon,
+} from "lucide-react";
 import { ACHIEVEMENT_MAP, COLOR_CLASSES } from "@/lib/achievements";
 
-const ICON_MAP = { Footprints, Coins, Compass, Ruler, Map, Trophy };
+const ICON_MAP = {
+  Footprints, Coins, Compass, Ruler, Map, Trophy,
+  Shield, Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon,
+};
 
 /**
  * Глобальный тост для достижений.

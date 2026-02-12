@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { checkAndGrantAchievements } from "@/lib/achievementEngine";
+import { logCoinTransaction } from "@/lib/coinTransactions";
 
 export async function POST(request, { params }) {
   const auth = await requireAuth(request);
@@ -53,10 +54,18 @@ export async function POST(request, { params }) {
 
     // Начисляем монеты
     if (coins > 0) {
-      await db.collection("users").updateOne(
+      const updatedUser = await db.collection("users").findOneAndUpdate(
         { _id: auth.user._id },
-        { $inc: { coins } }
+        { $inc: { coins } },
+        { returnDocument: "after" }
       );
+      await logCoinTransaction(db, {
+        userId,
+        type: "route_completion",
+        amount: coins,
+        balance: updatedUser.coins || 0,
+        meta: { routeId: id, routeTitle: route.title },
+      });
     }
 
     // Проверяем достижения

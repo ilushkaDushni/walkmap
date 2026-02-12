@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { X, Shield, Route, Users, BarChart3, Crown, Database } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2 } from "lucide-react";
 import { useUser } from "./UserProvider";
+import { useNavigationGuard } from "./NavigationGuardProvider";
 
 export default function AdminModal({ isOpen, onClose }) {
-  const router = useRouter();
   const { user, hasPermission, hasAnyPermission, authFetch } = useUser();
+  const { navigate } = useNavigationGuard();
   const [migrateStatus, setMigrateStatus] = useState(null); // null | "loading" | "done" | "error"
   const [migrateLog, setMigrateLog] = useState([]);
 
@@ -50,28 +50,56 @@ export default function AdminModal({ isOpen, onClose }) {
       icon: Route,
       title: "Управление маршрутами",
       description: "Добавление, редактирование и удаление маршрутов",
-      action: () => { router.push("/admin/routes"); onClose(); },
+      action: () => { navigate("/admin/routes"); onClose(); },
       visible: hasAnyPermission("routes.create", "routes.edit", "routes.delete"),
     },
     {
       icon: Users,
       title: "Пользователи",
       description: "Управление пользователями и ролями",
-      action: () => { router.push("/admin/users"); onClose(); },
+      action: () => { navigate("/admin/users"); onClose(); },
       visible: hasPermission("users.view"),
     },
     {
       icon: Crown,
       title: "Роли",
       description: "Управление ролями и правами",
-      action: () => { router.push("/admin/roles"); onClose(); },
+      action: () => { navigate("/admin/roles"); onClose(); },
       visible: hasPermission("roles.manage"),
     },
     {
       icon: BarChart3,
       title: "Статистика",
       description: "Просмотр активности и аналитики",
-      action: () => { router.push("/admin/stats"); onClose(); },
+      action: () => { navigate("/admin/stats"); onClose(); },
+      visible: hasPermission("admin.access"),
+    },
+    {
+      icon: MessageCircle,
+      title: "Комментарии",
+      description: "Модерация комментариев",
+      action: () => { navigate("/admin/comments"); onClose(); },
+      visible: hasPermission("comments.manage"),
+    },
+    {
+      icon: Megaphone,
+      title: "Рассылка",
+      description: "Уведомления пользователям",
+      action: () => { navigate("/admin/notifications"); onClose(); },
+      visible: hasPermission("notifications.broadcast"),
+    },
+    {
+      icon: Coins,
+      title: "Транзакции",
+      description: "Лог операций с монетами",
+      action: () => { navigate("/admin/transactions"); onClose(); },
+      visible: hasPermission("users.manage_coins"),
+    },
+    {
+      icon: Users2,
+      title: "Лобби",
+      description: "Мониторинг активных лобби",
+      action: () => { navigate("/admin/lobbies"); onClose(); },
       visible: hasPermission("admin.access"),
     },
   ].filter((s) => s.visible);

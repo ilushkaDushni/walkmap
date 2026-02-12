@@ -104,10 +104,68 @@ export async function POST(request) {
   }
   log.push(`Выдано ${achievementsGranted} достижений ретроактивно (без монет)`);
 
-  // 4. Создаём уникальные индексы
+  // 4. Создаём уникальные индексы для ролей
   await db.collection("roles").createIndex({ slug: 1 }, { unique: true });
   await db.collection("roles").createIndex({ name: 1 }, { unique: true });
-  log.push("Индексы созданы");
+  log.push("Индексы ролей созданы");
+
+  // 5. Миграция комментариев: добавляем parentId: null к существующим
+  const commentsUpdated = await db.collection("comments").updateMany(
+    { parentId: { $exists: false } },
+    { $set: { parentId: null } }
+  );
+  log.push(`Обновлено ${commentsUpdated.modifiedCount} комментариев (parentId: null)`);
+
+  // 6. Индексы для комментариев
+  await db.collection("comments").createIndex({ routeId: 1, parentId: 1, createdAt: -1 });
+  await db.collection("comments").createIndex({ parentId: 1, createdAt: 1 });
+  log.push("Индексы комментариев созданы");
+
+  // 7. Индексы для уведомлений
+  await db.collection("notifications").createIndex({ userId: 1, createdAt: -1 });
+  await db.collection("notifications").createIndex({ userId: 1, read: 1 });
+  await db.collection("notifications").createIndex(
+    { createdAt: 1 },
+    { expireAfterSeconds: 30 * 24 * 60 * 60 } // TTL 30 дней
+  );
+  log.push("Индексы уведомлений созданы (+ TTL 30 дней)");
+
+  // 8. Индексы для дружбы
+  await db.collection("friendships").createIndex({ users: 1 });
+  await db.collection("friendships").createIndex({ users: 1, status: 1 });
+  await db.collection("friendships").createIndex({ requesterId: 1, status: 1 });
+  log.push("Индексы дружбы созданы");
+
+  // 9. Индексы для сообщений
+  // Убираем старый TTL индекс (сообщения хранятся вечно)
+  try {
+    await db.collection("messages").dropIndex("createdAt_1");
+    log.push("TTL индекс messages (createdAt_1) удалён");
+  } catch {
+    log.push("TTL индекс messages (createdAt_1) не найден, пропуск");
+  }
+  await db.collection("messages").createIndex({ conversationKey: 1, createdAt: -1 });
+  await db.collection("messages").createIndex({ senderId: 1 });
+  log.push("Индексы сообщений созданы (без TTL)");
+
+  // 10. Индексы для лобби
+  await db.collection("lobbies").createIndex({ joinCode: 1, status: 1 });
+  await db.collection("lobbies").createIndex({ hostId: 1, status: 1 });
+  await db.collection("lobbies").createIndex(
+    { expiresAt: 1 },
+    { expireAfterSeconds: 0 } // TTL по полю expiresAt
+  );
+  log.push("Индексы лобби созданы (+ TTL по expiresAt)");
+
+  // 11. Индексы для coin_transactions
+  await db.collection("coin_transactions").createIndex({ userId: 1, createdAt: -1 });
+  await db.collection("coin_transactions").createIndex({ type: 1, createdAt: -1 });
+  await db.collection("coin_transactions").createIndex({ createdAt: -1 });
+  log.push("Индексы coin_transactions созданы");
+
+  // 12. Индекс для глобальной сортировки комментариев в админке
+  await db.collection("comments").createIndex({ createdAt: -1 });
+  log.push("Индекс comments.createdAt созданы");
 
   return NextResponse.json({ success: true, log });
 }

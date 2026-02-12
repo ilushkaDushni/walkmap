@@ -39,6 +39,7 @@ async function fetchProfile(username) {
   const achievements = [...new Set([...dbAchievements, ...computedAchievements])];
 
   return {
+    id: user._id.toString(),
     username: user.username,
     avatarUrl: user.avatarUrl || null,
     bio: user.bio || "",
