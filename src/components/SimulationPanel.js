@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { interpolateAlongPath, buildRouteEvents, cumulativeDistances, sortKeyToProgress } from "@/lib/geo";
+import { interpolateAlongPath, buildRouteEvents, cumulativeDistances, sortKeyToProgress, getDirectedPath, remapSegmentsForDirectedPath } from "@/lib/geo";
 import { MapPin, Play, Pause, RotateCcw, ChevronRight, ChevronLeft } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -14,22 +14,28 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
   const rafRef = useRef(null);
   const lastTimeRef = useRef(null);
 
+  // Directed path: от старта к финишу
+  const { dirPath, reversed, offset } = useMemo(
+    () => getDirectedPath(route.path || [], route.startPointIndex, route.finishPointIndex),
+    [route.path, route.startPointIndex, route.finishPointIndex]
+  );
+
+  const dirSegments = useMemo(
+    () => remapSegmentsForDirectedPath(route.segments || [], offset, reversed, dirPath.length),
+    [route.segments, offset, reversed, dirPath.length]
+  );
+
   // Упорядоченные события маршрута
   const events = useMemo(() => {
-    if (!route.path || route.path.length < 2) return [];
-    return buildRouteEvents(
-      route.path,
-      route.checkpoints || [],
-      route.segments || [],
-      route.finish
-    );
-  }, [route]);
+    if (!dirPath || dirPath.length < 2) return [];
+    return buildRouteEvents(dirPath, route.checkpoints || [], dirSegments, route.finish);
+  }, [dirPath, route.checkpoints, dirSegments, route.finish]);
 
   // Кумулятивные расстояния и пороги событий
   const cumDist = useMemo(() => {
-    if (!route.path || route.path.length < 2) return [0];
-    return cumulativeDistances(route.path);
-  }, [route.path]);
+    if (!dirPath || dirPath.length < 2) return [0];
+    return cumulativeDistances(dirPath);
+  }, [dirPath]);
 
   const eventThresholds = useMemo(() => {
     return events.map((ev) => sortKeyToProgress(ev.sortKey, cumDist));
@@ -55,7 +61,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
 
       setProgress((prev) => {
         const next = Math.min(1, prev + dt * (1 / 60) * speed);
-        const pos = interpolateAlongPath(route.path, next);
+        const pos = interpolateAlongPath(dirPath, next);
         onPositionChange?.(pos);
         if (next >= 1) {
           setIsPlaying(false);
@@ -66,7 +72,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
 
       rafRef.current = requestAnimationFrame(animate);
     },
-    [route.path, speed, onPositionChange]
+    [dirPath, speed, onPositionChange]
   );
 
   useEffect(() => {
@@ -84,15 +90,15 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
   const handleReset = () => {
     setIsPlaying(false);
     setProgress(0);
-    if (route.path.length > 0) {
-      onPositionChange?.(interpolateAlongPath(route.path, 0));
+    if (dirPath.length > 0) {
+      onPositionChange?.(interpolateAlongPath(dirPath, 0));
     }
   };
 
   const handleProgressChange = (e) => {
     const val = parseFloat(e.target.value);
     setProgress(val);
-    const pos = interpolateAlongPath(route.path, val);
+    const pos = interpolateAlongPath(dirPath, val);
     onPositionChange?.(pos);
   };
 
@@ -101,7 +107,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
     if (idx < 0 || idx >= events.length) return;
     const p = eventThresholds[idx];
     setProgress(p);
-    const pos = interpolateAlongPath(route.path, p);
+    const pos = interpolateAlongPath(dirPath, p);
     onPositionChange?.(pos);
   };
 
@@ -111,7 +117,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
         <h3 className="text-sm font-bold text-blue-600">Симуляция</h3>
 
         {/* Контролы */}
-        {route.path.length >= 2 && (
+        {dirPath.length >= 2 && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               {isPlaying ? (
@@ -177,7 +183,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
           </div>
         )}
 
-        {!simulatedPosition && route.path.length < 2 && (
+        {!simulatedPosition && dirPath.length < 2 && (
           <div className="text-center py-2">
             <MapPin className="mx-auto mb-2 h-6 w-6 text-[var(--text-muted)]" />
             <p className="text-sm text-[var(--text-muted)]">

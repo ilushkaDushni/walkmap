@@ -293,6 +293,51 @@ export function progressFromProjection(projection, cumDist) {
   return Math.min(1, (cumDist[i] + fraction * edgeDist) / total);
 }
 
+/**
+ * Вырезает подпуть от startPointIndex до finishPointIndex,
+ * при необходимости переворачивая порядок.
+ */
+export function getDirectedPath(path, startPointIndex, finishPointIndex) {
+  const si = startPointIndex ?? 0;
+  const fi = finishPointIndex ?? (path.length - 1);
+  if (si === 0 && fi === path.length - 1) {
+    return { dirPath: path, reversed: false, offset: 0 };
+  }
+  const reversed = si > fi;
+  const lo = Math.min(si, fi);
+  const hi = Math.max(si, fi);
+  const slice = path.slice(lo, hi + 1);
+  return {
+    dirPath: reversed ? [...slice].reverse() : slice,
+    reversed,
+    offset: lo,
+  };
+}
+
+/**
+ * Маппит индекс ребра из оригинального path в индекс ребра в directed path.
+ * Возвращает null если ребро вне диапазона.
+ */
+export function remapEdgeIndex(origEdgeIdx, offset, reversed, dirPathLen) {
+  const hi = offset + dirPathLen - 1;
+  if (origEdgeIdx < offset || origEdgeIdx >= hi) return null;
+  if (reversed) return hi - 1 - origEdgeIdx;
+  return origEdgeIdx - offset;
+}
+
+/**
+ * Перемаппит массив segments — фильтрует вне диапазона, обновляет pathIndex.
+ */
+export function remapSegmentsForDirectedPath(segments, offset, reversed, dirPathLen) {
+  return segments
+    .map((seg) => {
+      const newIdx = remapEdgeIndex(seg.pathIndex, offset, reversed, dirPathLen);
+      if (newIdx == null) return null;
+      return { ...seg, pathIndex: newIdx };
+    })
+    .filter(Boolean);
+}
+
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2) return [path];
 

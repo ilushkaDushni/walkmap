@@ -9,6 +9,8 @@ import {
   cumulativeDistances,
   progressFromProjection,
   splitPathAtProjection,
+  getDirectedPath,
+  remapSegmentsForDirectedPath,
 } from "@/lib/geo";
 
 const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = без сглаживания
@@ -51,25 +53,36 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
 
   useWakeLock(active);
 
-  const path = route?.path || [];
+  const rawPath = route?.path || [];
   const checkpoints = route?.checkpoints || [];
   const segments = route?.segments || [];
   const finish = route?.finish || null;
 
-  const cumDist = useMemo(() => cumulativeDistances(path), [path]);
+  // Directed path: от старта к финишу
+  const { dirPath, reversed, offset } = useMemo(
+    () => getDirectedPath(rawPath, route?.startPointIndex, route?.finishPointIndex),
+    [rawPath, route?.startPointIndex, route?.finishPointIndex]
+  );
+
+  const cumDist = useMemo(() => cumulativeDistances(dirPath), [dirPath]);
   const totalDistance = cumDist.length > 0 ? cumDist[cumDist.length - 1] : 0;
 
-  // Сегменты с позициями для useCheckpointTrigger
+  // Сегменты с позициями для useCheckpointTrigger (ремаппим на dirPath)
+  const dirSegments = useMemo(
+    () => remapSegmentsForDirectedPath(segments, offset, reversed, dirPath.length),
+    [segments, offset, reversed, dirPath.length]
+  );
+
   const segmentsWithPositions = useMemo(() => {
-    return segments.map((seg) => {
+    return dirSegments.map((seg) => {
       if (seg.position) return seg;
       const i = seg.pathIndex;
-      if (i != null && i >= 0 && i < path.length) {
-        return { ...seg, position: { lat: path[i].lat, lng: path[i].lng } };
+      if (i != null && i >= 0 && i < dirPath.length) {
+        return { ...seg, position: { lat: dirPath[i].lat, lng: dirPath[i].lng } };
       }
       return seg;
     });
-  }, [segments, path]);
+  }, [dirSegments, dirPath]);
 
   // Для триггеров используем raw-позицию (точнее для определения радиуса),
   // для визуала — сглаженную
@@ -94,9 +107,9 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
 
   // Обновляем проекцию при изменении сглаженной позиции
   useEffect(() => {
-    if (!active || !smoothedPosition || path.length < 2) return;
+    if (!active || !smoothedPosition || dirPath.length < 2) return;
 
-    const proj = projectPointOnPath(smoothedPosition, path);
+    const proj = projectPointOnPath(smoothedPosition, dirPath);
     if (!proj) return;
 
     setProjection(proj);
@@ -111,12 +124,12 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     // Разделяем путь по зафиксированному прогрессу
     const clampedProjection = clamped === rawProgress
       ? proj
-      : progressToProjection(clamped, cumDist, path);
+      : progressToProjection(clamped, cumDist, dirPath);
 
-    const { passed, remaining } = splitPathAtProjection(path, clampedProjection);
+    const { passed, remaining } = splitPathAtProjection(dirPath, clampedProjection);
     setPassedCoords(passed);
     setRemainingCoords(remaining);
-  }, [active, smoothedPosition, path, cumDist]);
+  }, [active, smoothedPosition, dirPath, cumDist]);
 
   const startGps = useCallback(() => {
     maxProgressRef.current = 0;

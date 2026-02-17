@@ -3,7 +3,7 @@
 import { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import Map, { Source, Layer, Marker } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { projectPointOnPath, splitPathByCheckpoints, haversineDistance } from "@/lib/geo";
+import { projectPointOnPath, splitPathByCheckpoints, haversineDistance, getDirectedPath } from "@/lib/geo";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -264,30 +264,44 @@ export default function LeafletMapInner({
   selectedSegmentIndex,
   segmentIndicesWithContent = [],
   simulatedPosition = null,
+  onMapReady,
 }) {
   const mapRef = useRef(null);
-  const dashStepRef = useRef(0);
-  const dashIntervalRef = useRef(null);
+  const dashAnimRef = useRef(null);
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
   const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
 
-  // Анимация пунктирной линии
+  // Анимация пунктирной линии (rAF, ~30fps)
   useEffect(() => {
-    const patterns = [[0, 4, 3], [1, 4, 2], [2, 4, 1], [3, 4, 0]];
-    dashIntervalRef.current = setInterval(() => {
-      const map = mapRef.current?.getMap();
-      if (!map) return;
-      dashStepRef.current = (dashStepRef.current + 1) % patterns.length;
-      try {
-        if (map.getLayer("route-path-animated")) {
-          map.setPaintProperty("route-path-animated", "line-dasharray", patterns[dashStepRef.current]);
+    const DASH = 3, GAP = 4, PERIOD = DASH + GAP, SPEED = 2.5;
+    let offset = 0, prevTime = 0, lastUpdate = 0;
+
+    const animate = (ts) => {
+      if (!prevTime) prevTime = ts;
+      offset = (offset + ((ts - prevTime) / 1000) * SPEED) % PERIOD;
+      prevTime = ts;
+
+      if (ts - lastUpdate > 33) {
+        lastUpdate = ts;
+        const map = mapRef.current?.getMap();
+        if (map) {
+          let p;
+          if (offset < GAP) {
+            p = [0.001, offset || 0.001, DASH, (GAP - offset) || 0.001];
+          } else {
+            const s = offset - GAP;
+            p = [s || 0.001, GAP, (DASH - s) || 0.001, 0.001];
+          }
+          try {
+            if (map.getLayer("route-path-animated"))
+              map.setPaintProperty("route-path-animated", "line-dasharray", p);
+          } catch {}
         }
-      } catch { /* layer может ещё не существовать */ }
-    }, 100);
-    return () => {
-      clearInterval(dashIntervalRef.current);
-      dashIntervalRef.current = null;
+      }
+      dashAnimRef.current = requestAnimationFrame(animate);
     };
+    dashAnimRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(dashAnimRef.current);
   }, []);
 
   // fitBounds к маршруту если есть достаточно точек
@@ -382,11 +396,17 @@ export default function LeafletMapInner({
     [mode, onMapClick, onSegmentLineClick, onPathInsert, path]
   );
 
+  // Directed path для анимации пунктира (от старта к финишу)
+  const { dirPath } = useMemo(
+    () => getDirectedPath(path, startPointIndex, finishPointIndex),
+    [path, startPointIndex, finishPointIndex]
+  );
+
   // GeoJSON для линии пути — разбитый по чекпоинтам на чередующиеся сегменты
   const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
   const pathSegmentsGeoJson = useMemo(() => {
-    if (path.length < 2) return null;
-    const parts = splitPathByCheckpoints(path, checkpoints);
+    if (dirPath.length < 2) return null;
+    const parts = splitPathByCheckpoints(dirPath, checkpoints);
     const features = parts.map((segment, i) => ({
       type: "Feature",
       properties: { colorIndex: i % 2 },
@@ -396,7 +416,7 @@ export default function LeafletMapInner({
       },
     }));
     return { type: "FeatureCollection", features };
-  }, [path, checkpoints]);
+  }, [dirPath, checkpoints]);
 
   // GeoJSON FeatureCollection: рёбра пути, сгруппированные через isMerged-точки
   const segmentLinesGeoJson = useMemo(() => {
@@ -551,6 +571,7 @@ export default function LeafletMapInner({
       interactiveLayerIds={interactiveLayerIds}
       cursor={cursor}
       attributionControl={true}
+      onLoad={() => onMapReady?.(mapRef.current)}
     >
       {/* Линия пути — чередующиеся цвета по чекпоинтам */}
       {pathSegmentsGeoJson && (

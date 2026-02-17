@@ -11,6 +11,7 @@ import RouteMediaSection from "./RouteMediaSection";
 import SimulationPanel from "./SimulationPanel";
 import { X } from "lucide-react";
 import { projectPointOnPath, haversineDistance } from "@/lib/geo";
+import AddressSearch from "./AddressSearch";
 
 const RouteMapLeaflet = dynamic(() => import("./RouteMapLeaflet"), { ssr: false });
 
@@ -41,6 +42,7 @@ export default forwardRef(function RouteEditor({ routeId, onSaved }, ref) {
   const [pathPointMenu, setPathPointMenu] = useState(null);
   const [pathLineMenu, setPathLineMenu] = useState(null);
   const [toastError, setToastError] = useState(null);
+  const mapInstanceRef = useRef(null);
 
   // Загрузка маршрута (с миграцией finishPointIndex)
   useEffect(() => {
@@ -273,6 +275,20 @@ export default forwardRef(function RouteEditor({ routeId, onSaved }, ref) {
     },
     [updateMainContext, updateRoute]
   );
+
+  // Выбор адреса из поиска — всегда ставит точку пути (smart insert)
+  const handleAddressSelect = useCallback(({ lat, lng }) => {
+    mapInstanceRef.current?.flyTo({ center: [lng, lat], zoom: 17, duration: 1500 });
+    const currentPath = route?.path || [];
+    if (currentPath.length >= 2) {
+      const proj = projectPointOnPath({ lat, lng }, currentPath);
+      if (proj && proj.distance < 200) {
+        handlePathInsert(proj.pathIndex + 1, { lat, lng });
+        return;
+      }
+    }
+    handleMapClick({ lat, lng }, "drawPath");
+  }, [route?.path, handleMapClick, handlePathInsert]);
 
   // Клик по отрезку линии (режим addSegment)
   const handleSegmentLineClick = useCallback(
@@ -740,6 +756,7 @@ export default forwardRef(function RouteEditor({ routeId, onSaved }, ref) {
 
       {/* Карта + тулбар */}
       <div className="relative">
+        <AddressSearch onSelect={handleAddressSelect} />
         <LeafletMap
           center={route.mapCenter}
           zoom={route.mapZoom}
@@ -764,6 +781,7 @@ export default forwardRef(function RouteEditor({ routeId, onSaved }, ref) {
           selectedSegmentIndex={selectedSegmentIndex}
           segmentIndicesWithContent={segmentIndicesWithContent}
           simulatedPosition={simulatedPosition}
+          onMapReady={(m) => { mapInstanceRef.current = m; }}
         />
         <RouteEditorToolbar
           mode={mode}

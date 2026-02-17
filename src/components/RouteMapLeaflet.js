@@ -7,7 +7,7 @@ import useOfflineDownload from "@/hooks/useOfflineDownload";
 import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
-import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath } from "@/lib/geo";
+import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -88,8 +88,7 @@ export default function RouteMapLeaflet({ route }) {
   const [autoFollow, setAutoFollow] = useState(true);
   const [completeSent, setCompleteSent] = useState(false);
   const userDragRef = useRef(false);
-  const dashStepRef = useRef(0);
-  const dashIntervalRef = useRef(null);
+  const dashAnimRef = useRef(null);
   const lastCameraRef = useRef(0);
 
   const { authFetch, user } = useUser();
@@ -147,34 +146,46 @@ export default function RouteMapLeaflet({ route }) {
     map.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 1000 });
   }, [gpsMode, gps.position, autoFollow]);
 
-  // === Анимация пунктирной линии (preview + GPS) ===
+  // === Анимация пунктирной линии (preview + GPS, rAF ~30fps) ===
   useEffect(() => {
-    // Анимируем в preview (gpsMode === null) и в GPS-режиме
     if (gpsMode !== null && gpsMode !== "gps_active") {
-      if (dashIntervalRef.current) {
-        clearInterval(dashIntervalRef.current);
-        dashIntervalRef.current = null;
+      if (dashAnimRef.current) {
+        cancelAnimationFrame(dashAnimRef.current);
+        dashAnimRef.current = null;
       }
       return;
     }
-    const patterns = [[0, 4, 3], [1, 4, 2], [2, 4, 1], [3, 4, 0]];
-    dashIntervalRef.current = setInterval(() => {
-      const map = mapRef.current;
-      if (!map) return;
-      dashStepRef.current = (dashStepRef.current + 1) % patterns.length;
-      try {
-        if (map.getLayer("route-path-animated")) {
-          map.setPaintProperty("route-path-animated", "line-dasharray", patterns[dashStepRef.current]);
+    const DASH = 3, GAP = 4, PERIOD = DASH + GAP, SPEED = 2.5;
+    let offset = 0, prevTime = 0, lastUpdate = 0;
+
+    const animate = (ts) => {
+      if (!prevTime) prevTime = ts;
+      offset = (offset + ((ts - prevTime) / 1000) * SPEED) % PERIOD;
+      prevTime = ts;
+
+      if (ts - lastUpdate > 33) {
+        lastUpdate = ts;
+        const map = mapRef.current;
+        if (map) {
+          let p;
+          if (offset < GAP) {
+            p = [0.001, offset || 0.001, DASH, (GAP - offset) || 0.001];
+          } else {
+            const s = offset - GAP;
+            p = [s || 0.001, GAP, (DASH - s) || 0.001, 0.001];
+          }
+          try {
+            if (map.getLayer("route-path-animated"))
+              map.setPaintProperty("route-path-animated", "line-dasharray", p);
+            if (map.getLayer("remaining-route-animated"))
+              map.setPaintProperty("remaining-route-animated", "line-dasharray", p);
+          } catch {}
         }
-        if (map.getLayer("remaining-route-animated")) {
-          map.setPaintProperty("remaining-route-animated", "line-dasharray", patterns[dashStepRef.current]);
-        }
-      } catch { /* layer может ещё не существовать */ }
-    }, 100);
-    return () => {
-      clearInterval(dashIntervalRef.current);
-      dashIntervalRef.current = null;
+      }
+      dashAnimRef.current = requestAnimationFrame(animate);
     };
+    dashAnimRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(dashAnimRef.current);
   }, [gpsMode]);
 
   // === Финиш GPS ===
@@ -203,11 +214,22 @@ export default function RouteMapLeaflet({ route }) {
       .catch(() => {});
   }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins]);
 
+  // Directed path: от старта к финишу
+  const { dirPath, reversed, offset } = useMemo(
+    () => getDirectedPath(route.path || [], route.startPointIndex, route.finishPointIndex),
+    [route.path, route.startPointIndex, route.finishPointIndex]
+  );
+
+  const dirSegments = useMemo(
+    () => remapSegmentsForDirectedPath(route.segments || [], offset, reversed, dirPath.length),
+    [route.segments, offset, reversed, dirPath.length]
+  );
+
   // === Events (manual mode) ===
   const events = useMemo(() => {
-    if (!route.path || route.path.length < 2) return [];
-    return buildRouteEvents(route.path, route.checkpoints || [], route.segments || [], route.finish);
-  }, [route]);
+    if (!dirPath || dirPath.length < 2) return [];
+    return buildRouteEvents(dirPath, route.checkpoints || [], dirSegments, route.finish);
+  }, [dirPath, route.checkpoints, dirSegments, route.finish]);
 
   const currentEvent = events[eventIndex] || null;
   const isLast = eventIndex >= events.length - 1;
@@ -245,8 +267,8 @@ export default function RouteMapLeaflet({ route }) {
   // === GeoJSON (manual mode layers) ===
   const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
   const pathSegmentsGeoJson = useMemo(() => {
-    if (!route.path || route.path.length < 2) return null;
-    const parts = splitPathByCheckpoints(route.path, route.checkpoints || []);
+    if (!dirPath || dirPath.length < 2) return null;
+    const parts = splitPathByCheckpoints(dirPath, route.checkpoints || []);
     const features = parts.map((segment, i) => ({
       type: "Feature",
       properties: { colorIndex: i % 2 },
@@ -256,43 +278,40 @@ export default function RouteMapLeaflet({ route }) {
       },
     }));
     return { type: "FeatureCollection", features };
-  }, [route.path, route.checkpoints]);
+  }, [dirPath, route.checkpoints]);
 
   // GeoJSON для цветных сегментов
   const coloredSegmentsGeoJson = useMemo(() => {
-    const path = route.path;
-    const segments = route.segments || [];
-    if (!path || path.length < 2 || segments.length === 0) return null;
+    if (!dirPath || dirPath.length < 2 || dirSegments.length === 0) return null;
     const features = [];
-    for (const seg of segments) {
+    for (const seg of dirSegments) {
       if (!seg.color || seg.pathIndex == null) continue;
       const i = seg.pathIndex;
-      if (i >= path.length - 1) continue;
+      if (i >= dirPath.length - 1) continue;
       features.push({
         type: "Feature",
         properties: { color: seg.color },
         geometry: {
           type: "LineString",
-          coordinates: [[path[i].lng, path[i].lat], [path[i + 1].lng, path[i + 1].lat]],
+          coordinates: [[dirPath[i].lng, dirPath[i].lat], [dirPath[i + 1].lng, dirPath[i + 1].lat]],
         },
       });
     }
     if (features.length === 0) return null;
     return { type: "FeatureCollection", features };
-  }, [route.path, route.segments]);
+  }, [dirPath, dirSegments]);
 
   const activeSegmentGeoJson = useMemo(() => {
     if (!currentEvent || !started || gpsMode === "gps_active") return null;
-    const path = route.path;
     if (currentEvent.type !== "segment") return null;
     const i = currentEvent.data.pathIndex;
-    if (i == null || i < 0 || i >= path.length - 1) return null;
-    const segStart = { lat: path[i].lat, lng: path[i].lng };
-    const segEnd = { lat: path[i + 1].lat, lng: path[i + 1].lng };
+    if (i == null || i < 0 || i >= dirPath.length - 1) return null;
+    const segStart = { lat: dirPath[i].lat, lng: dirPath[i].lng };
+    const segEnd = { lat: dirPath[i + 1].lat, lng: dirPath[i + 1].lng };
     const dividers = (route.checkpoints || []).filter((cp) => cp.isDivider);
     const splitsOnEdge = dividers
       .map((cp) => {
-        const proj = projectPointOnPath(cp.position, path);
+        const proj = projectPointOnPath(cp.position, dirPath);
         return proj && proj.pathIndex === i ? proj : null;
       })
       .filter(Boolean)
@@ -317,27 +336,26 @@ export default function RouteMapLeaflet({ route }) {
         ],
       },
     };
-  }, [currentEvent, started, gpsMode, route.path, route.checkpoints]);
+  }, [currentEvent, started, gpsMode, dirPath, route.checkpoints]);
 
   const activeAfterDividerGeoJson = useMemo(() => {
     if (!currentEvent || !started || gpsMode === "gps_active") return null;
     if (currentEvent.type !== "checkpoint" || !currentEvent.data.isDivider) return null;
-    const path = route.path;
-    const proj = projectPointOnPath(currentEvent.data.position, path);
+    const proj = projectPointOnPath(currentEvent.data.position, dirPath);
     if (!proj) return null;
     const i = proj.pathIndex;
-    if (i < 0 || i >= path.length - 1) return null;
+    if (i < 0 || i >= dirPath.length - 1) return null;
     return {
       type: "Feature",
       geometry: {
         type: "LineString",
         coordinates: [
           [proj.position.lng, proj.position.lat],
-          [path[i + 1].lng, path[i + 1].lat],
+          [dirPath[i + 1].lng, dirPath[i + 1].lat],
         ],
       },
     };
-  }, [currentEvent, started, gpsMode, route.path]);
+  }, [currentEvent, started, gpsMode, dirPath]);
 
   const accuracyGeoJson = useMemo(() => {
     if (gpsMode !== "gps_active" || !gps.position) return null;
@@ -502,6 +520,17 @@ export default function RouteMapLeaflet({ route }) {
               <Layer id="active-after-divider-line" type="line"
                 paint={{ "line-color": "#f97316", "line-width": 6, "line-opacity": 1 }} />
             </Source>
+          )}
+
+          {/* Маркер старта */}
+          {dirPath.length >= 2 && (
+            <Marker longitude={dirPath[0].lng} latitude={dirPath[0].lat}>
+              <div style={{
+                width: 14, height: 14, borderRadius: "50%",
+                background: "#22c55e", border: "2px solid white",
+                boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+              }} />
+            </Marker>
           )}
 
           {/* Чекпоинты */}
