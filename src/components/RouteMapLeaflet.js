@@ -7,7 +7,7 @@ import useOfflineDownload from "@/hooks/useOfflineDownload";
 import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
-import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath } from "@/lib/geo";
+import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
 import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -146,7 +146,7 @@ export default function RouteMapLeaflet({ route }) {
     map.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 1000 });
   }, [gpsMode, gps.position, autoFollow]);
 
-  // === Анимация пунктирной линии (preview + GPS, rAF ~30fps) ===
+  // === Анимация «змейки» — белый отрезок плавно едет по маршруту ===
   useEffect(() => {
     if (gpsMode !== null && gpsMode !== "gps_active") {
       if (dashAnimRef.current) {
@@ -155,23 +155,55 @@ export default function RouteMapLeaflet({ route }) {
       }
       return;
     }
-    const patterns = [
-      [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5],
-      [3, 3.5, 0.5], [3, 3, 1], [3, 2.5, 1.5], [3, 2, 2], [3, 1.5, 2.5],
-      [3, 1, 3], [3, 0.5, 3.5],
-    ];
-    let step = 0, lastUpdate = 0;
+    if (dirPath.length < 2) return;
+    const cumDist = [0];
+    for (let i = 1; i < dirPath.length; i++)
+      cumDist.push(cumDist[i - 1] + haversineDistance(dirPath[i - 1], dirPath[i]));
+    const total = cumDist[cumDist.length - 1];
+    if (total === 0) return;
+
+    const SNAKE = 0.12, SPEED = 0.15;
+    let progress = 0, prevTime = 0;
 
     const animate = (ts) => {
-      if (ts - lastUpdate > 80) {
-        lastUpdate = ts;
-        step = (step + 1) % patterns.length;
-        const map = mapRef.current;
+      if (!prevTime) prevTime = ts;
+      progress = (progress + ((ts - prevTime) / 1000) * SPEED) % 1;
+      prevTime = ts;
+
+      const headDist = progress * total;
+      const tailDist = Math.max(0, headDist - SNAKE * total);
+      const coords = [];
+      let tailDone = false;
+
+      for (let i = 0; i < dirPath.length - 1; i++) {
+        const d0 = cumDist[i], d1 = cumDist[i + 1];
+        if (d1 - d0 === 0) continue;
+        if (!tailDone && d1 >= tailDist) {
+          const t = (tailDist - d0) / (d1 - d0);
+          coords.push([
+            dirPath[i].lng + t * (dirPath[i + 1].lng - dirPath[i].lng),
+            dirPath[i].lat + t * (dirPath[i + 1].lat - dirPath[i].lat),
+          ]);
+          tailDone = true;
+        }
+        if (tailDone) {
+          if (d1 <= headDist) coords.push([dirPath[i + 1].lng, dirPath[i + 1].lat]);
+          if (d1 >= headDist) {
+            const t = (headDist - d0) / (d1 - d0);
+            coords.push([
+              dirPath[i].lng + t * (dirPath[i + 1].lng - dirPath[i].lng),
+              dirPath[i].lat + t * (dirPath[i + 1].lat - dirPath[i].lat),
+            ]);
+            break;
+          }
+        }
+      }
+
+      const map = mapRef.current;
+      if (map && coords.length >= 2) {
         try {
-          if (map?.getLayer("route-path-animated"))
-            map.setPaintProperty("route-path-animated", "line-dasharray", patterns[step]);
-          if (map?.getLayer("remaining-route-animated"))
-            map.setPaintProperty("remaining-route-animated", "line-dasharray", patterns[step]);
+          const src = map.getSource("route-snake");
+          if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } });
         } catch {}
       }
       dashAnimRef.current = requestAnimationFrame(animate);
@@ -443,17 +475,17 @@ export default function RouteMapLeaflet({ route }) {
                 filter={["==", ["get", "colorIndex"], 1]}
                 paint={{ "line-color": PATH_COLORS[1], "line-width": 3, "line-opacity": 0.8 }}
               />
-              {/* Анимированный пунктир поверх линий */}
-              <Layer
-                id="route-path-animated"
-                type="line"
-                paint={{
-                  "line-color": "#ffffff",
-                  "line-width": 3,
-                  "line-opacity": 0.4,
-                  "line-dasharray": [0, 4, 3],
-                }}
-              />
+            </Source>
+          )}
+
+          {/* Змейка — движущийся белый отрезок */}
+          {dirPath.length >= 2 && (
+            <Source id="route-snake" type="geojson" data={{
+              type: "Feature", geometry: { type: "LineString", coordinates: [[dirPath[0].lng, dirPath[0].lat], [dirPath[0].lng, dirPath[0].lat]] },
+            }}>
+              <Layer id="route-snake-line" type="line" paint={{
+                "line-color": "#ffffff", "line-width": 4, "line-opacity": 0.5,
+              }} />
             </Source>
           )}
 
@@ -480,13 +512,11 @@ export default function RouteMapLeaflet({ route }) {
             </Source>
           )}
 
-          {/* GPS: оставшийся путь (анимированные пунктиры) */}
+          {/* GPS: оставшийся путь */}
           {isGpsOverlay && gps.remainingGeoJson && (
             <Source id="remaining-route" type="geojson" data={gps.remainingGeoJson}>
               <Layer id="remaining-route-base" type="line"
-                paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.3 }} />
-              <Layer id="remaining-route-animated" type="line"
-                paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.8, "line-dasharray": [0, 4, 3] }} />
+                paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.5 }} />
             </Source>
           )}
 

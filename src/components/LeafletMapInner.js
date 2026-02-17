@@ -271,30 +271,65 @@ export default function LeafletMapInner({
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
   const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
 
-  // Анимация пунктирной линии
+  // Анимация «змейки» — белый отрезок плавно едет по маршруту
   useEffect(() => {
-    const patterns = [
-      [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5],
-      [3, 3.5, 0.5], [3, 3, 1], [3, 2.5, 1.5], [3, 2, 2], [3, 1.5, 2.5],
-      [3, 1, 3], [3, 0.5, 3.5],
-    ];
-    let step = 0, lastUpdate = 0;
+    if (dirPath.length < 2) return;
+    const cumDist = [0];
+    for (let i = 1; i < dirPath.length; i++)
+      cumDist.push(cumDist[i - 1] + haversineDistance(dirPath[i - 1], dirPath[i]));
+    const total = cumDist[cumDist.length - 1];
+    if (total === 0) return;
+
+    const SNAKE = 0.12; // длина змейки (доля маршрута)
+    const SPEED = 0.15; // доля маршрута в секунду
+    let progress = 0, prevTime = 0;
 
     const animate = (ts) => {
-      if (ts - lastUpdate > 80) {
-        lastUpdate = ts;
-        step = (step + 1) % patterns.length;
-        const map = mapRef.current?.getMap();
+      if (!prevTime) prevTime = ts;
+      progress = (progress + ((ts - prevTime) / 1000) * SPEED) % 1;
+      prevTime = ts;
+
+      const headDist = progress * total;
+      const tailDist = Math.max(0, headDist - SNAKE * total);
+      const coords = [];
+      let tailDone = false;
+
+      for (let i = 0; i < dirPath.length - 1; i++) {
+        const d0 = cumDist[i], d1 = cumDist[i + 1];
+        if (d1 - d0 === 0) continue;
+        if (!tailDone && d1 >= tailDist) {
+          const t = (tailDist - d0) / (d1 - d0);
+          coords.push([
+            dirPath[i].lng + t * (dirPath[i + 1].lng - dirPath[i].lng),
+            dirPath[i].lat + t * (dirPath[i + 1].lat - dirPath[i].lat),
+          ]);
+          tailDone = true;
+        }
+        if (tailDone) {
+          if (d1 <= headDist) coords.push([dirPath[i + 1].lng, dirPath[i + 1].lat]);
+          if (d1 >= headDist) {
+            const t = (headDist - d0) / (d1 - d0);
+            coords.push([
+              dirPath[i].lng + t * (dirPath[i + 1].lng - dirPath[i].lng),
+              dirPath[i].lat + t * (dirPath[i + 1].lat - dirPath[i].lat),
+            ]);
+            break;
+          }
+        }
+      }
+
+      const map = mapRef.current?.getMap();
+      if (map && coords.length >= 2) {
         try {
-          if (map?.getLayer("route-path-animated"))
-            map.setPaintProperty("route-path-animated", "line-dasharray", patterns[step]);
+          const src = map.getSource("route-snake");
+          if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } });
         } catch {}
       }
       dashAnimRef.current = requestAnimationFrame(animate);
     };
     dashAnimRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(dashAnimRef.current);
-  }, []);
+  }, [dirPath]);
 
   // fitBounds к маршруту если есть достаточно точек
   const routeBounds = useMemo(() => {
@@ -588,17 +623,17 @@ export default function LeafletMapInner({
               "line-opacity": 0.8,
             }}
           />
-          {/* Анимированный пунктир поверх линий */}
-          <Layer
-            id="route-path-animated"
-            type="line"
-            paint={{
-              "line-color": "#ffffff",
-              "line-width": 3,
-              "line-opacity": 0.4,
-              "line-dasharray": [0, 4, 3],
-            }}
-          />
+        </Source>
+      )}
+
+      {/* Змейка — движущийся белый отрезок */}
+      {dirPath.length >= 2 && (
+        <Source id="route-snake" type="geojson" data={{
+          type: "Feature", geometry: { type: "LineString", coordinates: [[dirPath[0].lng, dirPath[0].lat], [dirPath[0].lng, dirPath[0].lat]] },
+        }}>
+          <Layer id="route-snake-line" type="line" paint={{
+            "line-color": "#ffffff", "line-width": 4, "line-opacity": 0.5,
+          }} />
         </Source>
       )}
 
