@@ -162,7 +162,7 @@ export default function RouteMapLeaflet({ route }) {
     const total = cumDist[cumDist.length - 1];
     if (total === 0) return;
 
-    const SNAKE = 0.10, PERIOD = 0.25, SPEED = 0.08;
+    const SNAKE = 0.04, PERIOD = 0.12, SPEED = 0.08;
     let progress = 0, prevTime = 0;
 
     const sliceSegment = (tailDist, headDist) => {

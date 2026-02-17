@@ -280,8 +280,8 @@ export default function LeafletMapInner({
     const total = cumDist[cumDist.length - 1];
     if (total === 0) return;
 
-    const SNAKE = 0.10;  // длина каждой змейки (доля маршрута)
-    const PERIOD = 0.25; // период повторения (змейка + промежуток)
+    const SNAKE = 0.04;  // длина каждой змейки (доля маршрута)
+    const PERIOD = 0.12; // период повторения (змейка + промежуток)
     const SPEED = 0.08;  // скорость (доля маршрута в секунду)
     let progress = 0, prevTime = 0;
 
