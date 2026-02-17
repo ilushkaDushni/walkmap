@@ -155,32 +155,20 @@ export default function RouteMapLeaflet({ route }) {
       }
       return;
     }
-    const DASH = 3, GAP = 4, PERIOD = DASH + GAP, SPEED = 2.5;
-    let offset = 0, prevTime = 0, lastUpdate = 0;
+    const patterns = [[0, 4, 3], [1, 3, 3], [2, 2, 3], [3, 1, 3]];
+    let step = 0, lastUpdate = 0;
 
     const animate = (ts) => {
-      if (!prevTime) prevTime = ts;
-      offset = (offset + ((ts - prevTime) / 1000) * SPEED) % PERIOD;
-      prevTime = ts;
-
-      if (ts - lastUpdate > 33) {
+      if (ts - lastUpdate > 100) {
         lastUpdate = ts;
+        step = (step + 1) % patterns.length;
         const map = mapRef.current;
-        if (map) {
-          let p;
-          if (offset < GAP) {
-            p = [0.001, offset || 0.001, DASH, (GAP - offset) || 0.001];
-          } else {
-            const s = offset - GAP;
-            p = [s || 0.001, GAP, (DASH - s) || 0.001, 0.001];
-          }
-          try {
-            if (map.getLayer("route-path-animated"))
-              map.setPaintProperty("route-path-animated", "line-dasharray", p);
-            if (map.getLayer("remaining-route-animated"))
-              map.setPaintProperty("remaining-route-animated", "line-dasharray", p);
-          } catch {}
-        }
+        try {
+          if (map?.getLayer("route-path-animated"))
+            map.setPaintProperty("route-path-animated", "line-dasharray", patterns[step]);
+          if (map?.getLayer("remaining-route-animated"))
+            map.setPaintProperty("remaining-route-animated", "line-dasharray", patterns[step]);
+        } catch {}
       }
       dashAnimRef.current = requestAnimationFrame(animate);
     };
