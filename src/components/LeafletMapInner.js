@@ -271,7 +271,7 @@ export default function LeafletMapInner({
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
   const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
 
-  // Анимация «змейки» — белый отрезок плавно едет по маршруту
+  // Анимация «змеек» — несколько белых отрезков плавно едут к финишу
   useEffect(() => {
     if (dirPath.length < 2) return;
     const cumDist = [0];
@@ -280,20 +280,15 @@ export default function LeafletMapInner({
     const total = cumDist[cumDist.length - 1];
     if (total === 0) return;
 
-    const SNAKE = 0.12; // длина змейки (доля маршрута)
-    const SPEED = 0.15; // доля маршрута в секунду
+    const SNAKE = 0.10;  // длина каждой змейки (доля маршрута)
+    const PERIOD = 0.25; // период повторения (змейка + промежуток)
+    const SPEED = 0.08;  // скорость (доля маршрута в секунду)
     let progress = 0, prevTime = 0;
 
-    const animate = (ts) => {
-      if (!prevTime) prevTime = ts;
-      progress = (progress + ((ts - prevTime) / 1000) * SPEED) % 1;
-      prevTime = ts;
-
-      const headDist = progress * total;
-      const tailDist = Math.max(0, headDist - SNAKE * total);
+    // Извлечь координаты отрезка [tailDist..headDist] из пути
+    const sliceSegment = (tailDist, headDist) => {
       const coords = [];
       let tailDone = false;
-
       for (let i = 0; i < dirPath.length - 1; i++) {
         const d0 = cumDist[i], d1 = cumDist[i + 1];
         if (d1 - d0 === 0) continue;
@@ -317,12 +312,28 @@ export default function LeafletMapInner({
           }
         }
       }
+      return coords;
+    };
+
+    const animate = (ts) => {
+      if (!prevTime) prevTime = ts;
+      progress = (progress + ((ts - prevTime) / 1000) * SPEED) % PERIOD;
+      prevTime = ts;
+
+      const lines = [];
+      for (let base = -PERIOD; base < 1 + PERIOD; base += PERIOD) {
+        const head = (progress + base) * total;
+        const tail = head - SNAKE * total;
+        if (head <= 0 || tail >= total) continue;
+        const coords = sliceSegment(Math.max(0, tail), Math.min(total, head));
+        if (coords.length >= 2) lines.push(coords);
+      }
 
       const map = mapRef.current?.getMap();
-      if (map && coords.length >= 2) {
+      if (map && lines.length > 0) {
         try {
           const src = map.getSource("route-snake");
-          if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } });
+          if (src) src.setData({ type: "Feature", geometry: { type: "MultiLineString", coordinates: lines } });
         } catch {}
       }
       dashAnimRef.current = requestAnimationFrame(animate);
