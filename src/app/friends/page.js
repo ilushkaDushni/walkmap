@@ -7,6 +7,7 @@ import UserAvatar from "@/components/UserAvatar";
 import ChatView from "@/components/ChatView";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 
 const TABS = [
   { key: "friends", label: "Друзья", icon: Users },
@@ -197,10 +198,12 @@ export default function FriendsPage() {
         chatFriendId === f.id ? "ring-2 ring-green-500" : ""
       }`}
     >
-      <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" />
+      <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" online={isOnline(f.lastActivityAt)} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{f.username}</p>
-        {f.bio && <p className="text-xs text-[var(--text-muted)] truncate">{f.bio}</p>}
+        <p className={`text-xs truncate ${isOnline(f.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+          {formatLastSeen(f.lastActivityAt)}
+        </p>
       </div>
       <MessageCircle className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
     </button>

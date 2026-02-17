@@ -108,5 +108,9 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     return null;
   }, [authFetch, conversationKey]);
 
-  return { messages, loading, sendMessage, deleteMessage, toggleReaction, refresh: fetchMessages };
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  return { messages, loading, sendMessage, deleteMessage, toggleReaction, clearMessages, refresh: fetchMessages };
 }

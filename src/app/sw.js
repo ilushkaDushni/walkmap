@@ -73,6 +73,19 @@ const serwist = new Serwist({
         cacheableResponse: { statuses: [0, 200] },
       },
     },
+    // Медиа из S3 через proxy — CacheFirst, 30 дней
+    {
+      urlPattern: /\/api\/media\/.*/i,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "s3-media",
+        expiration: {
+          maxEntries: 500,
+          maxAgeSeconds: 30 * 24 * 60 * 60,
+        },
+        cacheableResponse: { statuses: [0, 200] },
+      },
+    },
     // Статические изображения (иконки и пр.)
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,

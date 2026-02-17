@@ -69,6 +69,12 @@ export async function POST(request) {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
+  // Обновляем lastActivityAt
+  await db.collection("users").updateOne(
+    { _id: new ObjectId(stored.userId) },
+    { $set: { lastActivityAt: new Date() } }
+  );
+
   const accessToken = await signAccessToken({ userId: stored.userId });
 
   const res = NextResponse.json({

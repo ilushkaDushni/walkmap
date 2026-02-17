@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useChatPolling from "@/hooks/useChatPolling";
 import useUnreadCount from "@/hooks/useUnreadCount";
 import Link from "next/link";
+import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
+import { getChatTheme, setChatTheme as saveChatTheme, CHAT_THEMES } from "@/lib/chatThemes";
+import { getChatFontSize } from "@/lib/chatSettings";
+import ChatSettingsModal from "./ChatSettingsModal";
+
+const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
 function timeShort(date) {
   const d = new Date(date);
@@ -145,7 +151,7 @@ function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClos
 }
 
 // --- Message Bubble ---
-function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction }) {
+function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction, theme, fontClass }) {
   const [contextMenu, setContextMenu] = useState(null);
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
@@ -183,6 +189,8 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction 
     if (r.userId === user?.id) grouped[r.emoji].mine = true;
   }
 
+  const accentHex = theme.accent;
+
   return (
     <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
       <div className="relative max-w-[min(75%,480px)]">
@@ -194,30 +202,42 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction 
           onTouchCancel={handleTouchEnd}
           className={`rounded-2xl px-3 py-1.5 select-none ${
             isMe
-              ? "bg-green-500 text-white rounded-br-sm"
-              : "bg-[var(--bg-elevated)] text-[var(--text-primary)] rounded-bl-sm"
+              ? "rounded-br-sm"
+              : `rounded-bl-sm ${theme.dark ? "" : "bg-[var(--bg-elevated)] text-[var(--text-primary)]"}`
           }`}
+          style={isMe
+            ? { backgroundColor: theme.bubble, color: theme.bubbleText }
+            : theme.dark ? { backgroundColor: "rgba(255,255,255,0.12)", color: "#e2e8f0" } : undefined
+          }
         >
           {/* Reply quote */}
           {msg.replyTo && (
-            <div className={`mb-1 pl-2 border-l-2 rounded-sm ${
-              isMe ? "border-white/50" : "border-green-500/50"
-            }`}>
-              <p className={`text-[10px] font-semibold ${isMe ? "text-white/80" : "text-green-600"}`}>
+            <div className={`mb-1 pl-2 border-l-2 rounded-sm`}
+              style={isMe ? { borderColor: "rgba(255,255,255,0.5)" } : { borderColor: theme.dark ? "rgba(226,232,240,0.3)" : accentHex + "80" }}
+            >
+              <p className="text-[10px] font-semibold"
+                style={isMe ? { color: "rgba(255,255,255,0.8)" } : { color: accentHex }}
+              >
                 {msg.replyTo.senderId === user?.id ? "Вы" : (msg.replyTo.senderName || friend?.username)}
               </p>
-              <p className={`text-[11px] truncate ${isMe ? "text-white/60" : "text-[var(--text-muted)]"}`}>
+              <p className={`text-[11px] truncate ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+                style={isMe ? { color: "rgba(255,255,255,0.6)" } : theme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}
+              >
                 {msg.replyTo.text}
               </p>
             </div>
           )}
 
-          <p className="text-sm break-words whitespace-pre-wrap leading-snug">{msg.text}</p>
+          <p className={`${fontClass} break-words whitespace-pre-wrap leading-snug`}>{msg.text}</p>
           {msg.routeId && <RouteCard routeId={msg.routeId} />}
 
           {/* Time + read status */}
-          <div className={`flex items-center justify-end gap-0.5 mt-0.5 ${isMe ? "text-white/60" : "text-[var(--text-muted)]"} leading-none`}>
-            <span className="text-[10px]">{timeShort(msg.createdAt)}</span>
+          <div className={`flex items-center justify-end gap-0.5 mt-0.5 leading-none`}
+            style={isMe ? { color: "rgba(255,255,255,0.6)" } : undefined}
+          >
+            <span className={`text-[10px] ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+              style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
+            >{timeShort(msg.createdAt)}</span>
             {isMe && (
               msg.readAt
                 ? <CheckCheck className="h-3 w-3 ml-0.5" />
@@ -235,9 +255,10 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction 
                 onClick={() => onReaction(msg.id, emoji)}
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition ${
                   data.mine
-                    ? "bg-green-500/15 border-green-500/40 text-green-600"
+                    ? "border-transparent"
                     : "bg-[var(--bg-elevated)] border-[var(--border-color)] text-[var(--text-secondary)]"
                 }`}
+                style={data.mine ? { backgroundColor: accentHex + "26", borderColor: accentHex + "66", color: accentHex } : undefined}
               >
                 <span>{emoji}</span>
                 {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
@@ -268,15 +289,35 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const { count } = useUnreadCount();
 
   const conversationKey = user ? [user.id, friendId].sort().join("_") : null;
-  const { messages, loading, sendMessage, deleteMessage, toggleReaction } = useChatPolling(conversationKey, {
+  const { messages, loading, sendMessage, deleteMessage, toggleReaction, clearMessages } = useChatPolling(conversationKey, {
     interval: 5000,
     enabled: !!conversationKey,
   });
+
+  // Тема чата
+  const [chatTheme, setChatThemeState] = useState(() => getChatTheme(conversationKey));
+  const [fontSize, setFontSize] = useState(() => conversationKey ? getChatFontSize(conversationKey) : "base");
+  const fontClass = FONT_CLASS[fontSize] || FONT_CLASS.base;
+
+  const handleThemeChange = useCallback((themeId) => {
+    const theme = CHAT_THEMES.find((t) => t.id === themeId) || CHAT_THEMES[0];
+    setChatThemeState(theme);
+    if (conversationKey) saveChatTheme(conversationKey, themeId);
+  }, [conversationKey]);
+
+  const handleFontSizeChange = useCallback((size) => {
+    setFontSize(size);
+  }, []);
+
+  const handleClearHistory = useCallback(() => {
+    if (clearMessages) clearMessages();
+  }, [clearMessages]);
 
   // Автоскролл вниз только при добавлении новых сообщений
   const prevCountRef = useRef(0);
@@ -326,6 +367,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
     window.dispatchEvent(new Event("toggle-notification-bell"));
   };
 
+  const friendOnline = isOnline(friend?.lastActivityAt);
+  const friendStatus = formatLastSeen(friend?.lastActivityAt);
+
   return (
     <div className={inline ? "flex flex-col h-full bg-[var(--bg-surface)]" : "fixed inset-0 z-[56] bg-[var(--bg-surface)] flex flex-col"}>
       {/* Header */}
@@ -341,34 +385,58 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
             username={friend?.username || "?"}
             avatarUrl={friend?.avatarUrl}
             size="sm"
+            online={friendOnline}
           />
-          <span className="text-sm font-semibold text-[var(--text-primary)] truncate">
-            {friend?.username || "Чат"}
-          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--text-primary)] truncate leading-tight">
+              {friend?.username || "Чат"}
+            </p>
+            {friend?.lastActivityAt != null && (
+              <p className={`text-[11px] leading-tight ${friendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+                {friendStatus}
+              </p>
+            )}
+          </div>
         </div>
 
-        {!inline && (
+        <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={handleBellClick}
-            className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition shrink-0"
+            onClick={() => setShowSettings(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition"
           >
-            <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
-            {count > 0 && (
-              <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
-                {count > 99 ? "99+" : count}
-              </span>
-            )}
+            <MoreVertical className="h-5 w-5 text-[var(--text-secondary)]" />
           </button>
-        )}
+          {!inline && (
+            <button
+              onClick={handleBellClick}
+              className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition"
+            >
+              <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
+              {count > 0 && (
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
+        style={chatTheme.bg ? {
+          background: chatTheme.bg,
+          backgroundSize: chatTheme.bgSize || "auto",
+        } : undefined}
+      >
         {loading ? (
-          <div className="py-8 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+          <div className="py-8 text-center text-sm" style={chatTheme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}>
+            <span className={chatTheme.dark ? "" : "text-[var(--text-muted)]"}>Загрузка...</span>
+          </div>
         ) : messages.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--text-muted)]">
-            Начните общение!
+          <div className="py-8 text-center text-sm" style={chatTheme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}>
+            <span className={chatTheme.dark ? "" : "text-[var(--text-muted)]"}>Начните общение!</span>
           </div>
         ) : (
           messages.map((msg) => (
@@ -381,6 +449,8 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
               onReply={handleReply}
               onDelete={handleDelete}
               onReaction={handleReaction}
+              theme={chatTheme}
+              fontClass={fontClass}
             />
           ))
         )}
@@ -391,9 +461,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
       {replyTo && (
         <div className="px-4 shrink-0">
           <div className="flex items-center gap-2 px-3 py-2 rounded-t-xl bg-[var(--bg-elevated)] border border-b-0 border-[var(--border-color)]">
-            <Reply className="h-4 w-4 text-green-500 shrink-0" />
+            <Reply className="h-4 w-4 shrink-0" style={{ color: chatTheme.accent }} />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-green-600">
+              <p className="text-xs font-semibold" style={{ color: chatTheme.accent }}>
                 {replyTo.senderId === user?.id ? "Вы" : (friend?.username || "Собеседник")}
               </p>
               <p className="text-xs text-[var(--text-muted)] truncate">{replyTo.text}</p>
@@ -406,7 +476,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
       )}
 
       {/* Input */}
-      <div className={`px-4 py-3 shrink-0 ${inline ? "" : "pb-24"}`}>
+      <div className={`px-4 py-3 shrink-0 ${inline ? "" : "pb-[env(safe-area-inset-bottom,12px)]"}`}>
         <div className={`flex items-end gap-2 max-w-2xl mx-auto ${inline ? "relative -left-40" : ""}`}>
           {/* Emoji button */}
           <div className="relative shrink-0">
@@ -449,12 +519,26 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
           <button
             onClick={handleSend}
             disabled={!text.trim()}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white transition hover:bg-green-600 disabled:opacity-40 shrink-0"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-white transition disabled:opacity-40 shrink-0"
+            style={{ backgroundColor: chatTheme.accent }}
           >
             <Send className="h-4 w-4" />
           </button>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && conversationKey && (
+        <ChatSettingsModal
+          conversationKey={conversationKey}
+          friend={friend}
+          currentTheme={chatTheme}
+          onThemeChange={handleThemeChange}
+          onFontSizeChange={handleFontSizeChange}
+          onClearHistory={handleClearHistory}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

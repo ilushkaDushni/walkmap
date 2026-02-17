@@ -9,12 +9,19 @@ const SIZES = {
   xl: "h-24 w-24 text-3xl",
 };
 
-export default function UserAvatar({ username, avatarUrl, roleColor, size = "md", linkToProfile = false, className = "" }) {
+const DOT_SIZES = {
+  sm: "h-2 w-2 ring-[1.5px]",
+  md: "h-2.5 w-2.5 ring-2",
+  lg: "h-3.5 w-3.5 ring-2",
+  xl: "h-4 w-4 ring-[3px]",
+};
+
+export default function UserAvatar({ username, avatarUrl, roleColor, size = "md", linkToProfile = false, online, className = "" }) {
   const sizeClass = SIZES[size] || SIZES.md;
   const initial = (username || "?")[0].toUpperCase();
   const bg = roleColor || "#6b7280";
 
-  const avatar = avatarUrl ? (
+  const avatarEl = avatarUrl ? (
     <img
       src={avatarUrl}
       alt={username || ""}
@@ -29,13 +36,24 @@ export default function UserAvatar({ username, avatarUrl, roleColor, size = "md"
     </div>
   );
 
+  const dotSize = DOT_SIZES[size] || DOT_SIZES.md;
+
+  const wrapped = online != null ? (
+    <div className="relative inline-flex shrink-0">
+      {avatarEl}
+      {online && (
+        <span className={`absolute bottom-0 right-0 block rounded-full bg-green-500 ring-[var(--bg-surface)] ${dotSize}`} />
+      )}
+    </div>
+  ) : avatarEl;
+
   if (linkToProfile && username) {
     return (
       <Link href={`/users/${username}`} className="shrink-0">
-        {avatar}
+        {wrapped}
       </Link>
     );
   }
 
-  return avatar;
+  return wrapped;
 }

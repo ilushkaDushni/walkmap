@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/adminAuth";
 import { randomBytes } from "crypto";
-import { writeFile, unlink, mkdir } from "fs/promises";
-import path from "path";
-
-const UPLOADS_DIR = path.resolve(process.cwd(), "uploads");
+import { uploadFile, deleteFile, s3KeyFromUrl } from "@/lib/storage";
 
 const ALLOWED = {
   photo: {
@@ -19,7 +16,7 @@ const ALLOWED = {
   },
 };
 
-// POST /api/upload — загрузка файла (admin only)
+// POST /api/upload — загрузка файла в S3 (admin only)
 export async function POST(request) {
   const { error } = await requirePermission(request, "upload.files");
   if (error) return error;
@@ -50,15 +47,18 @@ export async function POST(request) {
 
   const ext = file.name.split(".").pop().toLowerCase();
   const filename = `${randomBytes(12).toString("hex")}.${ext}`;
-
-  const dirPath = path.join(UPLOADS_DIR, config.dir);
-  await mkdir(dirPath, { recursive: true });
+  const key = `${config.dir}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dirPath, filename), buffer);
 
-  const url = `/api/uploads/${config.dir}/${filename}`;
-
-  return NextResponse.json({ url });
+  try {
+    console.log("[upload] key:", key, "size:", buffer.length, "type:", file.type);
+    const url = await uploadFile(key, buffer, file.type);
+    console.log("[upload] success:", url);
+    return NextResponse.json({ url });
+  } catch (err) {
+    console.error("[upload] FAILED:", err?.Code || err?.name || err?.message, err);
+    return NextResponse.json({ error: "Ошибка загрузки" }, { status: 500 });
+  }
 }
 
 // DELETE /api/upload — удаление файла (admin only)
@@ -72,23 +72,37 @@ export async function DELETE(request) {
     return NextResponse.json({ error: "URL не указан" }, { status: 400 });
   }
 
+  // S3 file (/api/media/... or direct S3 URL)
+  const key = s3KeyFromUrl(url);
+  if (key) {
+    try {
+      await deleteFile(url);
+    } catch {
+      // file may already be deleted
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Legacy: local file deletion (/api/uploads/...)
   const prefix = "/api/uploads/";
-  if (!url.includes(prefix)) {
-    return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
+  if (url.includes(prefix)) {
+    const { unlink } = await import("fs/promises");
+    const path = await import("path");
+    const UPLOADS_DIR = path.default.resolve(process.cwd(), "uploads");
+    const relativePath = url.split(prefix).pop();
+    const filePath = path.default.resolve(UPLOADS_DIR, relativePath);
+
+    if (!filePath.startsWith(UPLOADS_DIR)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    try {
+      await unlink(filePath);
+    } catch {
+      // file may already be deleted
+    }
+    return NextResponse.json({ ok: true });
   }
 
-  const relativePath = url.split(prefix).pop();
-  const filePath = path.resolve(UPLOADS_DIR, relativePath);
-
-  if (!filePath.startsWith(UPLOADS_DIR)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  try {
-    await unlink(filePath);
-  } catch {
-    // file may already be deleted
-  }
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
 }

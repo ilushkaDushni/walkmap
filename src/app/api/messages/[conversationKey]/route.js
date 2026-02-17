@@ -128,6 +128,12 @@ export async function POST(request, { params }) {
 
   const result = await db.collection("messages").insertOne(message);
 
+  // Обновляем lastActivityAt
+  await db.collection("users").updateOne(
+    { _id: new ObjectId(userId) },
+    { $set: { lastActivityAt: new Date() } }
+  );
+
   // Подгружаем replyTo если есть
   let replyTo = null;
   if (replyToId) {

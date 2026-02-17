@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 
@@ -21,6 +22,15 @@ export async function PATCH(request, { params }) {
   const result = await db.collection("messages").updateMany(
     { conversationKey, senderId: { $ne: userId }, readAt: null },
     { $set: { readAt: new Date() } }
+  );
+
+  // Обновляем lastActivityAt (тротлинг 30с)
+  await db.collection("users").updateOne(
+    { _id: new ObjectId(userId), $or: [
+      { lastActivityAt: { $exists: false } },
+      { lastActivityAt: { $lt: new Date(Date.now() - 30000) } }
+    ]},
+    { $set: { lastActivityAt: new Date() } }
   );
 
   return NextResponse.json({ updated: result.modifiedCount });

@@ -167,5 +167,26 @@ export async function POST(request) {
   await db.collection("comments").createIndex({ createdAt: -1 });
   log.push("Индекс comments.createdAt созданы");
 
+  // 13. Конвертация S3 URL → proxy URL для avatarUrl
+  const s3Prefix = "https://storage.yandexcloud.net/";
+  const usersWithS3Avatar = await db.collection("users").find({
+    avatarUrl: { $regex: `^${s3Prefix}` },
+  }).toArray();
+
+  let avatarsMigrated = 0;
+  for (const u of usersWithS3Avatar) {
+    const rest = u.avatarUrl.slice(s3Prefix.length);
+    const idx = rest.indexOf("/");
+    if (idx !== -1) {
+      const proxyUrl = `/api/media/${rest.slice(idx + 1)}`;
+      await db.collection("users").updateOne(
+        { _id: u._id },
+        { $set: { avatarUrl: proxyUrl } }
+      );
+      avatarsMigrated++;
+    }
+  }
+  log.push(`Конвертировано ${avatarsMigrated} avatarUrl (S3 → proxy)`);
+
   return NextResponse.json({ success: true, log });
 }

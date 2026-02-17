@@ -136,6 +136,21 @@ export async function resolveUserRolesData(user) {
 }
 
 /**
+ * Convert legacy S3 direct URLs to proxy URLs.
+ */
+function toProxyUrl(url) {
+  if (!url) return null;
+  if (url.startsWith("/api/media/")) return url;
+  const s3Host = "https://storage.yandexcloud.net/";
+  if (url.startsWith(s3Host)) {
+    const rest = url.slice(s3Host.length);
+    const idx = rest.indexOf("/");
+    if (idx !== -1) return `/api/media/${rest.slice(idx + 1)}`;
+  }
+  return url;
+}
+
+/**
  * Собирает полный объект юзера для фронтенда
  */
 export async function buildUserResponse(user) {
@@ -148,7 +163,7 @@ export async function buildUserResponse(user) {
     id: user._id.toString(),
     username: user.username,
     email: user.email,
-    avatarUrl: user.avatarUrl || null,
+    avatarUrl: toProxyUrl(user.avatarUrl),
     coins: user.coins || 0,
     bio: user.bio || "",
     roles,
