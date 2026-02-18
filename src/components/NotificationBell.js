@@ -26,6 +26,7 @@ function timeAgo(date) {
 const ICON_MAP = {
   achievement: Trophy,
   comment_reply: MessageCircle,
+  new_message: MessageCircle,
   friend_request: UserPlus,
   friend_accept: UserCheck,
   lobby_invite: Users,
@@ -37,6 +38,7 @@ const ICON_MAP = {
 const COLOR_MAP = {
   achievement: "text-amber-500",
   comment_reply: "text-blue-500",
+  new_message: "text-blue-500",
   friend_request: "text-green-500",
   friend_accept: "text-green-500",
   lobby_invite: "text-purple-500",
@@ -64,6 +66,8 @@ function getNotificationText(n) {
       return d.amount > 0
         ? `Администратор начислил вам ${d.amount} монет`
         : `Администратор списал ${Math.abs(d.amount)} монет`;
+    case "new_message":
+      return `${d.username || "Кто-то"} отправил вам сообщение`;
     case "admin_broadcast":
       return d.message || "Объявление от администрации";
     default:
@@ -76,6 +80,7 @@ function getNotificationLink(n) {
   switch (n.type) {
     case "comment_reply":
       return d.routeId ? `/routes/${d.routeId}` : null;
+    case "new_message":
     case "friend_request":
     case "friend_accept":
       return "/friends";
@@ -268,6 +273,15 @@ export default function NotificationBell({ inline = false }) {
       return;
     }
 
+    if (n.type === "new_message" && n.data?.userId) {
+      setOpen(false);
+      router.push("/friends");
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("open-chat", { detail: { friendId: n.data.userId } }));
+      }, 100);
+      return;
+    }
+
     const link = getNotificationLink(n);
     if (link) {
       setOpen(false);
@@ -307,7 +321,7 @@ export default function NotificationBell({ inline = false }) {
             {notifications.map((n) => {
               const Icon = ICON_MAP[n.type] || Bell;
               const colorCls = COLOR_MAP[n.type] || "text-[var(--text-secondary)]";
-              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin";
+              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin" || n.type === "new_message";
               return (
                 <div
                   key={n.id}
@@ -325,6 +339,9 @@ export default function NotificationBell({ inline = false }) {
                     </p>
                     {n.data?.message && (n.type === "coin_gift" || n.type === "coin_admin") && (
                       <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.message}&raquo;</p>
+                    )}
+                    {n.type === "new_message" && n.data?.text && (
+                      <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.text}&raquo;</p>
                     )}
                     <span className="text-[10px] text-[var(--text-muted)] mt-0.5">{timeAgo(n.createdAt)}</span>
                     {n.type === "friend_request" && !n.read && (

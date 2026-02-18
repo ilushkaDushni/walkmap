@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2 } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
@@ -13,7 +13,7 @@ import { APP_VERSION } from "@/lib/version";
 export default function ProfileModal({ isOpen, onClose }) {
   const { user, login, register, verify, logout, authFetch, updateUser } = useUser();
   const router = useRouter();
-  // "profile" | "login" | "register" | "verify" | "edit" | "settings"
+  // "profile" | "login" | "register" | "verify" | "welcome" | "edit" | "settings"
   const [screen, setScreen] = useState("profile");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,6 +38,23 @@ export default function ProfileModal({ isOpen, onClose }) {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Welcome screen
+  const [welcomeAvatarBlob, setWelcomeAvatarBlob] = useState(null);
+  const [welcomeAvatarPreview, setWelcomeAvatarPreview] = useState(null);
+
+  // Username change
+  const [editUsername, setEditUsername] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameMsg, setUsernameMsg] = useState({ text: "", ok: false });
+
+  // Password change
+  const [showPassword, setShowPassword] = useState(false);
+  const [curPassword, setCurPassword] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [savingPwd, setSavingPwd] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState({ text: "", ok: false });
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -60,13 +77,31 @@ export default function ProfileModal({ isOpen, onClose }) {
       setRegPassword2("");
       setVerifyCode("");
       setVerifyEmail("");
+      setCropImageSrc(null);
+      if (welcomeAvatarPreview) URL.revokeObjectURL(welcomeAvatarPreview);
+      setWelcomeAvatarBlob(null);
+      setWelcomeAvatarPreview(null);
+      setEditUsername("");
+      setUsernameMsg({ text: "", ok: false });
+      setShowPassword(false);
+      setCurPassword("");
+      setNewPwd("");
+      setConfirmPwd("");
+      setPwdMsg({ text: "", ok: false });
     }
   }, [isOpen]);
 
-  // Заполнить bio при открытии экрана edit
+  // Заполнить bio и username при открытии экрана edit
   useEffect(() => {
     if (screen === "edit" && user) {
       setEditBio(user.bio || "");
+      setEditUsername(user.username || "");
+      setUsernameMsg({ text: "", ok: false });
+      setShowPassword(false);
+      setCurPassword("");
+      setNewPwd("");
+      setConfirmPwd("");
+      setPwdMsg({ text: "", ok: false });
     }
   }, [screen, user]);
 
@@ -112,8 +147,7 @@ export default function ProfileModal({ isOpen, onClose }) {
     setSubmitting(true);
     try {
       await verify(verifyEmail, verifyCode);
-      onClose();
-      router.push("/");
+      setScreen("welcome");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -191,6 +225,105 @@ export default function ProfileModal({ isOpen, onClose }) {
     }
   };
 
+  // Welcome: обрезка аватара (сохраняем blob, не загружаем сразу)
+  const handleWelcomeCrop = (blob) => {
+    setCropImageSrc(null);
+    setWelcomeAvatarBlob(blob);
+    if (welcomeAvatarPreview) URL.revokeObjectURL(welcomeAvatarPreview);
+    setWelcomeAvatarPreview(URL.createObjectURL(blob));
+  };
+
+  // Welcome: сохранить аву + bio
+  const handleWelcomeSave = async () => {
+    setSubmitting(true);
+    setError("");
+    try {
+      if (welcomeAvatarBlob) {
+        const form = new FormData();
+        form.append("avatar", welcomeAvatarBlob, "avatar.webp");
+        const res = await authFetch("/api/users/avatar", { method: "POST", body: form });
+        const data = await res.json();
+        if (res.ok) updateUser({ avatarUrl: data.avatarUrl });
+      }
+      if (editBio.trim()) {
+        const res = await authFetch("/api/users/bio", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bio: editBio }),
+        });
+        const data = await res.json();
+        if (res.ok) updateUser({ bio: data.bio });
+      }
+      onClose();
+      router.push("/");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Смена ника
+  const handleSaveUsername = async () => {
+    const trimmed = editUsername.trim();
+    if (trimmed === user.username) return;
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      setUsernameMsg({ text: "Ник от 2 до 20 символов", ok: false });
+      return;
+    }
+    setSavingUsername(true);
+    setUsernameMsg({ text: "", ok: false });
+    try {
+      const res = await authFetch("/api/users/username", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      updateUser({ username: data.username, coins: data.coins });
+      setUsernameMsg({ text: "Ник изменён", ok: true });
+    } catch (e) {
+      setUsernameMsg({ text: e.message, ok: false });
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
+  // Смена пароля
+  const handleSavePassword = async () => {
+    if (newPwd.length < 6) {
+      setPwdMsg({ text: "Новый пароль минимум 6 символов", ok: false });
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      setPwdMsg({ text: "Пароли не совпадают", ok: false });
+      return;
+    }
+    setSavingPwd(true);
+    setPwdMsg({ text: "", ok: false });
+    try {
+      const res = await authFetch("/api/users/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: curPassword, newPassword: newPwd }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setPwdMsg({ text: "Пароль изменён", ok: true });
+      setCurPassword("");
+      setNewPwd("");
+      setConfirmPwd("");
+    } catch (e) {
+      setPwdMsg({ text: e.message, ok: false });
+    } finally {
+      setSavingPwd(false);
+    }
+  };
+
+  const usernameChanged = editUsername.trim() !== (user?.username || "");
+  const isFirstUsernameChange = !user?.usernameChangedAt;
+
   if (!isOpen) return null;
 
   const backdrop = (
@@ -244,6 +377,84 @@ export default function ProfileModal({ isOpen, onClose }) {
     return <SettingsScreen modalShell={modalShell} backBtn={backBtn} closeBtn={closeBtn} onClose={onClose} />;
   }
 
+  // === Экран: Welcome (после регистрации) ===
+  if (screen === "welcome") {
+    return modalShell(
+      <>
+        {closeBtn}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {cropImageSrc ? (
+          <div className="flex flex-col items-center mb-4">
+            <h2 className="text-lg font-bold text-[var(--text-primary)] mb-3">Обрезка фото</h2>
+            <AvatarCropper
+              imageSrc={cropImageSrc}
+              onCrop={handleWelcomeCrop}
+              onCancel={() => setCropImageSrc(null)}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col items-center mb-4">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Добро пожаловать!</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-1">Настройте свой профиль</p>
+            </div>
+            <div className="flex flex-col items-center mb-4">
+              <div className="relative mb-3">
+                {welcomeAvatarPreview ? (
+                  <img
+                    src={welcomeAvatarPreview}
+                    alt="Аватар"
+                    className="h-24 w-24 rounded-full object-cover border-2 border-[var(--border-color)]"
+                  />
+                ) : (
+                  <UserAvatar username={user?.username || "?"} size="xl" />
+                )}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">О себе</label>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value.slice(0, 200))}
+                  placeholder="Расскажите о себе..."
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
+                <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+                  {editBio.length}/200
+                </div>
+              </div>
+              {errorMsg}
+              <button onClick={handleWelcomeSave} disabled={submitting} className={btnPrimary}>
+                {submitting ? "Сохранение..." : "Сохранить"}
+              </button>
+              <button
+                onClick={() => { onClose(); router.push("/"); }}
+                className={btnOutline}
+              >
+                Пропустить
+              </button>
+            </div>
+          </>
+        )}
+      </>
+    );
+  }
+
   // === Экран: Редактирование профиля ===
   if (user && screen === "edit") {
     return modalShell(
@@ -294,7 +505,39 @@ export default function ProfileModal({ isOpen, onClose }) {
               )}
               <h2 className="text-lg font-bold text-[var(--text-primary)] mt-2">Редактирование</h2>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* --- Ник --- */}
+              <div>
+                <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">Ник</label>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value.slice(0, 20))}
+                  className={inputCls}
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    {isFirstUsernameChange ? "Первая смена — бесплатно" : "Смена ника — 50 монет"}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{editUsername.trim().length}/20</span>
+                </div>
+                {usernameMsg.text && (
+                  <p className={`text-xs mt-1 ${usernameMsg.ok ? "text-green-500" : "text-red-400"}`}>
+                    {usernameMsg.text}
+                  </p>
+                )}
+                {usernameChanged && (
+                  <button
+                    onClick={handleSaveUsername}
+                    disabled={savingUsername}
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                  >
+                    {savingUsername ? "Сохранение..." : "Сменить ник"}
+                  </button>
+                )}
+              </div>
+
+              {/* --- О себе --- */}
               <div>
                 <label className="text-xs font-medium text-[var(--text-muted)] mb-1 block">О себе</label>
                 <textarea
@@ -312,6 +555,58 @@ export default function ProfileModal({ isOpen, onClose }) {
               <button onClick={handleSaveBio} disabled={submitting} className={btnPrimary}>
                 {submitting ? "Сохранение..." : "Сохранить"}
               </button>
+
+              {/* --- Смена пароля --- */}
+              <div className="border-t border-[var(--border-color)] pt-3">
+                <button
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="flex w-full items-center justify-between text-sm font-medium text-[var(--text-secondary)]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    Сменить пароль
+                  </span>
+                  {showPassword ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showPassword && (
+                  <div className="mt-3 space-y-2">
+                    <input
+                      type="password"
+                      value={curPassword}
+                      onChange={(e) => setCurPassword(e.target.value)}
+                      placeholder="Текущий пароль"
+                      className={inputCls}
+                    />
+                    <input
+                      type="password"
+                      value={newPwd}
+                      onChange={(e) => setNewPwd(e.target.value)}
+                      placeholder="Новый пароль"
+                      className={inputCls}
+                    />
+                    <input
+                      type="password"
+                      value={confirmPwd}
+                      onChange={(e) => setConfirmPwd(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSavePassword()}
+                      placeholder="Повторите новый пароль"
+                      className={inputCls}
+                    />
+                    {pwdMsg.text && (
+                      <p className={`text-xs ${pwdMsg.ok ? "text-green-500" : "text-red-400"}`}>
+                        {pwdMsg.text}
+                      </p>
+                    )}
+                    <button
+                      onClick={handleSavePassword}
+                      disabled={savingPwd}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                    >
+                      {savingPwd ? "Сохранение..." : "Изменить пароль"}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

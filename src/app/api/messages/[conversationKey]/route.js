@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
+import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // GET /api/messages/[conversationKey] — получить сообщения
 export async function GET(request, { params }) {
@@ -133,6 +135,37 @@ export async function POST(request, { params }) {
     { _id: new ObjectId(userId) },
     { $set: { lastActivityAt: new Date() } }
   );
+
+  // Уведомление + SSE получателю
+  const recipientId = parts.find((p) => p !== userId);
+  if (recipientId) {
+    const sender = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { username: 1, avatarUrl: 1 } }
+    );
+    const ssePayload = {
+      type: "new_message",
+      username: sender?.username || "Кто-то",
+      avatarUrl: sender?.avatarUrl || null,
+      text: trimmed.slice(0, 100),
+      conversationKey,
+      userId,
+    };
+
+    // Дедупликация уведомлений в БД
+    const existing = await db.collection("notifications").findOne({
+      userId: recipientId,
+      type: "new_message",
+      "data.userId": userId,
+      read: false,
+    });
+    if (!existing) {
+      await createNotification(recipientId, "new_message", ssePayload);
+    }
+
+    // SSE — всегда пушим для мгновенного тоста
+    pushNotification(recipientId, ssePayload);
+  }
 
   // Подгружаем replyTo если есть
   let replyTo = null;

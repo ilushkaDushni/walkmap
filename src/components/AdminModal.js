@@ -114,7 +114,7 @@ export default function AdminModal({ isOpen, onClose }) {
 
       {/* Модальное окно */}
       <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-md animate-slide-up">
-        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors">
+        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors max-h-[70dvh] overflow-y-auto">
           {/* Закрыть */}
           <button
             onClick={onClose}

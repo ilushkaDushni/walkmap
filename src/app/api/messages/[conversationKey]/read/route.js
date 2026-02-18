@@ -24,6 +24,15 @@ export async function PATCH(request, { params }) {
     { $set: { readAt: new Date() } }
   );
 
+  // Помечаем уведомления о сообщениях от этого собеседника как прочитанные
+  const friendId = parts.find((p) => p !== userId);
+  if (friendId) {
+    await db.collection("notifications").updateMany(
+      { userId, type: "new_message", "data.userId": friendId, read: false },
+      { $set: { read: true } }
+    );
+  }
+
   // Обновляем lastActivityAt (тротлинг 30с)
   await db.collection("users").updateOne(
     { _id: new ObjectId(userId), $or: [

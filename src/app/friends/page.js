@@ -25,6 +25,7 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [chatFriendId, setChatFriendId] = useState(null);
+  const [unreadMap, setUnreadMap] = useState({}); // { friendId: count }
   const [contextMenu, setContextMenu] = useState(null); // { x, y, friend }
   const contextRef = useRef(null);
 
@@ -57,11 +58,37 @@ export default function FriendsPage() {
     } catch { /* ignore */ }
   }, [authFetch]);
 
+  const loadUnread = useCallback(async () => {
+    if (!authFetch) return;
+    try {
+      const res = await authFetch("/api/messages/conversations");
+      if (res.ok) {
+        const data = await res.json();
+        const map = {};
+        for (const c of data.conversations || []) {
+          if (c.unread > 0) map[c.friendId] = c.unread;
+        }
+        setUnreadMap(map);
+      }
+    } catch { /* ignore */ }
+  }, [authFetch]);
+
   useEffect(() => {
     if (!user) return;
     loadFriends();
     loadRequests();
-  }, [user, loadFriends, loadRequests]);
+    loadUnread();
+  }, [user, loadFriends, loadRequests, loadUnread]);
+
+  // Обработка события open-chat (из NotificationBell)
+  useEffect(() => {
+    const handler = (e) => {
+      const friendId = e.detail?.friendId;
+      if (friendId) setChatFriendId(friendId);
+    };
+    window.addEventListener("open-chat", handler);
+    return () => window.removeEventListener("open-chat", handler);
+  }, []);
 
   const handleSearch = useCallback(async (q) => {
     if (q.length < 2) {
@@ -160,6 +187,11 @@ export default function FriendsPage() {
     );
   }
 
+  const handleCloseChat = useCallback(() => {
+    setChatFriendId(null);
+    loadUnread();
+  }, [loadUnread]);
+
   const chatFriend = friends.find((f) => f.id === chatFriendId);
 
   const renderTabs = () => (
@@ -205,7 +237,14 @@ export default function FriendsPage() {
           {formatLastSeen(f.lastActivityAt)}
         </p>
       </div>
-      <MessageCircle className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+      <div className="relative shrink-0">
+        <MessageCircle className="h-4 w-4 text-[var(--text-muted)]" />
+        {unreadMap[f.id] > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+            {unreadMap[f.id] > 99 ? "99+" : unreadMap[f.id]}
+          </span>
+        )}
+      </div>
     </button>
   );
 
@@ -376,7 +415,7 @@ export default function FriendsPage() {
           <ChatView
             friendId={chatFriendId}
             friend={chatFriend}
-            onBack={() => setChatFriendId(null)}
+            onBack={handleCloseChat}
           />
         </div>
       )}
@@ -396,7 +435,7 @@ export default function FriendsPage() {
             <ChatView
               friendId={chatFriendId}
               friend={chatFriend}
-              onBack={() => setChatFriendId(null)}
+              onBack={handleCloseChat}
               inline
             />
           ) : (

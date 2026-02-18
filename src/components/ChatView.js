@@ -319,6 +319,15 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
     if (clearMessages) clearMessages();
   }, [clearMessages]);
 
+  // Сигнализируем MessageToast о том, что чат открыт/закрыт
+  useEffect(() => {
+    if (!conversationKey) return;
+    window.dispatchEvent(new CustomEvent("chat-active", { detail: { conversationKey } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("chat-closed", { detail: { conversationKey } }));
+    };
+  }, [conversationKey]);
+
   // Автоскролл вниз только при добавлении новых сообщений
   const prevCountRef = useRef(0);
   useEffect(() => {

@@ -7,11 +7,13 @@ import { useUser } from "./UserProvider";
 import { useNavigationGuard } from "./NavigationGuardProvider";
 import ProfileModal from "./ProfileModal";
 import AdminModal from "./AdminModal";
+import useUnreadMessages from "@/hooks/useUnreadMessages";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { user, hasPermission } = useUser();
   const { navigate } = useNavigationGuard();
+  const { count: unreadMsgCount } = useUnreadMessages();
   const [profileOpen, setProfileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
 
@@ -84,17 +86,22 @@ export default function BottomNav() {
               isFriendsActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="var(--bg-surface)" stroke="currentColor" strokeWidth={isFriendsActive ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
-              {/* Левый задний */}
-              <circle cx="6.5" cy="8" r="2.2" />
-              <path d="M2.5 20a4 4 0 0 1 8 0" />
-              {/* Правый задний */}
-              <circle cx="17.5" cy="8" r="2.2" />
-              <path d="M13.5 20a4 4 0 0 1 8 0" />
-              {/* Передний центральный (перекрывает) */}
-              <circle cx="12" cy="9" r="2.8" />
-              <path d="M7 21a5 5 0 0 1 10 0" />
-            </svg>
+            <div className="relative">
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="var(--bg-surface)" stroke="currentColor" strokeWidth={isFriendsActive ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
+                {/* Левый задний */}
+                <circle cx="6.5" cy="8" r="2.2" />
+                <path d="M2.5 20a4 4 0 0 1 8 0" />
+                {/* Правый задний */}
+                <circle cx="17.5" cy="8" r="2.2" />
+                <path d="M13.5 20a4 4 0 0 1 8 0" />
+                {/* Передний центральный (перекрывает) */}
+                <circle cx="12" cy="9" r="2.8" />
+                <path d="M7 21a5 5 0 0 1 10 0" />
+              </svg>
+              {unreadMsgCount > 0 && (
+                <span className="absolute -top-0.5 -right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-[var(--bg-surface)]" />
+              )}
+            </div>
             <span className="text-[10px] font-medium">Друзья</span>
           </button>
 

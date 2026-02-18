@@ -4,6 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import PreviewBanner from "@/components/PreviewBanner";
 import BanModal from "@/components/BanModal";
 import AchievementToast from "@/components/AchievementToast";
+import MessageToast from "@/components/MessageToast";
 import NotificationBell from "@/components/NotificationBell";
 import LobbyController from "@/components/LobbyController";
 import UpdateModal from "@/components/UpdateModal";
@@ -51,6 +52,7 @@ export default function RootLayout({ children }) {
           <NavigationGuardProvider>
             <BanModal />
             <AchievementToast />
+            <MessageToast />
             <UpdateModal />
             <PreviewBanner />
             {/* Шапка */}

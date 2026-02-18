@@ -636,101 +636,104 @@ function RouteRow({ route, folder, folders, onEdit, onDelete, onFieldChange, onT
   const isException = folder?.adminOnly && folder.exceptions?.includes(route._id);
 
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 transition">
-      <div
-        className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-elevated)] cursor-pointer"
-        onClick={onEdit}
-      >
-        {route.coverImage ? (
-          <img
-            src={typeof route.coverImage === "string" ? route.coverImage : route.coverImage.url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-[var(--text-muted)]">
-            <Eye className="h-4 w-4" />
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{route.title}</p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          {route.status === "published" ? (
-            <span className="flex items-center gap-1 text-green-600">
-              <Eye className="h-3 w-3" /> Опубл.
-            </span>
+    <div className="flex flex-col gap-2 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-3 transition">
+      {/* Первая строка: thumbnail + название + статус */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div
+          className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-elevated)] cursor-pointer"
+          onClick={onEdit}
+        >
+          {route.coverImage ? (
+            <img
+              src={typeof route.coverImage === "string" ? route.coverImage : route.coverImage.url}
+              alt=""
+              className="h-full w-full object-cover"
+            />
           ) : (
-            <span className="flex items-center gap-1">
-              <EyeOff className="h-3 w-3" /> Черн.
-            </span>
+            <div className="flex h-full w-full items-center justify-center text-[var(--text-muted)]">
+              <Eye className="h-4 w-4" />
+            </div>
           )}
         </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2">{route.title}</p>
+          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+            {route.status === "published" ? (
+              <span className="flex items-center gap-1 text-green-600">
+                <Eye className="h-3 w-3" /> Опубл.
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <EyeOff className="h-3 w-3" /> Черн.
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      <input
-        type="number"
-        className="w-14 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-center text-[var(--text-primary)] outline-none"
-        value={order}
-        onChange={(e) => setOrder(e.target.value)}
-        onBlur={() => {
-          const v = Number(order);
-          if (!isNaN(v) && v !== (route.sortOrder ?? 0)) {
-            onFieldChange(route._id, "sortOrder", v);
-          }
-        }}
-        title="Порядок"
-      />
+      {/* Вторая строка: папка + порядок + действия */}
+      <div className="flex items-center gap-2">
+        <FolderPicker route={route} folders={folders} onFieldChange={onFieldChange} />
 
-      <FolderPicker route={route} folders={folders} onFieldChange={onFieldChange} />
+        <input
+          type="number"
+          className="w-14 rounded-lg border border-[var(--border-color)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-center text-[var(--text-primary)] outline-none"
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+          onBlur={() => {
+            const v = Number(order);
+            if (!isNaN(v) && v !== (route.sortOrder ?? 0)) {
+              onFieldChange(route._id, "sortOrder", v);
+            }
+          }}
+          title="Порядок"
+        />
 
-      {folder?.adminOnly ? (
-        <button
-          onClick={() => onToggleException?.(folder._id, route._id)}
-          className={`rounded-lg p-1.5 transition ${
-            isException
-              ? "text-green-500 hover:text-green-600"
-              : hiddenByFolder
-                ? "text-red-400 hover:text-green-500"
-                : "text-[var(--text-muted)] hover:text-red-400"
-          }`}
-          title={isException ? "Исключение — виден несмотря на скрытую папку" : hiddenByFolder ? "Скрыт папкой — нажмите чтобы добавить в исключения" : ""}
-        >
-          <Shield className="h-4 w-4" fill={hiddenByFolder || isException ? "currentColor" : "none"} />
-        </button>
-      ) : (
-        <div className="w-7" />
-      )}
+        <div className="flex-1" />
 
-      <div className="flex gap-0.5">
-        <button
-          onClick={() => onSetFeatured(route._id, isFeatured)}
-          className={`rounded-lg p-1.5 transition ${
-            isFeatured
-              ? "text-orange-500 hover:text-orange-600"
-              : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-orange-500"
-          }`}
-          title={isFeatured ? "Убрать из маршрута дня" : "Сделать маршрутом дня"}
-        >
-          <Star className="h-4 w-4" fill={isFeatured ? "currentColor" : "none"} />
-        </button>
-        <button
-          onClick={onEdit}
-          className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-blue-500 transition"
-          title="Редактировать"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-red-500 transition"
-          title="Удалить"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {folder?.adminOnly ? (
+          <button
+            onClick={() => onToggleException?.(folder._id, route._id)}
+            className={`rounded-lg p-1.5 transition ${
+              isException
+                ? "text-green-500 hover:text-green-600"
+                : hiddenByFolder
+                  ? "text-red-400 hover:text-green-500"
+                  : "text-[var(--text-muted)] hover:text-red-400"
+            }`}
+            title={isException ? "Исключение — виден несмотря на скрытую папку" : hiddenByFolder ? "Скрыт папкой — нажмите чтобы добавить в исключения" : ""}
+          >
+            <Shield className="h-4 w-4" fill={hiddenByFolder || isException ? "currentColor" : "none"} />
+          </button>
+        ) : null}
+
+        <div className="flex gap-0.5">
+          <button
+            onClick={() => onSetFeatured(route._id, isFeatured)}
+            className={`rounded-lg p-1.5 transition ${
+              isFeatured
+                ? "text-orange-500 hover:text-orange-600"
+                : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-orange-500"
+            }`}
+            title={isFeatured ? "Убрать из маршрута дня" : "Сделать маршрутом дня"}
+          >
+            <Star className="h-4 w-4" fill={isFeatured ? "currentColor" : "none"} />
+          </button>
+          <button
+            onClick={onEdit}
+            className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-blue-500 transition"
+            title="Редактировать"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-red-500 transition"
+            title="Удалить"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
