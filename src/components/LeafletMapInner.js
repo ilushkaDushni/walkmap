@@ -271,6 +271,12 @@ export default function LeafletMapInner({
   const [hoveredSegmentIndex, setHoveredSegmentIndex] = useState(null);
   const [ghostDot, setGhostDot] = useState(null); // { lat, lng } для превью чекпоинта
 
+  // Directed path для анимации пунктира (от старта к финишу)
+  const { dirPath } = useMemo(
+    () => getDirectedPath(path, startPointIndex, finishPointIndex),
+    [path, startPointIndex, finishPointIndex]
+  );
+
   // Анимация «змеек» — несколько белых отрезков плавно едут к финишу
   useEffect(() => {
     if (dirPath.length < 2) return;
@@ -432,12 +438,6 @@ export default function LeafletMapInner({
       onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }, mode);
     },
     [mode, onMapClick, onSegmentLineClick, onPathInsert, path]
-  );
-
-  // Directed path для анимации пунктира (от старта к финишу)
-  const { dirPath } = useMemo(
-    () => getDirectedPath(path, startPointIndex, finishPointIndex),
-    [path, startPointIndex, finishPointIndex]
   );
 
   // GeoJSON для линии пути — разбитый по чекпоинтам на чередующиеся сегменты
