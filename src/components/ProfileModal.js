@@ -49,9 +49,11 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   // Password change
   const [showPassword, setShowPassword] = useState(false);
+  const [pwdMode, setPwdMode] = useState("change"); // "change" | "forgot" | "code"
   const [curPassword, setCurPassword] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
+  const [resetCode, setResetCode] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdMsg, setPwdMsg] = useState({ text: "", ok: false });
 
@@ -84,9 +86,11 @@ export default function ProfileModal({ isOpen, onClose }) {
       setEditUsername("");
       setUsernameMsg({ text: "", ok: false });
       setShowPassword(false);
+      setPwdMode("change");
       setCurPassword("");
       setNewPwd("");
       setConfirmPwd("");
+      setResetCode("");
       setPwdMsg({ text: "", ok: false });
     }
   }, [isOpen]);
@@ -98,9 +102,11 @@ export default function ProfileModal({ isOpen, onClose }) {
       setEditUsername(user.username || "");
       setUsernameMsg({ text: "", ok: false });
       setShowPassword(false);
+      setPwdMode("change");
       setCurPassword("");
       setNewPwd("");
       setConfirmPwd("");
+      setResetCode("");
       setPwdMsg({ text: "", ok: false });
     }
   }, [screen, user]);
@@ -290,7 +296,7 @@ export default function ProfileModal({ isOpen, onClose }) {
     }
   };
 
-  // Смена пароля
+  // Смена пароля (с текущим паролем)
   const handleSavePassword = async () => {
     if (newPwd.length < 6) {
       setPwdMsg({ text: "Новый пароль минимум 6 символов", ok: false });
@@ -314,6 +320,61 @@ export default function ProfileModal({ isOpen, onClose }) {
       setCurPassword("");
       setNewPwd("");
       setConfirmPwd("");
+    } catch (e) {
+      setPwdMsg({ text: e.message, ok: false });
+    } finally {
+      setSavingPwd(false);
+    }
+  };
+
+  // Забыли пароль — отправить код на email
+  const handleForgotPassword = async () => {
+    setSavingPwd(true);
+    setPwdMsg({ text: "", ok: false });
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setPwdMode("code");
+      setPwdMsg({ text: `Код отправлен на ${user.email}`, ok: true });
+    } catch (e) {
+      setPwdMsg({ text: e.message, ok: false });
+    } finally {
+      setSavingPwd(false);
+    }
+  };
+
+  // Сброс пароля по коду
+  const handleResetPassword = async () => {
+    if (newPwd.length < 6) {
+      setPwdMsg({ text: "Новый пароль минимум 6 символов", ok: false });
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      setPwdMsg({ text: "Пароли не совпадают", ok: false });
+      return;
+    }
+    setSavingPwd(true);
+    setPwdMsg({ text: "", ok: false });
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, code: resetCode, newPassword: newPwd }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setPwdMsg({ text: "Пароль изменён, войдите заново", ok: true });
+      setResetCode("");
+      setNewPwd("");
+      setConfirmPwd("");
+      setPwdMode("change");
+      // Разлогин (токены удалены на сервере)
+      setTimeout(() => logout(), 2000);
     } catch (e) {
       setPwdMsg({ text: e.message, ok: false });
     } finally {
@@ -570,40 +631,105 @@ export default function ProfileModal({ isOpen, onClose }) {
                 </button>
                 {showPassword && (
                   <div className="mt-3 space-y-2">
-                    <input
-                      type="password"
-                      value={curPassword}
-                      onChange={(e) => setCurPassword(e.target.value)}
-                      placeholder="Текущий пароль"
-                      className={inputCls}
-                    />
-                    <input
-                      type="password"
-                      value={newPwd}
-                      onChange={(e) => setNewPwd(e.target.value)}
-                      placeholder="Новый пароль"
-                      className={inputCls}
-                    />
-                    <input
-                      type="password"
-                      value={confirmPwd}
-                      onChange={(e) => setConfirmPwd(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSavePassword()}
-                      placeholder="Повторите новый пароль"
-                      className={inputCls}
-                    />
+                    {pwdMode === "change" && (
+                      <>
+                        <input
+                          type="password"
+                          value={curPassword}
+                          onChange={(e) => setCurPassword(e.target.value)}
+                          placeholder="Текущий пароль"
+                          className={inputCls}
+                        />
+                        <input
+                          type="password"
+                          value={newPwd}
+                          onChange={(e) => setNewPwd(e.target.value)}
+                          placeholder="Новый пароль"
+                          className={inputCls}
+                        />
+                        <input
+                          type="password"
+                          value={confirmPwd}
+                          onChange={(e) => setConfirmPwd(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSavePassword()}
+                          placeholder="Повторите новый пароль"
+                          className={inputCls}
+                        />
+                        <button
+                          onClick={handleSavePassword}
+                          disabled={savingPwd}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                        >
+                          {savingPwd ? "Сохранение..." : "Изменить пароль"}
+                        </button>
+                        <button
+                          onClick={() => { setPwdMode("forgot"); setPwdMsg({ text: "", ok: false }); }}
+                          className="w-full text-center text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+                        >
+                          Не помню пароль
+                        </button>
+                      </>
+                    )}
+                    {pwdMode === "forgot" && (
+                      <>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          Отправим код на <span className="font-medium">{user.email}</span>
+                        </p>
+                        <button
+                          onClick={handleForgotPassword}
+                          disabled={savingPwd}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                        >
+                          {savingPwd ? "Отправка..." : "Отправить код"}
+                        </button>
+                        <button
+                          onClick={() => { setPwdMode("change"); setPwdMsg({ text: "", ok: false }); }}
+                          className="w-full text-center text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+                        >
+                          Вспомнил пароль
+                        </button>
+                      </>
+                    )}
+                    {pwdMode === "code" && (
+                      <>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ""))}
+                          placeholder="6-значный код"
+                          className={`${inputCls} text-center text-lg tracking-[0.3em]`}
+                        />
+                        <input
+                          type="password"
+                          value={newPwd}
+                          onChange={(e) => setNewPwd(e.target.value)}
+                          placeholder="Новый пароль"
+                          className={inputCls}
+                        />
+                        <input
+                          type="password"
+                          value={confirmPwd}
+                          onChange={(e) => setConfirmPwd(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
+                          placeholder="Повторите новый пароль"
+                          className={inputCls}
+                        />
+                        <button
+                          onClick={handleResetPassword}
+                          disabled={savingPwd}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+                        >
+                          {savingPwd ? "Сохранение..." : "Сбросить пароль"}
+                        </button>
+                      </>
+                    )}
                     {pwdMsg.text && (
                       <p className={`text-xs ${pwdMsg.ok ? "text-green-500" : "text-red-400"}`}>
                         {pwdMsg.text}
                       </p>
                     )}
-                    <button
-                      onClick={handleSavePassword}
-                      disabled={savingPwd}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
-                    >
-                      {savingPwd ? "Сохранение..." : "Изменить пароль"}
-                    </button>
                   </div>
                 )}
               </div>

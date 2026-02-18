@@ -6,17 +6,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import useOfflineDownload from "@/hooks/useOfflineDownload";
 import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
-import useAudioPlayer from "@/hooks/useAudioPlayer";
 import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Volume2 } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const ROSTOV_BOUNDS = [[38.8, 46.9], [40.6, 47.6]];
-const CAMERA_THROTTLE_MS = 1000;
-const SHEET_COLLAPSED = 100;
-const SHEET_MAX_RATIO = 0.6;
+const CAMERA_THROTTLE_MS = 1000; // обновлять камеру не чаще чем раз в 1с
 
 function Dot({ color, size = 14, label, pulse }) {
   return (
@@ -80,121 +77,10 @@ function accuracyCircleGeoJson(center, radiusMeters) {
   };
 }
 
-// === Voice button for bottom sheet ===
-function VoiceButton({ audioUrls }) {
-  const hasAudio = audioUrls && audioUrls.length > 0;
-  const { isPlaying, togglePlay } = useAudioPlayer({ urls: hasAudio ? audioUrls : [] });
-  const [toast, setToast] = useState(false);
-
-  const handleClick = () => {
-    if (hasAudio) {
-      togglePlay();
-    } else {
-      setToast(true);
-      setTimeout(() => setToast(false), 1500);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <button
-        onClick={handleClick}
-        className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
-          hasAudio
-            ? isPlaying
-              ? "bg-green-600 text-white"
-              : "bg-green-600/20 text-green-600"
-            : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
-        }`}
-      >
-        <Volume2 className="h-4 w-4" />
-      </button>
-      {toast && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-lg bg-black/80 px-3 py-1.5 text-xs text-white">
-          Нет озвучки
-        </div>
-      )}
-    </div>
-  );
-}
-
-// === Bottom Sheet ===
-function BottomSheet({ children, expanded, onToggle }) {
-  const sheetRef = useRef(null);
-  const startYRef = useRef(0);
-  const startHeightRef = useRef(0);
-  const isDraggingRef = useRef(false);
-
-  const maxHeight = typeof window !== "undefined" ? window.innerHeight * SHEET_MAX_RATIO : 400;
-
-  const handleTouchStart = (e) => {
-    if (e.target.closest("button, a, input, .no-drag")) return;
-    isDraggingRef.current = true;
-    startYRef.current = e.touches[0].clientY;
-    startHeightRef.current = expanded ? maxHeight : SHEET_COLLAPSED;
-  };
-
-  const handleTouchMove = (e) => {
-    if (!isDraggingRef.current) return;
-    const dy = startYRef.current - e.touches[0].clientY;
-    const newH = Math.max(SHEET_COLLAPSED, Math.min(maxHeight, startHeightRef.current + dy));
-    if (sheetRef.current) {
-      sheetRef.current.style.height = `${newH}px`;
-      sheetRef.current.style.transition = "none";
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    if (!sheetRef.current) return;
-    const h = sheetRef.current.offsetHeight;
-    const threshold = (SHEET_COLLAPSED + maxHeight) / 2;
-    sheetRef.current.style.transition = "height 0.3s ease";
-    if (h > threshold) {
-      sheetRef.current.style.height = `${maxHeight}px`;
-      if (!expanded) onToggle();
-    } else {
-      sheetRef.current.style.height = `${SHEET_COLLAPSED}px`;
-      if (expanded) onToggle();
-    }
-  };
-
-  useEffect(() => {
-    if (sheetRef.current) {
-      sheetRef.current.style.transition = "height 0.3s ease";
-      sheetRef.current.style.height = expanded ? `${maxHeight}px` : `${SHEET_COLLAPSED}px`;
-    }
-  }, [expanded, maxHeight]);
-
-  return (
-    <div
-      ref={sheetRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="absolute bottom-0 left-0 right-0 z-20 rounded-t-2xl bg-[var(--bg-surface)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)] overflow-hidden"
-      style={{ height: SHEET_COLLAPSED }}
-    >
-      {/* Drag handle */}
-      <div
-        className="flex justify-center pt-2 pb-1 cursor-grab"
-        onClick={onToggle}
-      >
-        <div className="h-1 w-10 rounded-full bg-[var(--text-muted)] opacity-40" />
-      </div>
-      <div className="h-[calc(100%-16px)] overflow-y-auto">
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export default function RouteMapLeaflet({ route }) {
   const [started, setStarted] = useState(false);
   const [eventIndex, setEventIndex] = useState(0);
   const mapRef = useRef(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   // GPS
   const [gpsMode, setGpsMode] = useState(null); // null | gps_requesting | gps_active | gps_finished
@@ -260,7 +146,7 @@ export default function RouteMapLeaflet({ route }) {
     map.easeTo({ center: [gps.position.lng, gps.position.lat], zoom: 17, duration: 1000 });
   }, [gpsMode, gps.position, autoFollow]);
 
-  // === Анимация «змейки» ===
+  // === Анимация «змейки» — белый отрезок плавно едет по маршруту ===
   useEffect(() => {
     if (gpsMode !== null && gpsMode !== "gps_active") {
       if (dashAnimRef.current) {
@@ -381,24 +267,7 @@ export default function RouteMapLeaflet({ route }) {
   const currentEvent = events[eventIndex] || null;
   const isLast = eventIndex >= events.length - 1;
 
-  // Получаем audio текущего события для VoiceButton
-  const currentAudio = useMemo(() => {
-    if (!currentEvent) return null;
-    if (currentEvent.type === "segment") return currentEvent.data.audio;
-    if (currentEvent.type === "checkpoint") return currentEvent.data.audio;
-    return null;
-  }, [currentEvent]);
-
-  // Заголовок текущего события для bottom sheet
-  const currentTitle = useMemo(() => {
-    if (!currentEvent) return "";
-    if (currentEvent.type === "segment") return currentEvent.data.title || "Отрезок";
-    if (currentEvent.type === "checkpoint") return currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`;
-    if (currentEvent.type === "finish") return "Финиш";
-    return "";
-  }, [currentEvent]);
-
-  // === GPS auto-advance ===
+  // === GPS auto-advance: когда GPS триггерит чекпоинт/сегмент, переключаем карточку ===
   useEffect(() => {
     if (!gps.activeCheckpoint || !started) return;
     const idx = events.findIndex(
@@ -419,6 +288,7 @@ export default function RouteMapLeaflet({ route }) {
     }
   }, [gps.activeSegment, started, events, eventIndex]);
 
+  // При GPS-финише переключаемся на финишную карточку
   useEffect(() => {
     if (gpsMode !== "gps_finished" || !started) return;
     const idx = events.findIndex((e) => e.type === "finish");
@@ -427,7 +297,7 @@ export default function RouteMapLeaflet({ route }) {
     }
   }, [gpsMode, started, events]);
 
-  // === GeoJSON ===
+  // === GeoJSON (manual mode layers) ===
   const PATH_COLORS = ["#3b82f6", "#8b5cf6"];
   const pathSegmentsGeoJson = useMemo(() => {
     if (!dirPath || dirPath.length < 2) return null;
@@ -443,6 +313,7 @@ export default function RouteMapLeaflet({ route }) {
     return { type: "FeatureCollection", features };
   }, [dirPath, route.checkpoints]);
 
+  // GeoJSON для цветных сегментов
   const coloredSegmentsGeoJson = useMemo(() => {
     if (!dirPath || dirPath.length < 2 || dirSegments.length === 0) return null;
     const features = [];
@@ -547,35 +418,17 @@ export default function RouteMapLeaflet({ route }) {
     }
   }, [gps.position]);
 
-  // === "Начать маршрут" — только ручной режим, без GPS ===
+  // === "Начать маршрут" запускает GPS + ручной режим одновременно ===
   const handleStart = () => {
     setStarted(true);
     setGpsError(null);
+    setGpsMode("gps_requesting");
+    setAutoFollow(true);
     setCompleteSent(false);
-    setSheetExpanded(false);
-  };
-
-  // === GPS toggle ===
-  const handleToggleGps = () => {
-    if (gpsMode === "gps_active" || gpsMode === "gps_requesting") {
-      // Остановить GPS
-      gps.stopGps();
-      setGpsMode(null);
-      setGpsError(null);
-      setAutoFollow(true);
-      setCompleteSent(false);
-      userDragRef.current = false;
-    } else {
-      // Запустить GPS
-      setGpsError(null);
-      setGpsMode("gps_requesting");
-      setAutoFollow(true);
-      setCompleteSent(false);
-      userDragRef.current = false;
-      lastCameraRef.current = 0;
-      gps.startGps();
-      requestPermission();
-    }
+    userDragRef.current = false;
+    lastCameraRef.current = 0;
+    gps.startGps();
+    requestPermission();
   };
 
   const handleStopGps = () => {
@@ -585,6 +438,7 @@ export default function RouteMapLeaflet({ route }) {
     setAutoFollow(true);
     setCompleteSent(false);
     userDragRef.current = false;
+    // started остаётся true — ручной режим работает
   };
 
   const handleNext = () => {
@@ -597,300 +451,313 @@ export default function RouteMapLeaflet({ route }) {
 
   const isGpsOverlay = gpsMode === "gps_active" || gpsMode === "gps_finished";
 
-  // === Рендер карты (общий для preview и started) ===
-  const mapContent = (
-    <Map
-      onLoad={onLoad}
-      onMoveStart={onMoveStart}
-      initialViewState={
-        routeBounds
-          ? { bounds: routeBounds, fitBoundsOptions: { padding: 40 } }
-          : { longitude: center.lng, latitude: center.lat, zoom }
-      }
-      maxBounds={ROSTOV_BOUNDS}
-      minZoom={10}
-      style={{ height: "100%", width: "100%" }}
-      mapStyle={STYLE}
-      attributionControl={true}
-    >
-      {!isGpsOverlay && pathSegmentsGeoJson && (
-        <Source id="route-path" type="geojson" data={pathSegmentsGeoJson}>
-          <Layer
-            id="route-path-line-0"
-            type="line"
-            filter={["==", ["get", "colorIndex"], 0]}
-            paint={{ "line-color": PATH_COLORS[0], "line-width": 3, "line-opacity": 0.8 }}
-          />
-          <Layer
-            id="route-path-line-1"
-            type="line"
-            filter={["==", ["get", "colorIndex"], 1]}
-            paint={{ "line-color": PATH_COLORS[1], "line-width": 3, "line-opacity": 0.8 }}
-          />
-        </Source>
-      )}
-
-      {dirPath.length >= 2 && (
-        <Source id="route-snake" type="geojson" data={{
-          type: "Feature", geometry: { type: "LineString", coordinates: [[dirPath[0].lng, dirPath[0].lat], [dirPath[0].lng, dirPath[0].lat]] },
-        }}>
-          <Layer id="route-snake-line" type="line" paint={{
-            "line-color": "#ffffff", "line-width": 4, "line-opacity": 0.5,
-          }} />
-        </Source>
-      )}
-
-      {!isGpsOverlay && coloredSegmentsGeoJson && (
-        <Source id="colored-segments" type="geojson" data={coloredSegmentsGeoJson}>
-          <Layer
-            id="colored-segments-line"
-            type="line"
-            paint={{
-              "line-color": ["get", "color"],
-              "line-width": 4,
-              "line-opacity": 0.9,
-            }}
-          />
-        </Source>
-      )}
-
-      {isGpsOverlay && gps.passedGeoJson && (
-        <Source id="passed-route" type="geojson" data={gps.passedGeoJson}>
-          <Layer id="passed-route-line" type="line"
-            paint={{ "line-color": "#808080", "line-width": 4, "line-opacity": 0.5 }} />
-        </Source>
-      )}
-
-      {isGpsOverlay && gps.remainingGeoJson && (
-        <Source id="remaining-route" type="geojson" data={gps.remainingGeoJson}>
-          <Layer id="remaining-route-base" type="line"
-            paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.5 }} />
-        </Source>
-      )}
-
-      {isGpsOverlay && accuracyGeoJson && (
-        <Source id="accuracy-circle" type="geojson" data={accuracyGeoJson}>
-          <Layer id="accuracy-circle-fill" type="fill"
-            paint={{ "fill-color": "#4285f4", "fill-opacity": 0.1 }} />
-          <Layer id="accuracy-circle-border" type="line"
-            paint={{ "line-color": "#4285f4", "line-opacity": 0.3, "line-width": 1 }} />
-        </Source>
-      )}
-
-      {activeSegmentGeoJson && (
-        <Source id="active-segment" type="geojson" data={activeSegmentGeoJson}>
-          <Layer id="active-segment-line" type="line"
-            paint={{ "line-color": "#f97316", "line-width": 6, "line-opacity": 1 }} />
-        </Source>
-      )}
-      {activeAfterDividerGeoJson && (
-        <Source id="active-after-divider" type="geojson" data={activeAfterDividerGeoJson}>
-          <Layer id="active-after-divider-line" type="line"
-            paint={{ "line-color": "#f97316", "line-width": 6, "line-opacity": 1 }} />
-        </Source>
-      )}
-
-      {dirPath.length >= 2 && (
-        <Marker longitude={dirPath[0].lng} latitude={dirPath[0].lat}>
-          <div style={{
-            width: 14, height: 14, borderRadius: "50%",
-            background: "#22c55e", border: "2px solid white",
-            boxShadow: "0 1px 4px rgba(0,0,0,.3)",
-          }} />
-        </Marker>
-      )}
-
-      {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
-        const isTriggeredGps = isGpsOverlay && gps.triggeredIds.has(cp.id);
-        const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
-        const color = isTriggeredGps
-          ? "#22c55e"
-          : isActive ? "#ef4444" : (cp.color || "#f59e0b");
-        const label = isTriggeredGps ? "\u2713" : (cp.order + 1);
-        const size = isActive ? 18 : 14;
-        return (
-          <Marker key={cp.id} longitude={cp.position.lng} latitude={cp.position.lat}>
-            <Dot color={color} size={size} label={label} pulse={isActive} />
-          </Marker>
-        );
-      })}
-
-      {route.finish?.position && (
-        <Marker longitude={route.finish.position.lng} latitude={route.finish.position.lat}>
-          <div style={{
-            width: 20, height: 20, borderRadius: 3,
-            background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 10px 10px",
-            border: "2px solid white",
-            boxShadow: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
-              ? "0 0 10px #ef444488" : "0 1px 4px rgba(0,0,0,.3)",
-            animation: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
-              ? "pulse 2s infinite" : "none",
-          }} />
-        </Marker>
-      )}
-
-      {isGpsOverlay && gps.position && (
-        <Marker longitude={gps.position.lng} latitude={gps.position.lat}>
-          <div className="gps-dot">
-            <div className="gps-dot-pulse" />
-            <div className="gps-dot-core" />
-          </div>
-        </Marker>
-      )}
-    </Map>
-  );
-
-  // ===================================================================
-  // === STARTED MODE: fullscreen map + bottom sheet ===
-  // ===================================================================
-  if (started) {
-    return (
-      <div className="relative" style={{ height: "calc(100dvh - 80px)" }}>
-        {/* Fullscreen map */}
-        <div className="absolute inset-0 overflow-hidden rounded-2xl">
-          {mapContent}
-        </div>
-
-        {/* GPS toggle button */}
-        <button
-          onClick={handleToggleGps}
-          className={`absolute top-3 right-3 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-lg border transition ${
-            gpsMode === "gps_active"
-              ? "bg-blue-600 border-blue-700 text-white"
-              : gpsMode === "gps_requesting"
-                ? "bg-white border-blue-300 text-blue-600 animate-pulse"
-                : "bg-white border-gray-200 text-gray-500 hover:text-blue-600"
-          }`}
-          title={gpsMode === "gps_active" ? "Остановить GPS" : "Включить GPS"}
+  return (
+    <div className="space-y-4">
+      {/* Карта */}
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm relative">
+        <Map
+          onLoad={onLoad}
+          onMoveStart={onMoveStart}
+          initialViewState={
+            routeBounds
+              ? { bounds: routeBounds, fitBoundsOptions: { padding: 40 } }
+              : { longitude: center.lng, latitude: center.lat, zoom }
+          }
+          maxBounds={ROSTOV_BOUNDS}
+          minZoom={10}
+          style={{ height: started ? "350px" : "300px", width: "100%" }}
+          mapStyle={STYLE}
+          attributionControl={true}
         >
-          <Navigation className="h-5 w-5" />
-        </button>
+          {/* Обычный путь (скрываем когда GPS overlay показывает passed/remaining) */}
+          {!isGpsOverlay && pathSegmentsGeoJson && (
+            <Source id="route-path" type="geojson" data={pathSegmentsGeoJson}>
+              <Layer
+                id="route-path-line-0"
+                type="line"
+                filter={["==", ["get", "colorIndex"], 0]}
+                paint={{ "line-color": PATH_COLORS[0], "line-width": 3, "line-opacity": 0.8 }}
+              />
+              <Layer
+                id="route-path-line-1"
+                type="line"
+                filter={["==", ["get", "colorIndex"], 1]}
+                paint={{ "line-color": PATH_COLORS[1], "line-width": 3, "line-opacity": 0.8 }}
+              />
+            </Source>
+          )}
 
-        {/* Recenter button */}
+          {/* Змейка — движущийся белый отрезок */}
+          {dirPath.length >= 2 && (
+            <Source id="route-snake" type="geojson" data={{
+              type: "Feature", geometry: { type: "LineString", coordinates: [[dirPath[0].lng, dirPath[0].lat], [dirPath[0].lng, dirPath[0].lat]] },
+            }}>
+              <Layer id="route-snake-line" type="line" paint={{
+                "line-color": "#ffffff", "line-width": 4, "line-opacity": 0.5,
+              }} />
+            </Source>
+          )}
+
+          {/* Цветные сегменты поверх базового пути */}
+          {!isGpsOverlay && coloredSegmentsGeoJson && (
+            <Source id="colored-segments" type="geojson" data={coloredSegmentsGeoJson}>
+              <Layer
+                id="colored-segments-line"
+                type="line"
+                paint={{
+                  "line-color": ["get", "color"],
+                  "line-width": 4,
+                  "line-opacity": 0.9,
+                }}
+              />
+            </Source>
+          )}
+
+          {/* GPS: пройденный путь (серый) */}
+          {isGpsOverlay && gps.passedGeoJson && (
+            <Source id="passed-route" type="geojson" data={gps.passedGeoJson}>
+              <Layer id="passed-route-line" type="line"
+                paint={{ "line-color": "#808080", "line-width": 4, "line-opacity": 0.5 }} />
+            </Source>
+          )}
+
+          {/* GPS: оставшийся путь */}
+          {isGpsOverlay && gps.remainingGeoJson && (
+            <Source id="remaining-route" type="geojson" data={gps.remainingGeoJson}>
+              <Layer id="remaining-route-base" type="line"
+                paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.5 }} />
+            </Source>
+          )}
+
+          {/* GPS: круг точности */}
+          {isGpsOverlay && accuracyGeoJson && (
+            <Source id="accuracy-circle" type="geojson" data={accuracyGeoJson}>
+              <Layer id="accuracy-circle-fill" type="fill"
+                paint={{ "fill-color": "#4285f4", "fill-opacity": 0.1 }} />
+              <Layer id="accuracy-circle-border" type="line"
+                paint={{ "line-color": "#4285f4", "line-opacity": 0.3, "line-width": 1 }} />
+            </Source>
+          )}
+
+          {/* Подсветка активного отрезка (только без GPS overlay) */}
+          {activeSegmentGeoJson && (
+            <Source id="active-segment" type="geojson" data={activeSegmentGeoJson}>
+              <Layer id="active-segment-line" type="line"
+                paint={{ "line-color": "#f97316", "line-width": 6, "line-opacity": 1 }} />
+            </Source>
+          )}
+          {activeAfterDividerGeoJson && (
+            <Source id="active-after-divider" type="geojson" data={activeAfterDividerGeoJson}>
+              <Layer id="active-after-divider-line" type="line"
+                paint={{ "line-color": "#f97316", "line-width": 6, "line-opacity": 1 }} />
+            </Source>
+          )}
+
+          {/* Маркер старта */}
+          {dirPath.length >= 2 && (
+            <Marker longitude={dirPath[0].lng} latitude={dirPath[0].lat}>
+              <div style={{
+                width: 14, height: 14, borderRadius: "50%",
+                background: "#22c55e", border: "2px solid white",
+                boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+              }} />
+            </Marker>
+          )}
+
+          {/* Чекпоинты */}
+          {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
+            const isTriggeredGps = isGpsOverlay && gps.triggeredIds.has(cp.id);
+            const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
+            const color = isTriggeredGps
+              ? "#22c55e"
+              : isActive ? "#ef4444" : (cp.color || "#f59e0b");
+            const label = isTriggeredGps ? "✓" : (cp.order + 1);
+            const size = isActive ? 18 : 14;
+            return (
+              <Marker key={cp.id} longitude={cp.position.lng} latitude={cp.position.lat}>
+                <Dot color={color} size={size} label={label} pulse={isActive} />
+              </Marker>
+            );
+          })}
+
+          {/* Финиш */}
+          {route.finish?.position && (
+            <Marker longitude={route.finish.position.lng} latitude={route.finish.position.lat}>
+              <div style={{
+                width: 20, height: 20, borderRadius: 3,
+                background: "repeating-conic-gradient(#000 0% 25%, #fff 0% 50%) 50% / 10px 10px",
+                border: "2px solid white",
+                boxShadow: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
+                  ? "0 0 10px #ef444488" : "0 1px 4px rgba(0,0,0,.3)",
+                animation: (started && currentEvent?.type === "finish") || gpsMode === "gps_finished"
+                  ? "pulse 2s infinite" : "none",
+              }} />
+            </Marker>
+          )}
+
+          {/* GPS: маркер пользователя */}
+          {isGpsOverlay && gps.position && (
+            <Marker longitude={gps.position.lng} latitude={gps.position.lat}>
+              <div className="gps-dot">
+                <div className="gps-dot-pulse" />
+                <div className="gps-dot-core" />
+              </div>
+            </Marker>
+          )}
+        </Map>
+
+        {/* Кнопка перецентрировать */}
         {isGpsOverlay && !autoFollow && (
           <button
             onClick={handleRecenter}
-            className="absolute top-16 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
+            className="absolute bottom-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
           >
             <Locate className="h-5 w-5" />
           </button>
         )}
+      </div>
 
-        {/* GPS error toast */}
-        {gpsError && (
-          <div className="absolute top-3 left-3 right-16 z-10 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 flex items-start gap-1.5">
-            <span className="shrink-0">&#9888;</span>
-            <span>{gpsError}</span>
-          </div>
-        )}
-
-        {/* Bottom Sheet */}
-        <BottomSheet
-          expanded={sheetExpanded}
-          onToggle={() => setSheetExpanded((v) => !v)}
-        >
-          {/* Collapsed header: arrows + counter + title + voice */}
-          <div className="px-3 pb-2">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrev}
-                disabled={eventIndex === 0}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition disabled:opacity-30"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-
-              <div
-                className="min-w-0 flex-1 cursor-pointer"
-                onClick={() => setSheetExpanded((v) => !v)}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[var(--text-muted)] shrink-0 tabular-nums">
-                    {eventIndex + 1}/{events.length}
-                  </span>
-                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                    {currentTitle}
-                  </p>
-                </div>
-                {/* GPS progress mini */}
-                {gpsMode === "gps_active" && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="h-1 flex-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-1000"
-                        style={{ width: `${Math.round(gps.progress * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-[var(--text-muted)] tabular-nums shrink-0">
-                      {gps.distanceRemaining > 1000
-                        ? `${(gps.distanceRemaining / 1000).toFixed(1)} км`
-                        : `${Math.round(gps.distanceRemaining)} м`
-                      }
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <VoiceButton audioUrls={currentAudio} />
-
-              {gpsMode === "gps_active" ? (
-                <div className="h-9 w-9 shrink-0" />
+      {/* === PREVIEW (до начала) === */}
+      {!started && !gpsMode && (
+        <>
+          {/* Оффлайн */}
+          <div className="flex gap-2">
+            <button
+              onClick={download}
+              disabled={downloading || done}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+            >
+              {done ? (
+                <><Check className="h-4 w-4 text-green-600" /> Готово</>
+              ) : downloading ? (
+                <>{dlProgress}%</>
               ) : (
-                <button
-                  onClick={handleNext}
-                  disabled={isLast}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-600 text-white transition hover:bg-green-700 disabled:opacity-30"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
+                <><Download className="h-4 w-4" /> Оффлайн</>
+              )}
+            </button>
+          </div>
+
+          {/* GPS ошибка */}
+          {gpsError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+              <span className="shrink-0 mt-0.5">⚠</span>
+              <span>{gpsError}</span>
+            </div>
+          )}
+
+          {/* Intro */}
+          {(route.intro || route.audio?.length > 0) && (
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3">
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">{route.title}</h2>
+              {route.intro && (
+                <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {route.intro}
+                </div>
+              )}
+              {route.audio?.length > 0 && (
+                <AudioPlayer urls={route.audio} variant="full" />
               )}
             </div>
+          )}
 
-            {/* Off-route warning */}
-            {gpsMode === "gps_active" && gps.isOffRoute && (
-              <div className="mt-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-700 text-center">
-                Вы отклонились от маршрута
-              </div>
-            )}
+          {/* Кнопка старт — запускает GPS + маршрут */}
+          <button
+            onClick={handleStart}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-semibold text-white transition hover:bg-green-700 active:bg-green-800"
+          >
+            <Navigation className="h-5 w-5" />
+            Начать маршрут
+          </button>
+        </>
+      )}
+
+      {/* === GPS REQUESTING === */}
+      {gpsMode === "gps_requesting" && !gps.position && (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 text-blue-600">
+            <Navigation className="h-5 w-5 animate-pulse" />
+            <span className="text-sm font-medium">Определяем местоположение...</span>
           </div>
+          <button
+            onClick={handleStopGps}
+            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+          >
+            Продолжить без GPS
+          </button>
+        </div>
+      )}
 
-          {/* Expanded content */}
-          {sheetExpanded && currentEvent && (
-            <div className="px-4 pb-4 space-y-3 no-drag">
-              {/* GPS panel */}
-              {gpsMode === "gps_active" && (
-                <div className="rounded-xl bg-[var(--bg-elevated)] p-3 space-y-2">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-[var(--text-muted)]">
-                      <span>{Math.round(gps.progress * 100)}%</span>
-                      <span>{gps.distanceRemaining > 1000
-                        ? `${(gps.distanceRemaining / 1000).toFixed(1)} км`
-                        : `${Math.round(gps.distanceRemaining)} м`
-                      }</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-1000"
-                        style={{ width: `${Math.round(gps.progress * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  {gps.accuracy > 100 && (
-                    <p className="text-[10px] text-[var(--text-muted)] text-center">
-                      Низкая точность GPS ({Math.round(gps.accuracy)}м)
-                    </p>
-                  )}
-                  <button
-                    onClick={handleStopGps}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Остановить GPS
-                  </button>
-                </div>
-              )}
+      {/* === GPS панель (прогресс + предупреждения) === */}
+      {gpsMode === "gps_active" && (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-2">
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-[var(--text-muted)]">
+              <span>{Math.round(gps.progress * 100)}%</span>
+              <span>{gps.distanceRemaining > 1000
+                ? `${(gps.distanceRemaining / 1000).toFixed(1)} км`
+                : `${Math.round(gps.distanceRemaining)} м`
+              }</span>
+            </div>
+            <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-500 transition-all duration-1000"
+                style={{ width: `${Math.round(gps.progress * 100)}%` }}
+              />
+            </div>
+          </div>
+          {gps.isOffRoute && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 text-center">
+              Вы отклонились от маршрута
+            </div>
+          )}
+          {gps.accuracy > 100 && (
+            <p className="text-[10px] text-[var(--text-muted)] text-center">
+              Низкая точность GPS ({Math.round(gps.accuracy)}м)
+            </p>
+          )}
+          <button
+            onClick={handleStopGps}
+            className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-red-300 px-4 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+          >
+            <X className="h-3.5 w-3.5" />
+            Остановить GPS
+          </button>
+        </div>
+      )}
 
-              {/* Event content */}
+      {/* === GPS FINISHED === */}
+      {gpsMode === "gps_finished" && (
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 text-center space-y-3 animate-slide-up">
+          <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
+          {gps.totalCoins > 0 && (
+            <p className="text-sm text-green-600">+{gps.totalCoins} монет</p>
+          )}
+          <div className="flex gap-2 justify-center">
+            <a
+              href="/routes"
+              className="inline-block rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              К маршрутам
+            </a>
+            <button
+              onClick={handleStopGps}
+              className="rounded-xl border border-[var(--border-color)] px-6 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)]"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === Карточки событий + навигация (всегда после старта) === */}
+      {started && gpsMode !== "gps_finished" && (
+        <>
+          {currentEvent && (
+            <div
+              key={`main-${eventIndex}`}
+              className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3 animate-[fadeIn_0.7s_ease]"
+            >
+              {/* Сегмент */}
               {currentEvent.type === "segment" && (
                 <>
                   {currentEvent.data.title && (
@@ -899,7 +766,7 @@ export default function RouteMapLeaflet({ route }) {
                     </h3>
                   )}
                   {currentEvent.data.text && (
-                    <div className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                    <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
                       {currentEvent.data.text}
                     </div>
                   )}
@@ -916,6 +783,7 @@ export default function RouteMapLeaflet({ route }) {
                 </>
               )}
 
+              {/* Чекпоинт */}
               {currentEvent.type === "checkpoint" && (
                 currentEvent.data.isEmpty ? (
                   <p className="text-sm font-medium text-[var(--text-muted)] text-center py-2">
@@ -934,7 +802,7 @@ export default function RouteMapLeaflet({ route }) {
                       </h3>
                     </div>
                     {currentEvent.data.description && (
-                      <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                      <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
                         {currentEvent.data.description}
                       </div>
                     )}
@@ -955,118 +823,49 @@ export default function RouteMapLeaflet({ route }) {
                 )
               )}
 
+              {/* Финиш */}
               {currentEvent.type === "finish" && (
                 <div className="text-center py-2 space-y-3">
                   <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
                   {currentEvent.data.coinsReward > 0 && (
                     <p className="text-sm text-green-600">+{currentEvent.data.coinsReward} монет за финиш</p>
                   )}
-                  {gps.totalCoins > 0 && (
-                    <p className="text-sm text-green-600">+{gps.totalCoins} монет всего</p>
-                  )}
                   <a href="/routes" className="inline-block rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700">
-                    К маршрутам
+                    Выйти
                   </a>
                 </div>
               )}
             </div>
           )}
-        </BottomSheet>
 
-        {/* GPS Finished overlay */}
-        {gpsMode === "gps_finished" && (
-          <div className="absolute top-3 left-3 right-16 z-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-4 text-center space-y-2 shadow-lg animate-slide-up">
-            <p className="text-base font-bold text-green-600">Маршрут пройден!</p>
-            {gps.totalCoins > 0 && (
-              <p className="text-sm text-green-600">+{gps.totalCoins} монет</p>
-            )}
-            <div className="flex gap-2 justify-center">
-              <a
-                href="/routes"
-                className="inline-block rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
-              >
-                К маршрутам
-              </a>
+          {/* Навигация Вперёд/Назад */}
+          {events.length > 0 && (
+            <div className="flex items-center justify-between">
               <button
-                onClick={handleStopGps}
-                className="rounded-xl border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)]"
+                onClick={handlePrev}
+                disabled={eventIndex === 0}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-30"
               >
-                Закрыть
+                <ChevronLeft className="h-6 w-6" />
               </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ===================================================================
-  // === PREVIEW MODE (before start) ===
-  // ===================================================================
-  return (
-    <div className="space-y-4">
-      {/* Карта */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] shadow-sm relative" style={{ height: 300 }}>
-        {mapContent}
-
-        {isGpsOverlay && !autoFollow && (
-          <button
-            onClick={handleRecenter}
-            className="absolute bottom-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
-          >
-            <Locate className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      {/* Оффлайн */}
-      <div className="flex gap-2">
-        <button
-          onClick={download}
-          disabled={downloading || done}
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 text-sm font-medium text-[var(--text-secondary)] transition hover:bg-[var(--bg-elevated)] disabled:opacity-50"
-        >
-          {done ? (
-            <><Check className="h-4 w-4 text-green-600" /> Готово</>
-          ) : downloading ? (
-            <>{dlProgress}%</>
-          ) : (
-            <><Download className="h-4 w-4" /> Оффлайн</>
-          )}
-        </button>
-      </div>
-
-      {/* GPS ошибка */}
-      {gpsError && (
-        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
-          <span className="shrink-0 mt-0.5">&#9888;</span>
-          <span>{gpsError}</span>
-        </div>
-      )}
-
-      {/* Intro */}
-      {(route.intro || route.audio?.length > 0) && (
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 space-y-3">
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">{route.title}</h2>
-          {route.intro && (
-            <div className="max-h-[40vh] overflow-y-auto scrollbar-thin text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
-              {route.intro}
+              <span className="text-xs text-[var(--text-muted)]">
+                {eventIndex + 1} / {events.length}
+              </span>
+              {gpsMode === "gps_active" ? (
+                <div className="h-12 w-12" />
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={isLast}
+                  className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-600 text-white transition hover:bg-green-700 disabled:opacity-30"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              )}
             </div>
           )}
-          {route.audio?.length > 0 && (
-            <AudioPlayer urls={route.audio} variant="full" />
-          )}
-        </div>
+        </>
       )}
-
-      {/* Кнопка старт */}
-      <button
-        onClick={handleStart}
-        className="w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-semibold text-white transition hover:bg-green-700 active:bg-green-800"
-      >
-        <Navigation className="h-5 w-5" />
-        Начать маршрут
-      </button>
     </div>
   );
 }
