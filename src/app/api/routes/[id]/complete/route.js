@@ -26,15 +26,6 @@ export async function POST(request, { params }) {
 
     const userId = auth.user._id.toString();
 
-    // Проверяем дубликат
-    const existing = await db.collection("completed_routes").findOne({
-      userId,
-      routeId: id,
-    });
-    if (existing) {
-      return NextResponse.json({ alreadyCompleted: true });
-    }
-
     // Считаем максимум монет из маршрута
     const body = await request.json().catch(() => ({}));
     const checkpointCoins = (route.checkpoints || []).reduce((s, cp) => s + (cp.coinsReward || 0), 0);
@@ -42,15 +33,22 @@ export async function POST(request, { params }) {
     const maxPossibleCoins = checkpointCoins + finishCoins;
     const coins = Math.min(body.coins || 0, maxPossibleCoins);
 
-    // Записываем прохождение
+    // Атомарная вставка — уникальный индекс {userId, routeId} предотвращает дубли
     const gpsVerified = body.gpsVerified === true;
-    await db.collection("completed_routes").insertOne({
-      userId,
-      routeId: id,
-      completedAt: new Date(),
-      coinsEarned: coins,
-      gpsVerified,
-    });
+    try {
+      await db.collection("completed_routes").insertOne({
+        userId,
+        routeId: id,
+        completedAt: new Date(),
+        coinsEarned: coins,
+        gpsVerified,
+      });
+    } catch (e) {
+      if (e.code === 11000) {
+        return NextResponse.json({ alreadyCompleted: true });
+      }
+      throw e;
+    }
 
     // Начисляем монеты
     if (coins > 0) {

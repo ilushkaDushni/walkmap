@@ -167,6 +167,13 @@ export async function POST(request) {
   await db.collection("comments").createIndex({ createdAt: -1 });
   log.push("Индекс comments.createdAt созданы");
 
+  // 13b. Уникальный индекс для completed_routes (защита от дублирования монет)
+  await db.collection("completed_routes").createIndex(
+    { userId: 1, routeId: 1 },
+    { unique: true }
+  );
+  log.push("Уникальный индекс completed_routes {userId, routeId} создан");
+
   // 13. Конвертация S3 URL → proxy URL для avatarUrl
   const s3Prefix = "https://storage.yandexcloud.net/";
   const usersWithS3Avatar = await db.collection("users").find({

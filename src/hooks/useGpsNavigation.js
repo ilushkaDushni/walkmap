@@ -51,7 +51,7 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
   const [passedCoords, setPassedCoords] = useState([]);
   const [remainingCoords, setRemainingCoords] = useState([]);
 
-  useWakeLock(active);
+  const wakeLock = useWakeLock(active);
 
   const rawPath = route?.path || [];
   const checkpoints = route?.checkpoints || [];
@@ -105,30 +105,36 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     onFinishTriggered,
   });
 
-  // Обновляем проекцию при изменении сглаженной позиции
+  // Обновляем проекцию при изменении сглаженной позиции (с дебаунсом)
+  const debounceRef = useRef(null);
   useEffect(() => {
     if (!active || !smoothedPosition || dirPath.length < 2) return;
 
-    const proj = projectPointOnPath(smoothedPosition, dirPath);
-    if (!proj) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const proj = projectPointOnPath(smoothedPosition, dirPath);
+      if (!proj) return;
 
-    setProjection(proj);
-    setIsOffRoute(proj.distance > 50);
+      setProjection(proj);
+      setIsOffRoute(proj.distance > 50);
 
-    const rawProgress = progressFromProjection(proj, cumDist);
-    // Блокировка обратного хода — GPS-джиттер не «раз-серит» пройденные участки
-    const clamped = Math.max(maxProgressRef.current, rawProgress);
-    maxProgressRef.current = clamped;
-    setProgress(clamped);
+      const rawProgress = progressFromProjection(proj, cumDist);
+      // Блокировка обратного хода — GPS-джиттер не «раз-серит» пройденные участки
+      const clamped = Math.max(maxProgressRef.current, rawProgress);
+      maxProgressRef.current = clamped;
+      setProgress(clamped);
 
-    // Разделяем путь по зафиксированному прогрессу
-    const clampedProjection = clamped === rawProgress
-      ? proj
-      : progressToProjection(clamped, cumDist, dirPath);
+      // Разделяем путь по зафиксированному прогрессу
+      const clampedProjection = clamped === rawProgress
+        ? proj
+        : progressToProjection(clamped, cumDist, dirPath);
 
-    const { passed, remaining } = splitPathAtProjection(dirPath, clampedProjection);
-    setPassedCoords(passed);
-    setRemainingCoords(remaining);
+      const { passed, remaining } = splitPathAtProjection(dirPath, clampedProjection);
+      setPassedCoords(passed);
+      setRemainingCoords(remaining);
+    }, 800);
+
+    return () => clearTimeout(debounceRef.current);
   }, [active, smoothedPosition, dirPath, cumDist]);
 
   const startGps = useCallback(() => {
@@ -201,6 +207,7 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     dismissEvent,
     startGps,
     stopGps,
+    wakeLockFailed: wakeLock.failed,
   };
 }
 

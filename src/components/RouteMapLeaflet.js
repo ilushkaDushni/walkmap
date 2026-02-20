@@ -705,6 +705,11 @@ export default function RouteMapLeaflet({ route }) {
               />
             </div>
           </div>
+          {gps.wakeLockFailed && (
+            <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700 text-center">
+              Не удалось заблокировать экран — он может погаснуть
+            </div>
+          )}
           {gps.isOffRoute && (
             <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 text-center">
               Вы отклонились от маршрута

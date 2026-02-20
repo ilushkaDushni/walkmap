@@ -15,8 +15,9 @@ export async function GET(request) {
 
   const db = await getDb();
 
-  const filter = q
-    ? { username: { $regex: q, $options: "i" } }
+  const escaped = q ? q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "";
+  const filter = escaped
+    ? { username: { $regex: escaped, $options: "i" } }
     : {};
 
   const allowedSorts = ["createdAt", "username", "coins", "lastLoginAt"];

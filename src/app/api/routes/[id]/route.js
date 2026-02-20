@@ -23,7 +23,7 @@ export async function GET(request, { params }) {
 
 // PUT /api/routes/[id] — обновить
 export async function PUT(request, { params }) {
-  const { error } = await requirePermission(request, "routes.edit");
+  const { user, error, permissions } = await requirePermission(request, "routes.edit");
   if (error) return error;
 
   const { id } = await params;
@@ -31,8 +31,19 @@ export async function PUT(request, { params }) {
     return NextResponse.json({ error: "Невалидный ID" }, { status: 400 });
   }
 
-  const body = await request.json();
   const db = await getDb();
+
+  // Проверяем авторство (или admin.access для редактирования чужих)
+  const existingRoute = await db.collection("routes").findOne({ _id: new ObjectId(id) });
+  if (!existingRoute) {
+    return NextResponse.json({ error: "Маршрут не найден" }, { status: 404 });
+  }
+  const isOwner = existingRoute.createdBy?.toString() === user._id.toString();
+  if (!isOwner && !permissions.includes("admin.access")) {
+    return NextResponse.json({ error: "Нет прав на редактирование чужого маршрута" }, { status: 403 });
+  }
+
+  const body = await request.json();
 
   // Авто-расчёт distance и duration
   if (body.path && body.path.length >= 2) {

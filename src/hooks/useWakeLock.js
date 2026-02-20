@@ -1,33 +1,38 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Не даёт экрану гаснуть пока active === true.
- * Использует Screen Wake Lock API. Тихо игнорирует если не поддерживается.
+ * Использует Screen Wake Lock API.
+ * Возвращает { supported, failed } для отображения предупреждения в UI.
  */
 export default function useWakeLock(active) {
   const wakeLockRef = useRef(null);
+  const [supported] = useState(() => typeof navigator !== "undefined" && "wakeLock" in navigator);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!active) {
       wakeLockRef.current?.release().catch(() => {});
       wakeLockRef.current = null;
+      setFailed(false);
       return;
     }
 
-    if (!("wakeLock" in navigator)) return;
+    if (!supported) return;
 
     let released = false;
 
     const request = async () => {
       try {
         wakeLockRef.current = await navigator.wakeLock.request("screen");
+        setFailed(false);
         wakeLockRef.current.addEventListener("release", () => {
           wakeLockRef.current = null;
         });
       } catch {
-        // Браузер отклонил запрос — ничего не делаем
+        setFailed(true);
       }
     };
 
@@ -48,5 +53,7 @@ export default function useWakeLock(active) {
       wakeLockRef.current?.release().catch(() => {});
       wakeLockRef.current = null;
     };
-  }, [active]);
+  }, [active, supported]);
+
+  return { supported, failed };
 }

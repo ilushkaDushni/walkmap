@@ -16,9 +16,10 @@ export async function GET(request) {
 
   const match = {};
   if (q) {
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     match.$or = [
-      { text: { $regex: q, $options: "i" } },
-      { "user.username": { $regex: q, $options: "i" } },
+      { text: { $regex: escaped, $options: "i" } },
+      { "user.username": { $regex: escaped, $options: "i" } },
     ];
   }
 
