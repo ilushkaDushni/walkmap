@@ -11,6 +11,7 @@ import {
 import UserAvatar from "@/components/UserAvatar";
 import { useUser } from "@/components/UserProvider";
 import { ACHIEVEMENT_REGISTRY, COLOR_CLASSES } from "@/lib/achievements";
+import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 
 const ICON_MAP = {
   Footprints, Coins, Compass, Ruler, Map, Trophy,
@@ -235,8 +236,11 @@ export default function ProfileClient({ profile }) {
 
       {/* Header */}
       <div className="flex flex-col items-center mb-6">
-        <UserAvatar username={username} avatarUrl={profile.avatarUrl} roleColor={primaryRoleColor} size="xl" />
+        <UserAvatar username={username} avatarUrl={profile.avatarUrl} roleColor={primaryRoleColor} size="xl" online={isOnline(profile.lastActivityAt)} />
         <h1 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">{username}</h1>
+        <span className={`text-xs ${isOnline(profile.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+          {formatLastSeen(profile.lastActivityAt)}
+        </span>
         <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${level.bg} ${level.color}`}>
           <Trophy className="h-3 w-3" />
           {level.title}

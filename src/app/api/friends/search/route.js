@@ -24,7 +24,7 @@ export async function GET(request) {
       _id: { $ne: auth.user._id },
       banned: { $ne: true },
     })
-    .project({ username: 1, avatarUrl: 1, bio: 1 })
+    .project({ username: 1, avatarUrl: 1, bio: 1, lastActivityAt: 1 })
     .limit(20)
     .toArray();
 
@@ -63,6 +63,7 @@ export async function GET(request) {
       username: u.username,
       avatarUrl: u.avatarUrl || null,
       bio: u.bio || "",
+      lastActivityAt: u.lastActivityAt || null,
       friendStatus,
     };
   });

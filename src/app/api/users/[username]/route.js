@@ -51,6 +51,7 @@ export async function GET(request, { params }) {
     avatarUrl: user.avatarUrl || null,
     bio: user.bio || "",
     createdAt: user.createdAt || null,
+    lastActivityAt: user.lastActivityAt || null,
     roles,
     stats: { completedRoutes, totalDistanceM, coins: user.coins || 0 },
     achievements,

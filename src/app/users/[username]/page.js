@@ -44,6 +44,7 @@ async function fetchProfile(username) {
     avatarUrl: user.avatarUrl || null,
     bio: user.bio || "",
     createdAt: user.createdAt ? user.createdAt.toISOString() : null,
+    lastActivityAt: user.lastActivityAt ? user.lastActivityAt.toISOString() : null,
     roles,
     stats,
     achievements,
