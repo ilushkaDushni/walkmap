@@ -151,8 +151,7 @@ function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClos
 }
 
 // --- Message Bubble ---
-function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction, theme, fontClass }) {
-  const [contextMenu, setContextMenu] = useState(null);
+function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
 
@@ -160,8 +159,8 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
     e.preventDefault();
     const x = Math.min(e.clientX, window.innerWidth - 200);
     const y = Math.min(e.clientY, window.innerHeight - 200);
-    setContextMenu({ x, y });
-  }, []);
+    onContextMenu(msg.id, { x, y });
+  }, [msg.id, onContextMenu]);
 
   const handleTouchStart = useCallback(() => {
     longPressTimer.current = setTimeout(() => {
@@ -169,10 +168,10 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
         const rect = bubbleRef.current.getBoundingClientRect();
         const x = Math.min(rect.left, window.innerWidth - 200);
         const y = Math.min(rect.top - 10, window.innerHeight - 200);
-        setContextMenu({ x, y });
+        onContextMenu(msg.id, { x, y });
       }
     }, 500);
-  }, []);
+  }, [msg.id, onContextMenu]);
 
   const handleTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
@@ -276,7 +275,7 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
             onReact={(emoji) => onReaction(msg.id, emoji)}
             onDeleteAll={() => onDelete(msg.id, "all")}
             onDeleteSelf={() => onDelete(msg.id, "self")}
-            onClose={() => setContextMenu(null)}
+            onClose={onCloseContextMenu}
           />
         )}
       </div>
@@ -290,6 +289,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   const [replyTo, setReplyTo] = useState(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [activeContextMenu, setActiveContextMenu] = useState(null); // { msgId, x, y }
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const { count } = useUnreadCount();
@@ -365,6 +365,14 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   const handleReaction = useCallback(async (messageId, emoji) => {
     await toggleReaction(messageId, emoji);
   }, [toggleReaction]);
+
+  const handleMsgContextMenu = useCallback((msgId, pos) => {
+    setActiveContextMenu({ msgId, x: pos.x, y: pos.y });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setActiveContextMenu(null);
+  }, []);
 
   const handleEmojiSelect = useCallback((emoji) => {
     setText((prev) => prev + emoji);
@@ -460,6 +468,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
               onReaction={handleReaction}
               theme={chatTheme}
               fontClass={fontClass}
+              contextMenu={activeContextMenu?.msgId === msg.id ? activeContextMenu : null}
+              onContextMenu={handleMsgContextMenu}
+              onCloseContextMenu={handleCloseContextMenu}
             />
           ))
         )}
