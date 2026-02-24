@@ -268,25 +268,27 @@ export default function RouteMapLeaflet({ route }) {
   const isLast = eventIndex >= events.length - 1;
 
   // === GPS auto-advance: когда GPS триггерит чекпоинт/сегмент, переключаем карточку ===
+  // ВАЖНО: eventIndex НЕ в зависимостях — иначе activeCheckpoint и activeSegment
+  // конкурируют и вызывают бесконечную осцилляцию (мерцание)
   useEffect(() => {
     if (!gps.activeCheckpoint || !started) return;
     const idx = events.findIndex(
       (e) => e.type === "checkpoint" && e.data.id === gps.activeCheckpoint.id
     );
-    if (idx >= 0 && idx !== eventIndex) {
+    if (idx >= 0) {
       setEventIndex(idx);
     }
-  }, [gps.activeCheckpoint, started, events, eventIndex]);
+  }, [gps.activeCheckpoint, started, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!gps.activeSegment || !started) return;
     const idx = events.findIndex(
       (e) => e.type === "segment" && e.data.id === gps.activeSegment.id
     );
-    if (idx >= 0 && idx !== eventIndex) {
+    if (idx >= 0) {
       setEventIndex(idx);
     }
-  }, [gps.activeSegment, started, events, eventIndex]);
+  }, [gps.activeSegment, started, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // При GPS-финише переключаемся на финишную карточку
   useEffect(() => {
