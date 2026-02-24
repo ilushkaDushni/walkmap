@@ -22,6 +22,8 @@ export const PERMISSION_REGISTRY = {
   "upload.files":       { label: "Загрузка файлов",             group: "Файлы" },
   "comments.manage":    { label: "Управление комментариями",    group: "Комментарии" },
   "notifications.broadcast": { label: "Рассылка уведомлений",  group: "Уведомления" },
+  "shop.manage":            { label: "Управление магазином",    group: "Магазин" },
+  "shop.edit":              { label: "Редактирование товаров",  group: "Магазин" },
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_REGISTRY);
@@ -165,7 +167,9 @@ export async function buildUserResponse(user) {
     email: user.email,
     avatarUrl: toProxyUrl(user.avatarUrl),
     coins: user.coins || 0,
+    routiks: user.routiks || 0,
     bio: user.bio || "",
+    equippedItems: user.equippedItems || {},
     roles,
     permissions,
     isSuperadmin: isSuperadmin(user),
