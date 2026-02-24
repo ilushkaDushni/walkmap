@@ -28,8 +28,32 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
     audioRef.current.play().catch(() => {});
   }, []);
 
+  // Автодисмисс: когда пользователь прошёл активный поинт (ушёл за пределы радиуса),
+  // снимаем блокировку и разрешаем следующие триггеры
   useEffect(() => {
     if (!userPosition) return;
+
+    if (activeCheckpoint) {
+      const dist = haversineDistance(userPosition, activeCheckpoint.position);
+      const radius = activeCheckpoint.triggerRadiusMeters || 20;
+      if (dist > radius * 1.5) {
+        setActiveCheckpoint(null);
+      }
+    }
+    if (activeSegment) {
+      const dist = haversineDistance(userPosition, activeSegment.position);
+      const radius = activeSegment.triggerRadiusMeters || 30;
+      if (dist > radius * 1.5) {
+        setActiveSegment(null);
+      }
+    }
+  }, [userPosition, activeCheckpoint, activeSegment]);
+
+  useEffect(() => {
+    if (!userPosition) return;
+
+    // Блокируем новые триггеры пока есть активный (непройденный) чекпоинт/сегмент
+    if (activeCheckpoint || activeSegment) return;
 
     // Проверяем чекпоинты
     for (const cp of checkpoints) {
@@ -56,7 +80,7 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       }
     }
 
-    // Проверяем финиш
+    // Проверяем финиш (не блокируется — финиш всегда срабатывает)
     if (finish?.position && !finishReached) {
       const dist = haversineDistance(userPosition, finish.position);
       if (dist <= 30) {
@@ -65,7 +89,7 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
         onFinishTriggered?.();
       }
     }
-  }, [userPosition, checkpoints, segments, finish, triggeredIds, triggeredSegmentIds, finishReached, playAudio]);
+  }, [userPosition, checkpoints, segments, finish, triggeredIds, triggeredSegmentIds, finishReached, activeCheckpoint, activeSegment, playAudio]);
 
   const dismissActiveCheckpoint = useCallback(() => {
     setActiveCheckpoint(null);
