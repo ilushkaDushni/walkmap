@@ -133,7 +133,7 @@ export default function RouteMapLeaflet({ route }) {
       setGpsMode(null);
       setGpsError("Ошибка GPS. Попробуйте ещё раз.");
     }
-  }, [gpsMode, gps.gpsStatus, gps.position]);
+  }, [gpsMode, gps.gpsStatus, gps.rawPosition]);
 
   // === Плавное следование камеры (throttled) ===
   useEffect(() => {
