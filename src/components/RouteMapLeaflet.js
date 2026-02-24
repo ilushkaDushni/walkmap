@@ -120,7 +120,7 @@ export default function RouteMapLeaflet({ route }) {
   // === GPS state machine ===
   useEffect(() => {
     if (gpsMode !== "gps_requesting") return;
-    if (gps.gpsStatus === "watching" && gps.position) {
+    if (gps.gpsStatus === "watching" && gps.rawPosition) {
       setGpsMode("gps_active");
       setGpsError(null);
     } else if (gps.gpsStatus === "denied") {
