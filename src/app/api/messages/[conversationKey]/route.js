@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
   const { searchParams } = new URL(request.url);
   const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100);
   const before = searchParams.get("before");
+  const after = searchParams.get("after");
 
   const db = await getDb();
 
@@ -30,13 +31,19 @@ export async function GET(request, { params }) {
   };
   if (before) {
     filter.createdAt = { $lt: new Date(before) };
+  } else if (after) {
+    filter.createdAt = { $gt: new Date(after) };
   }
 
-  const messages = await db.collection("messages")
+  // Fetch limit+1 to determine hasMore
+  const raw = await db.collection("messages")
     .find(filter)
     .sort({ createdAt: -1 })
-    .limit(limit)
+    .limit(limit + 1)
     .toArray();
+
+  const hasMore = raw.length > limit;
+  const messages = hasMore ? raw.slice(0, limit) : raw;
 
   // Собираем replyToId для подгрузки оригиналов
   const replyIds = messages
@@ -67,19 +74,33 @@ export async function GET(request, { params }) {
     }
   }
 
+  // Typing indicators (пигибэк)
+  let typingUsers = [];
+  try {
+    const typingDocs = await db.collection("typing_indicators")
+      .find({ conversationKey, userId: { $ne: userId } })
+      .toArray();
+    typingUsers = typingDocs.map((t) => t.userId);
+  } catch {
+    // коллекция может не существовать
+  }
+
   const serialized = messages.reverse().map((m) => ({
     id: m._id.toString(),
     senderId: m.senderId,
     text: m.text,
+    type: m.type || "text",
+    imageUrl: m.imageUrl || null,
     routeId: m.routeId || null,
     createdAt: m.createdAt,
+    editedAt: m.editedAt || null,
     readAt: m.readAt || null,
     replyTo: m.replyToId ? (replyMap[m.replyToId] || null) : null,
     replyToId: m.replyToId || null,
     reactions: m.reactions || [],
   }));
 
-  return NextResponse.json({ messages: serialized });
+  return NextResponse.json({ messages: serialized, hasMore, typingUsers });
 }
 
 // POST /api/messages/[conversationKey] — отправить сообщение
@@ -120,6 +141,7 @@ export async function POST(request, { params }) {
     conversationKey,
     senderId: userId,
     text: trimmed,
+    type: "text",
     routeId: routeId || null,
     replyToId: replyToId || null,
     reactions: [],
@@ -129,6 +151,11 @@ export async function POST(request, { params }) {
   };
 
   const result = await db.collection("messages").insertOne(message);
+
+  // Убираем typing indicator после отправки
+  try {
+    await db.collection("typing_indicators").deleteOne({ conversationKey, userId });
+  } catch { /* ignore */ }
 
   // Обновляем lastActivityAt
   await db.collection("users").updateOne(
@@ -190,11 +217,14 @@ export async function POST(request, { params }) {
     id: result.insertedId.toString(),
     senderId: userId,
     text: trimmed,
+    type: "text",
+    imageUrl: null,
     routeId: message.routeId,
     replyToId: message.replyToId,
     replyTo,
     reactions: [],
     createdAt: message.createdAt,
+    editedAt: null,
     readAt: null,
   }, { status: 201 });
 }

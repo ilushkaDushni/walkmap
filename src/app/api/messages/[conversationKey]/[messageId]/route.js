@@ -33,7 +33,10 @@ export async function DELETE(request, { params }) {
   }
 
   if (mode === "all") {
-    // Удалить для всех — любой участник беседы может
+    // Удалить для всех — только автор может
+    if (message.senderId !== userId) {
+      return NextResponse.json({ error: "Только автор может удалить у всех" }, { status: 403 });
+    }
     await db.collection("messages").deleteOne({ _id: oid });
     return NextResponse.json({ deleted: true, mode: "all" });
   }

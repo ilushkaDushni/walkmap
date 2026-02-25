@@ -75,10 +75,22 @@ export const CHAT_THEMES = [
   },
 ];
 
+// Премиум темы из магазина добавляются сюда динамически
+let premiumThemes = [];
+
+export function addPremiumThemes(themes) {
+  premiumThemes = themes;
+}
+
+export function getAllChatThemes() {
+  return [...CHAT_THEMES, ...premiumThemes];
+}
+
 export function getChatTheme(conversationKey) {
   if (typeof window === "undefined") return CHAT_THEMES[0];
   const id = localStorage.getItem(`chat-theme-${conversationKey}`);
-  return CHAT_THEMES.find((t) => t.id === id) || CHAT_THEMES[0];
+  const all = getAllChatThemes();
+  return all.find((t) => t.id === id) || CHAT_THEMES[0];
 }
 
 export function setChatTheme(conversationKey, themeId) {

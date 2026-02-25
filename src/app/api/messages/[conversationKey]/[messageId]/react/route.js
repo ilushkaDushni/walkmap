@@ -31,32 +31,37 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: "Неверный ID" }, { status: 400 });
   }
 
-  const message = await db.collection("messages").findOne({ _id: oid, conversationKey });
-  if (!message) {
+  // Атомарный toggle: проверяем наличие реакции и переключаем за одну операцию
+  // Сначала пробуем убрать существующую реакцию этого юзера с этим emoji
+  const pullResult = await db.collection("messages").findOneAndUpdate(
+    { _id: oid, conversationKey, "reactions.userId": userId, "reactions.emoji": emoji },
+    { $pull: { reactions: { userId, emoji } } },
+    { returnDocument: "after" }
+  );
+
+  if (pullResult) {
+    return NextResponse.json({ reactions: pullResult.reactions || [] });
+  }
+
+  // Реакции не было — добавляем (заменяя предыдущую реакцию юзера, если была)
+  const updated = await db.collection("messages").findOneAndUpdate(
+    { _id: oid, conversationKey },
+    [
+      { $set: {
+        reactions: {
+          $concatArrays: [
+            { $filter: { input: { $ifNull: ["$reactions", []] }, as: "r", cond: { $ne: ["$$r.userId", userId] } } },
+            [{ userId, emoji }]
+          ]
+        }
+      }}
+    ],
+    { returnDocument: "after" }
+  );
+
+  if (!updated) {
     return NextResponse.json({ error: "Сообщение не найдено" }, { status: 404 });
   }
 
-  const reactions = message.reactions || [];
-  const existing = reactions.find((r) => r.userId === userId && r.emoji === emoji);
-
-  if (existing) {
-    // Убираем реакцию
-    await db.collection("messages").updateOne(
-      { _id: oid },
-      { $pull: { reactions: { userId, emoji } } }
-    );
-  } else {
-    // Добавляем реакцию (убираем предыдущую от этого юзера, если есть)
-    await db.collection("messages").updateOne(
-      { _id: oid },
-      { $pull: { reactions: { userId } } }
-    );
-    await db.collection("messages").updateOne(
-      { _id: oid },
-      { $push: { reactions: { userId, emoji } } }
-    );
-  }
-
-  const updated = await db.collection("messages").findOne({ _id: oid });
   return NextResponse.json({ reactions: updated.reactions || [] });
 }

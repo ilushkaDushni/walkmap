@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useChatPolling from "@/hooks/useChatPolling";
 import useUnreadCount from "@/hooks/useUnreadCount";
 import Link from "next/link";
 import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
-import { getChatTheme, setChatTheme as saveChatTheme, CHAT_THEMES } from "@/lib/chatThemes";
+import { getChatTheme, setChatTheme as saveChatTheme, CHAT_THEMES, addPremiumThemes, getAllChatThemes } from "@/lib/chatThemes";
 import { getChatFontSize } from "@/lib/chatSettings";
 import ChatSettingsModal from "./ChatSettingsModal";
 
@@ -17,6 +17,19 @@ const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 function timeShort(date) {
   const d = new Date(date);
   return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+function dateLabel(date) {
+  const d = new Date(date);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  if (msgDate.getTime() === today.getTime()) return "Сегодня";
+  if (msgDate.getTime() === yesterday.getTime()) return "Вчера";
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
 function RouteCard({ routeId }) {
@@ -86,9 +99,8 @@ function EmojiPicker({ onSelect, onClose }) {
 const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 // --- Context Menu ---
-function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClose }) {
+function ContextMenu({ x, y, msg, isMe, onReply, onReact, onDeleteAll, onDeleteSelf, onEdit, onCopy, onClose }) {
   const ref = useRef(null);
-  const [showReactionRow, setShowReactionRow] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -98,33 +110,33 @@ function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClos
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
+  const canEdit = isMe && msg.type !== "image" && !msg._optimistic &&
+    (Date.now() - new Date(msg.createdAt).getTime() < 15 * 60 * 1000);
+
+  // Зажимаем в границы экрана
+  const menuStyle = {
+    top: Math.min(y, window.innerHeight - 280),
+    left: Math.min(x, window.innerWidth - 200),
+  };
+
   return (
     <div
       ref={ref}
       className="fixed z-50 min-w-[180px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-xl overflow-hidden py-1"
-      style={{ top: y, left: x }}
+      style={menuStyle}
     >
       {/* Reaction row */}
-      {showReactionRow && (
-        <div className="flex gap-1 px-2 py-1.5 border-b border-[var(--border-color)]">
-          {REACTION_EMOJI.map((e) => (
-            <button
-              key={e}
-              onClick={() => { onReact(e); onClose(); }}
-              className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-surface)] transition text-base hover:scale-125"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
-      <button
-        onClick={() => setShowReactionRow((v) => !v)}
-        className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition"
-      >
-        <Smile className="h-4 w-4" />
-        Реакция
-      </button>
+      <div className="flex gap-1 px-2 py-1.5 border-b border-[var(--border-color)]">
+        {REACTION_EMOJI.map((e) => (
+          <button
+            key={e}
+            onClick={() => { onReact(e); onClose(); }}
+            className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-surface)] transition text-base hover:scale-125"
+          >
+            {e}
+          </button>
+        ))}
+      </div>
       <button
         onClick={() => { onReply(); onClose(); }}
         className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition"
@@ -132,13 +144,33 @@ function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClos
         <Reply className="h-4 w-4" />
         Ответить
       </button>
-      <button
-        onClick={() => { onDeleteAll(); onClose(); }}
-        className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500 hover:bg-[var(--bg-surface)] transition"
-      >
-        <Trash2 className="h-4 w-4" />
-        Удалить у всех
-      </button>
+      {msg.text && (
+        <button
+          onClick={() => { onCopy(); onClose(); }}
+          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition"
+        >
+          <Copy className="h-4 w-4" />
+          Копировать
+        </button>
+      )}
+      {canEdit && (
+        <button
+          onClick={() => { onEdit(); onClose(); }}
+          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition"
+        >
+          <Pencil className="h-4 w-4" />
+          Редактировать
+        </button>
+      )}
+      {isMe && !msg._optimistic && (
+        <button
+          onClick={() => { onDeleteAll(); onClose(); }}
+          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500 hover:bg-[var(--bg-surface)] transition"
+        >
+          <Trash2 className="h-4 w-4" />
+          Удалить у всех
+        </button>
+      )}
       <button
         onClick={() => { onDeleteSelf(); onClose(); }}
         className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-muted)] hover:bg-[var(--bg-surface)] transition"
@@ -150,10 +182,52 @@ function ContextMenu({ x, y, onReply, onReact, onDeleteAll, onDeleteSelf, onClos
   );
 }
 
+// --- Typing Indicator ---
+function TypingIndicator({ theme }) {
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1">
+      <span className="text-xs text-[var(--text-muted)]" style={theme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}>
+        печатает
+      </span>
+      <span className="flex gap-0.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-muted)] animate-typing-dot-1" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-muted)] animate-typing-dot-2" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-muted)] animate-typing-dot-3" />
+      </span>
+    </div>
+  );
+}
+
+// --- Date Separator ---
+function DateSeparator({ label, theme }) {
+  return (
+    <div className="flex items-center justify-center py-2">
+      <span className="px-3 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-elevated)]/60 text-[var(--text-muted)]"
+        style={theme.dark ? { backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(226,232,240,0.5)" } : undefined}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// --- Image Lightbox ---
+function ImageLightbox({ src, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white">
+        <X className="h-6 w-6" />
+      </button>
+      <img src={src} alt="" className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
 // --- Message Bubble ---
-function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
+function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDelete, onReaction, onEdit, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
+  const [lightbox, setLightbox] = useState(false);
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -180,18 +254,34 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
     }
   }, []);
 
+  const handleCopy = useCallback(() => {
+    if (msg.text) navigator.clipboard?.writeText(msg.text);
+  }, [msg.text]);
+
   const reactions = msg.reactions || [];
-  const grouped = {};
+  const grouped_reactions = {};
   for (const r of reactions) {
-    if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, mine: false };
-    grouped[r.emoji].count++;
-    if (r.userId === user?.id) grouped[r.emoji].mine = true;
+    if (!grouped_reactions[r.emoji]) grouped_reactions[r.emoji] = { count: 0, mine: false };
+    grouped_reactions[r.emoji].count++;
+    if (r.userId === user?.id) grouped_reactions[r.emoji].mine = true;
   }
 
   const accentHex = theme.accent;
+  const isOptimistic = msg._optimistic;
+  const isError = msg._status === "error";
+  const isSending = msg._status === "sending";
+  const isImageOnly = msg.type === "image" && msg.imageUrl && !msg.text;
 
   return (
-    <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+    <div className={`flex ${isMe ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"} ${isNew ? "animate-message-in" : ""}`}>
+      {/* Аватар (только для не-сгруппированных чужих) */}
+      {!isMe && !grouped && (
+        <div className="shrink-0 mr-2 self-end">
+          <UserAvatar username={friend?.username || "?"} avatarUrl={friend?.avatarUrl} size="sm" />
+        </div>
+      )}
+      {!isMe && grouped && <div className="w-8 mr-2 shrink-0" />}
+
       <div className="relative max-w-[min(75%,480px)]">
         <div
           ref={bubbleRef}
@@ -199,19 +289,19 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
-          className={`rounded-2xl px-3 py-1.5 select-none ${
+          className={`rounded-2xl select-none ${isImageOnly ? "overflow-hidden" : "px-3 py-1.5"} ${
             isMe
               ? "rounded-br-sm"
-              : `rounded-bl-sm ${theme.dark ? "" : "bg-[var(--bg-elevated)] text-[var(--text-primary)]"}`
-          }`}
-          style={isMe
+              : `rounded-bl-sm ${!isImageOnly && !theme.dark ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : ""}`
+          } ${isOptimistic ? "opacity-70" : ""}`}
+          style={isMe && !isImageOnly
             ? { backgroundColor: theme.bubble, color: theme.bubbleText }
-            : theme.dark ? { backgroundColor: "rgba(255,255,255,0.12)", color: "#e2e8f0" } : undefined
+            : !isMe && !isImageOnly && theme.dark ? { backgroundColor: "rgba(255,255,255,0.12)", color: "#e2e8f0" } : undefined
           }
         >
           {/* Reply quote */}
           {msg.replyTo && (
-            <div className={`mb-1 pl-2 border-l-2 rounded-sm`}
+            <div className={`mb-1 pl-2 border-l-2 rounded-sm ${isImageOnly ? "px-3 pt-1.5" : ""}`}
               style={isMe ? { borderColor: "rgba(255,255,255,0.5)" } : { borderColor: theme.dark ? "rgba(226,232,240,0.3)" : accentHex + "80" }}
             >
               <p className="text-[10px] font-semibold"
@@ -227,28 +317,75 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
             </div>
           )}
 
-          <p className={`${fontClass} break-words whitespace-pre-wrap leading-snug`}>{msg.text}</p>
+          {/* Image */}
+          {msg.type === "image" && msg.imageUrl && (
+            <div className="relative">
+              <img
+                src={msg.imageUrl}
+                alt=""
+                className="rounded-2xl max-w-full max-h-80 object-cover cursor-pointer"
+                style={isImageOnly ? { display: "block" } : undefined}
+                onClick={() => setLightbox(true)}
+              />
+              {/* Time overlay for image-only messages */}
+              {isImageOnly && (
+                <div className="absolute bottom-1.5 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/50 text-white">
+                  {msg.editedAt && <span className="text-[9px]">ред.</span>}
+                  <span className="text-[10px]">{timeShort(msg.createdAt)}</span>
+                  {isMe && (
+                    isSending ? <Clock className="h-2.5 w-2.5 ml-0.5" /> :
+                    isError ? <AlertCircle className="h-2.5 w-2.5 ml-0.5 text-red-400" /> :
+                    msg.readAt ? <CheckCheck className="h-2.5 w-2.5 ml-0.5" /> :
+                    <Check className="h-2.5 w-2.5 ml-0.5" />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Text */}
+          {msg.text && (
+            <p className={`${isImageOnly ? "px-3 pt-1" : ""} ${fontClass} break-words whitespace-pre-wrap leading-snug`}>{msg.text}</p>
+          )}
           {msg.routeId && <RouteCard routeId={msg.routeId} />}
 
-          {/* Time + read status */}
-          <div className={`flex items-center justify-end gap-0.5 mt-0.5 leading-none`}
-            style={isMe ? { color: "rgba(255,255,255,0.6)" } : undefined}
-          >
-            <span className={`text-[10px] ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
-              style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
-            >{timeShort(msg.createdAt)}</span>
-            {isMe && (
-              msg.readAt
-                ? <CheckCheck className="h-3 w-3 ml-0.5" />
-                : <Check className="h-3 w-3 ml-0.5" />
-            )}
-          </div>
+          {/* Time + status (скрыто для image-only, время на фото) */}
+          {!isImageOnly && (
+            <div className="flex items-center justify-end gap-0.5 mt-0.5 leading-none"
+              style={isMe ? { color: "rgba(255,255,255,0.6)" } : undefined}
+            >
+              {msg.editedAt && (
+                <span className={`text-[10px] mr-0.5 ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+                  style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
+                >ред.</span>
+              )}
+              <span className={`text-[10px] ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+                style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
+              >{timeShort(msg.createdAt)}</span>
+              {isMe && (
+                isSending ? <Clock className="h-3 w-3 ml-0.5" /> :
+                isError ? <AlertCircle className="h-3 w-3 ml-0.5 text-red-400" /> :
+                msg.readAt ? <CheckCheck className="h-3 w-3 ml-0.5" /> :
+                <Check className="h-3 w-3 ml-0.5" />
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Error retry */}
+        {isError && (
+          <button
+            onClick={() => msg._retryFn?.(msg.id)}
+            className="flex items-center gap-1 mt-0.5 text-[10px] text-red-400 hover:text-red-300"
+          >
+            <RefreshCw className="h-3 w-3" /> Повторить
+          </button>
+        )}
+
         {/* Reaction badges */}
-        {Object.keys(grouped).length > 0 && (
+        {Object.keys(grouped_reactions).length > 0 && (
           <div className={`flex gap-1 mt-0.5 ${isMe ? "justify-end" : "justify-start"}`}>
-            {Object.entries(grouped).map(([emoji, data]) => (
+            {Object.entries(grouped_reactions).map(([emoji, data]) => (
               <button
                 key={emoji}
                 onClick={() => onReaction(msg.id, emoji)}
@@ -271,42 +408,84 @@ function MessageBubble({ msg, isMe, user, friend, onReply, onDelete, onReaction,
           <ContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
+            msg={msg}
+            isMe={isMe}
             onReply={() => onReply(msg)}
             onReact={(emoji) => onReaction(msg.id, emoji)}
             onDeleteAll={() => onDelete(msg.id, "all")}
             onDeleteSelf={() => onDelete(msg.id, "self")}
+            onEdit={() => onEdit(msg)}
+            onCopy={handleCopy}
             onClose={onCloseContextMenu}
           />
         )}
       </div>
+
+      {lightbox && msg.imageUrl && (
+        <ImageLightbox src={msg.imageUrl} onClose={() => setLightbox(false)} />
+      )}
     </div>
   );
 }
 
 export default function ChatView({ friendId, friend, onBack, inline = false }) {
-  const { user } = useUser();
+  const { user, authFetch: chatAuthFetch } = useUser();
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeContextMenu, setActiveContextMenu] = useState(null); // { msgId, x, y }
+  const [activeContextMenu, setActiveContextMenu] = useState(null);
+  const [showScrollFab, setShowScrollFab] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const topSentinelRef = useRef(null);
   const { count } = useUnreadCount();
 
   const conversationKey = user ? [user.id, friendId].sort().join("_") : null;
-  const { messages, loading, sendMessage, deleteMessage, toggleReaction, clearMessages } = useChatPolling(conversationKey, {
+  const {
+    messages, loading, hasMore, loadingOlder, typingUsers,
+    sendMessage, sendImage, retryMessage, deleteMessage, toggleReaction,
+    editMessage, loadOlder, sendTyping, clearMessages,
+  } = useChatPolling(conversationKey, {
     interval: 5000,
     enabled: !!conversationKey,
   });
 
-  // Тема чата
+  // Загрузка купленных тем чата
+  const [premiumLoaded, setPremiumLoaded] = useState(false);
+  useEffect(() => {
+    if (!chatAuthFetch) return;
+    chatAuthFetch("/api/shop/inventory")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        const themes = (data.items || [])
+          .filter((i) => i.category === "chatTheme" && i.cssData?.id)
+          .map((i) => i.cssData);
+        if (themes.length > 0) addPremiumThemes(themes);
+      })
+      .catch(() => {})
+      .finally(() => setPremiumLoaded(true));
+  }, [chatAuthFetch]);
+
+  // Тема чата (обновляется после загрузки премиум)
   const [chatTheme, setChatThemeState] = useState(() => getChatTheme(conversationKey));
   const [fontSize, setFontSize] = useState(() => conversationKey ? getChatFontSize(conversationKey) : "base");
+
+  useEffect(() => {
+    if (premiumLoaded && conversationKey) {
+      setChatThemeState(getChatTheme(conversationKey));
+    }
+  }, [premiumLoaded, conversationKey]);
   const fontClass = FONT_CLASS[fontSize] || FONT_CLASS.base;
 
   const handleThemeChange = useCallback((themeId) => {
-    const theme = CHAT_THEMES.find((t) => t.id === themeId) || CHAT_THEMES[0];
+    const all = getAllChatThemes();
+    const theme = all.find((t) => t.id === themeId) || CHAT_THEMES[0];
     setChatThemeState(theme);
     if (conversationKey) saveChatTheme(conversationKey, themeId);
   }, [conversationKey]);
@@ -319,7 +498,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
     if (clearMessages) clearMessages();
   }, [clearMessages]);
 
-  // Сигнализируем MessageToast о том, что чат открыт/закрыт
+  // Chat active/closed events
   useEffect(() => {
     if (!conversationKey) return;
     window.dispatchEvent(new CustomEvent("chat-active", { detail: { conversationKey } }));
@@ -328,16 +507,77 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
     };
   }, [conversationKey]);
 
-  // Автоскролл вниз только при добавлении новых сообщений
+  // Автоскролл + new message detection
   const prevCountRef = useRef(0);
+  const prevIdsRef = useRef(new Set());
+  const [newMessageIds, setNewMessageIds] = useState(new Set());
+
   useEffect(() => {
-    if (messages.length > prevCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const currentIds = new Set(messages.map((m) => m.id));
+    const newIds = new Set();
+    for (const id of currentIds) {
+      if (!prevIdsRef.current.has(id)) newIds.add(id);
     }
+
+    if (newIds.size > 0 && prevIdsRef.current.size > 0) {
+      setNewMessageIds(newIds);
+      // Очищаем через 300ms (после анимации)
+      setTimeout(() => setNewMessageIds(new Set()), 300);
+    }
+
+    // Автоскролл только если были внизу
+    if (messages.length > prevCountRef.current) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+        if (isNearBottom || prevCountRef.current === 0) {
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        }
+      }
+    }
+
     prevCountRef.current = messages.length;
+    prevIdsRef.current = currentIds;
   }, [messages]);
 
-  // Сброс высоты textarea когда текст пустой
+  // Scroll FAB
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handler = () => {
+      const fromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShowScrollFab(fromBottom > 200);
+    };
+    container.addEventListener("scroll", handler, { passive: true });
+    return () => container.removeEventListener("scroll", handler);
+  }, []);
+
+  // Infinite scroll up (IntersectionObserver)
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    const container = messagesContainerRef.current;
+    if (!sentinel || !container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loadingOlder) {
+          const prevHeight = container.scrollHeight;
+          loadOlder().then(() => {
+            // Сохраняем позицию скролла после загрузки старых
+            requestAnimationFrame(() => {
+              const newHeight = container.scrollHeight;
+              container.scrollTop += newHeight - prevHeight;
+            });
+          });
+        }
+      },
+      { root: container, threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingOlder, loadOlder]);
+
+  // Сброс высоты textarea
   useEffect(() => {
     if (!text && textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -345,6 +585,23 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   }, [text]);
 
   const handleSend = async () => {
+    if (editingMsg) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      await editMessage(editingMsg.id, trimmed);
+      setEditingMsg(null);
+      setText("");
+      return;
+    }
+
+    // Image
+    if (imagePreview) {
+      await sendImage(imagePreview.file);
+      setImagePreview(null);
+      setText("");
+      return;
+    }
+
     const trimmed = text.trim();
     if (!trimmed) return;
     const replyId = replyTo?.id || null;
@@ -355,6 +612,16 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
 
   const handleReply = useCallback((msg) => {
     setReplyTo(msg);
+    setEditingMsg(null);
+    setImagePreview(null);
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleEdit = useCallback((msg) => {
+    setEditingMsg(msg);
+    setText(msg.text || "");
+    setReplyTo(null);
+    setImagePreview(null);
     textareaRef.current?.focus();
   }, []);
 
@@ -384,8 +651,65 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
     window.dispatchEvent(new Event("toggle-notification-bell"));
   };
 
+  const handleFileSelect = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return;
+    if (file.size > 10 * 1024 * 1024) return;
+    setImagePreview({ file, url: URL.createObjectURL(file) });
+    setEditingMsg(null);
+    setReplyTo(null);
+    e.target.value = "";
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  // Группировка сообщений
+  const processedMessages = useMemo(() => {
+    const result = [];
+    let lastDate = null;
+    let lastSenderId = null;
+    let lastTime = null;
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const msgDate = dateLabel(msg.createdAt);
+      const msgTime = new Date(msg.createdAt).getTime();
+
+      // Разделитель дат
+      if (msgDate !== lastDate) {
+        result.push({ type: "date", label: msgDate, key: `date-${msgDate}-${i}` });
+        lastDate = msgDate;
+        lastSenderId = null;
+        lastTime = null;
+      }
+
+      // Группировка: тот же отправитель + < 2 минут
+      const isGrouped = msg.senderId === lastSenderId && lastTime && (msgTime - lastTime < 2 * 60 * 1000);
+
+      // Добавляем retry функцию для optimistic
+      const enrichedMsg = msg._optimistic ? { ...msg, _retryFn: retryMessage } : msg;
+
+      result.push({
+        type: "message",
+        msg: enrichedMsg,
+        grouped: isGrouped,
+        isNew: newMessageIds.has(msg.id),
+        key: msg.id,
+      });
+
+      lastSenderId = msg.senderId;
+      lastTime = msgTime;
+    }
+
+    return result;
+  }, [messages, newMessageIds, retryMessage]);
+
   const friendOnline = isOnline(friend?.lastActivityAt);
   const friendStatus = formatLastSeen(friend?.lastActivityAt);
+  const isTyping = typingUsers.length > 0;
 
   return (
     <div className={inline ? "flex flex-col h-full bg-[var(--bg-surface)]" : "fixed inset-0 z-[56] bg-[var(--bg-surface)] flex flex-col"}>
@@ -408,11 +732,13 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate leading-tight">
               {friend?.username || "Чат"}
             </p>
-            {friend?.lastActivityAt != null && (
+            {isTyping ? (
+              <p className="text-[11px] leading-tight text-[var(--text-muted)]">печатает...</p>
+            ) : friend?.lastActivityAt != null ? (
               <p className={`text-[11px] leading-tight ${friendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
                 {friendStatus}
               </p>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -441,12 +767,22 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-3"
         style={chatTheme.bg ? {
           background: chatTheme.bg,
           backgroundSize: chatTheme.bgSize || "auto",
         } : undefined}
       >
+        {/* Top sentinel for infinite scroll */}
+        <div ref={topSentinelRef} className="h-1" />
+
+        {loadingOlder && (
+          <div className="py-2 text-center">
+            <span className="text-xs text-[var(--text-muted)]">Загрузка...</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="py-8 text-center text-sm" style={chatTheme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}>
             <span className={chatTheme.dark ? "" : "text-[var(--text-muted)]"}>Загрузка...</span>
@@ -456,29 +792,84 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
             <span className={chatTheme.dark ? "" : "text-[var(--text-muted)]"}>Начните общение!</span>
           </div>
         ) : (
-          messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              msg={msg}
-              isMe={msg.senderId === user?.id}
-              user={user}
-              friend={friend}
-              onReply={handleReply}
-              onDelete={handleDelete}
-              onReaction={handleReaction}
-              theme={chatTheme}
-              fontClass={fontClass}
-              contextMenu={activeContextMenu?.msgId === msg.id ? activeContextMenu : null}
-              onContextMenu={handleMsgContextMenu}
-              onCloseContextMenu={handleCloseContextMenu}
-            />
-          ))
+          processedMessages.map((item) => {
+            if (item.type === "date") {
+              return <DateSeparator key={item.key} label={item.label} theme={chatTheme} />;
+            }
+            const msg = item.msg;
+            const isMe = msg.senderId === user?.id || msg.senderId === "__me__";
+            return (
+              <MessageBubble
+                key={item.key}
+                msg={msg}
+                isMe={isMe}
+                user={user}
+                friend={friend}
+                grouped={item.grouped}
+                isNew={item.isNew}
+                onReply={handleReply}
+                onDelete={handleDelete}
+                onReaction={handleReaction}
+                onEdit={handleEdit}
+                theme={chatTheme}
+                fontClass={fontClass}
+                contextMenu={activeContextMenu?.msgId === msg.id ? activeContextMenu : null}
+                onContextMenu={handleMsgContextMenu}
+                onCloseContextMenu={handleCloseContextMenu}
+              />
+            );
+          })
         )}
+
+        {/* Typing indicator */}
+        {isTyping && <TypingIndicator theme={chatTheme} />}
+
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Scroll FAB */}
+      {showScrollFab && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-28 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-lg hover:bg-[var(--bg-surface)] transition"
+        >
+          <ChevronDown className="h-5 w-5 text-[var(--text-secondary)]" />
+        </button>
+      )}
+
+      {/* Image preview */}
+      {imagePreview && (
+        <div className="px-4 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-t-xl bg-[var(--bg-elevated)] border border-b-0 border-[var(--border-color)]">
+            <img src={imagePreview.url} alt="" className="h-16 w-16 rounded-lg object-cover" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[var(--text-muted)]">Отправить фото</p>
+            </div>
+            <button onClick={() => { URL.revokeObjectURL(imagePreview.url); setImagePreview(null); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit preview */}
+      {editingMsg && (
+        <div className="px-4 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-t-xl bg-[var(--bg-elevated)] border border-b-0 border-[var(--border-color)]">
+            <Pencil className="h-4 w-4 shrink-0" style={{ color: chatTheme.accent }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{ color: chatTheme.accent }}>Редактирование</p>
+              <p className="text-xs text-[var(--text-muted)] truncate">{editingMsg.text}</p>
+            </div>
+            <button onClick={() => { setEditingMsg(null); setText(""); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Reply preview */}
-      {replyTo && (
+      {replyTo && !editingMsg && (
         <div className="px-4 shrink-0">
           <div className="flex items-center gap-2 px-3 py-2 rounded-t-xl bg-[var(--bg-elevated)] border border-b-0 border-[var(--border-color)]">
             <Reply className="h-4 w-4 shrink-0" style={{ color: chatTheme.accent }} />
@@ -514,11 +905,31 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
             )}
           </div>
 
+          {/* Attach image button */}
+          {!editingMsg && (
+            <div className="shrink-0">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => {
               setText(e.target.value.slice(0, 1000));
+              sendTyping();
               const ta = textareaRef.current;
               if (ta) {
                 ta.style.height = "auto";
@@ -531,18 +942,18 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
                 handleSend();
               }
             }}
-            placeholder="Сообщение..."
+            placeholder={editingMsg ? "Редактировать сообщение..." : "Сообщение..."}
             rows={1}
             className="flex-1 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)] resize-none"
             style={{ maxHeight: "144px", overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}
           />
           <button
             onClick={handleSend}
-            disabled={!text.trim()}
+            disabled={!text.trim() && !imagePreview}
             className="flex h-10 w-10 items-center justify-center rounded-full text-white transition disabled:opacity-40 shrink-0"
             style={{ backgroundColor: chatTheme.accent }}
           >
-            <Send className="h-4 w-4" />
+            {editingMsg ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
           </button>
         </div>
       </div>

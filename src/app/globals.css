@@ -214,3 +214,56 @@ textarea::-webkit-scrollbar {
   animation: gps-pulse 2s ease-out infinite;
   z-index: 1;
 }
+
+/* Чат: появление нового сообщения */
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-message-in {
+  animation: message-in 0.2s ease-out;
+}
+
+/* Чат: пульсация точек "печатает..." */
+@keyframes typing-dot {
+  0%, 60%, 100% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+.animate-typing-dot-1 { animation: typing-dot 1.4s infinite 0s; }
+.animate-typing-dot-2 { animation: typing-dot 1.4s infinite 0.2s; }
+.animate-typing-dot-3 { animation: typing-dot 1.4s infinite 0.4s; }
+
+/* Рамки аватаров — вращение */
+@keyframes frame-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-frame-spin {
+  animation: frame-spin 3s linear infinite;
+}
+
+/* Рамки — пульсация свечения */
+@keyframes frame-pulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 2px currentColor); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 8px currentColor); }
+}
+.animate-frame-pulse {
+  animation: frame-pulse 2s ease-in-out infinite;
+}
+
+/* Рамки — радуга (сдвиг hue) */
+@keyframes frame-rainbow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+.animate-frame-rainbow {
+  animation: frame-rainbow 4s linear infinite;
+}

@@ -163,6 +163,11 @@ export default function FriendsPage() {
     } catch { /* ignore */ }
   };
 
+  const handleCloseChat = useCallback(() => {
+    setChatFriendId(null);
+    loadUnread();
+  }, [loadUnread]);
+
   // Закрытие контекстного меню при клике вне
   useEffect(() => {
     if (!contextMenu) return;
@@ -186,11 +191,6 @@ export default function FriendsPage() {
       </div>
     );
   }
-
-  const handleCloseChat = useCallback(() => {
-    setChatFriendId(null);
-    loadUnread();
-  }, [loadUnread]);
 
   const chatFriend = friends.find((f) => f.id === chatFriendId);
 
@@ -230,9 +230,9 @@ export default function FriendsPage() {
         chatFriendId === f.id ? "ring-2 ring-green-500" : ""
       }`}
     >
-      <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" online={isOnline(f.lastActivityAt)} />
+      <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" online={isOnline(f.lastActivityAt)} equippedItems={f.equippedItems} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-[var(--text-primary)]">{f.username}</p>
+        <p className="text-sm font-semibold" style={{ color: f.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{f.username}</p>
         <p className={`text-xs truncate ${isOnline(f.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
           {formatLastSeen(f.lastActivityAt)}
         </p>
