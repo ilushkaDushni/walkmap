@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
@@ -10,10 +10,10 @@ import UserAvatar from "./UserAvatar";
 import AvatarCropper from "./AvatarCropper";
 import { APP_VERSION } from "@/lib/version";
 
-export default function ProfileModal({ isOpen, onClose }) {
+export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   const { user, login, register, verify, logout, authFetch, updateUser } = useUser();
   const router = useRouter();
-  // "profile" | "login" | "register" | "verify" | "welcome" | "edit" | "settings"
+  // "profile" | "login" | "register" | "verify" | "welcome" | "edit" | "settings" | "about"
   const [screen, setScreen] = useState("profile");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +56,12 @@ export default function ProfileModal({ isOpen, onClose }) {
   const [resetCode, setResetCode] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdMsg, setPwdMsg] = useState({ text: "", ok: false });
+
+  useEffect(() => {
+    if (isOpen && initialScreen) {
+      setScreen(initialScreen);
+    }
+  }, [isOpen, initialScreen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -433,9 +439,24 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   const primaryRoleColor = user?.roles?.[0]?.color || null;
 
+  // === Экран: О приложении ===
+  if (screen === "about") {
+    return (
+      <AboutScreen
+        modalShell={modalShell}
+        backBtn={backBtn}
+        closeBtn={closeBtn}
+        inputCls={inputCls}
+        btnPrimary={btnPrimary}
+        user={user}
+        goBack={user ? "settings" : "profile"}
+      />
+    );
+  }
+
   // === Экран: Настройки ===
   if (user && screen === "settings") {
-    return <SettingsScreen modalShell={modalShell} backBtn={backBtn} closeBtn={closeBtn} onClose={onClose} />;
+    return <SettingsScreen modalShell={modalShell} backBtn={backBtn} closeBtn={closeBtn} onClose={onClose} setScreen={setScreen} />;
   }
 
   // === Экран: Welcome (после регистрации) ===
@@ -747,9 +768,14 @@ export default function ProfileModal({ isOpen, onClose }) {
         {closeBtn}
         <div className="flex flex-col items-center">
           <div className="mb-3">
-            <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="lg" />
+            <UserAvatar username={user.username} avatarUrl={user.avatarUrl} roleColor={primaryRoleColor} size="lg" equippedItems={user.equippedItems} />
           </div>
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">{user.username}</h2>
+          <h2 className="text-lg font-bold" style={{ color: user.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{user.username}</h2>
+          {user.equippedItems?.title?.cssData?.text && (
+            <span className="text-xs font-medium mt-0.5" style={{ color: user.equippedItems.title.cssData.color || "var(--text-secondary)" }}>
+              {user.equippedItems.title.cssData.text}
+            </span>
+          )}
           {user.bio && (
             <p className="text-sm text-[var(--text-secondary)] text-center mt-1 max-w-[260px]">{user.bio}</p>
           )}
@@ -774,10 +800,30 @@ export default function ProfileModal({ isOpen, onClose }) {
           </div>
         </div>
         <div className="mt-4 space-y-2">
+          {/* Баланс */}
+          <div className="flex items-center justify-center gap-4 mb-1">
+            <div className="flex items-center gap-1 text-sm">
+              <span>🪙</span>
+              <span className="font-bold text-[var(--text-primary)]">{user.coins || 0}</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <span>🔷</span>
+              <span className="font-bold text-[var(--text-primary)]">{user.routiks || 0}</span>
+            </div>
+          </div>
+
           <button onClick={() => { setScreen("edit"); setError(""); }} className={btnOutline}>
             <Pencil className="h-4 w-4" />
             Редактировать профиль
           </button>
+          <Link
+            href="/shop"
+            onClick={onClose}
+            className={`${btnOutline} no-underline`}
+          >
+            <Package className="h-4 w-4" />
+            Магазин
+          </Link>
           <Link
             href={`/users/${user.username}`}
             onClick={onClose}
@@ -818,6 +864,12 @@ export default function ProfileModal({ isOpen, onClose }) {
           <button onClick={() => setScreen("register")} className={btnOutline}>
             <UserPlus className="h-4 w-4" />
             Зарегистрироваться
+          </button>
+          <button
+            onClick={() => setScreen("about")}
+            className="w-full text-center text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition pt-1"
+          >
+            О приложении
           </button>
         </div>
       </>
@@ -952,7 +1004,115 @@ export default function ProfileModal({ isOpen, onClose }) {
   return null;
 }
 
-function SettingsScreen({ modalShell, backBtn, closeBtn, onClose }) {
+function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user, goBack }) {
+  const [name, setName] = useState(user?.username || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null); // { ok: bool, text: string }
+
+  const handleSend = async () => {
+    if (!email.trim() || !message.trim()) {
+      setResult({ ok: false, text: "Заполните email и сообщение" });
+      return;
+    }
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка отправки");
+      setResult({ ok: true, text: "Сообщение отправлено!" });
+      setMessage("");
+    } catch (e) {
+      setResult({ ok: false, text: e.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return modalShell(
+    <>
+      {backBtn(goBack)}
+      {closeBtn}
+      <div className="flex flex-col items-center mb-4">
+        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/10">
+          <MapPin className="h-8 w-8 text-green-500" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Ростов GO</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-0.5">Больше, чем просто прогулка</p>
+      </div>
+
+      <p className="text-sm text-[var(--text-secondary)] text-center mb-4 leading-relaxed">
+        Приложение для прогулок по Ростову-на-Дону. Исследуйте город через уникальные маршруты с аудиогидом, зарабатывайте монеты и открывайте достижения.
+      </p>
+
+      <div className="text-center mb-4">
+        <span className="text-[10px] text-[var(--text-muted)]">Версия {APP_VERSION}</span>
+      </div>
+
+      {/* Форма обратной связи */}
+      <div className="border-t border-[var(--border-color)] pt-4">
+        <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Обратная связь</h3>
+
+        {result?.ok ? (
+          <div className="flex flex-col items-center py-4">
+            <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
+            <p className="text-sm font-medium text-green-500">{result.text}</p>
+            <button
+              onClick={() => setResult(null)}
+              className="mt-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+            >
+              Отправить ещё
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 100))}
+              placeholder="Имя (необязательно)"
+              className={inputCls}
+            />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email *"
+              className={inputCls}
+            />
+            <div>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 1000))}
+                placeholder="Ваше сообщение *"
+                rows={4}
+                className={`${inputCls} resize-none`}
+              />
+              <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+                {message.length}/1000
+              </div>
+            </div>
+            {result && !result.ok && (
+              <p className="text-center text-xs text-red-400">{result.text}</p>
+            )}
+            <button onClick={handleSend} disabled={sending} className={btnPrimary}>
+              <Send className="h-4 w-4" />
+              {sending ? "Отправка..." : "Отправить"}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SettingsScreen({ modalShell, backBtn, closeBtn, onClose, setScreen }) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
 
@@ -987,6 +1147,15 @@ function SettingsScreen({ modalShell, backBtn, closeBtn, onClose }) {
         >
           <span className="text-sm text-[var(--text-secondary)]">Версия</span>
           <span className="text-sm text-[var(--text-muted)]">{APP_VERSION}</span>
+        </button>
+
+        {/* О приложении */}
+        <button
+          onClick={() => setScreen("about")}
+          className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
+        >
+          <span className="text-sm text-[var(--text-secondary)]">О приложении</span>
+          <Info className="h-4 w-4 text-[var(--text-muted)]" />
         </button>
       </div>
     </>

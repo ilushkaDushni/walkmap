@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { User, MapPin, Shield, House } from "lucide-react";
+import { User, MapPin, Shield, House, ShoppingBag } from "lucide-react";
 import { useUser } from "./UserProvider";
 import { useNavigationGuard } from "./NavigationGuardProvider";
 import ProfileModal from "./ProfileModal";
@@ -15,17 +15,27 @@ export default function BottomNav() {
   const { navigate } = useNavigationGuard();
   const { count: unreadMsgCount } = useUnreadMessages();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileInitialScreen, setProfileInitialScreen] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
 
   useEffect(() => {
     const handler = () => setProfileOpen(true);
+    const aboutHandler = () => {
+      setProfileInitialScreen("about");
+      setProfileOpen(true);
+    };
     window.addEventListener("open-profile-modal", handler);
-    return () => window.removeEventListener("open-profile-modal", handler);
+    window.addEventListener("open-about-screen", aboutHandler);
+    return () => {
+      window.removeEventListener("open-profile-modal", handler);
+      window.removeEventListener("open-about-screen", aboutHandler);
+    };
   }, []);
 
   const isHome = pathname === "/";
   const isRoutesActive = pathname === "/routes" || pathname.startsWith("/routes/");
   const isFriendsActive = pathname === "/friends";
+  const isShopActive = pathname === "/shop";
   const isAdmin = hasPermission("admin.access");
 
   return (
@@ -73,6 +83,23 @@ export default function BottomNav() {
             </button>
           )}
 
+          {/* Магазин */}
+          <button
+            onClick={() => {
+              if (!user) {
+                window.dispatchEvent(new Event("open-profile-modal"));
+              } else {
+                navigate("/shop");
+              }
+            }}
+            className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
+              isShopActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            }`}
+          >
+            <ShoppingBag className="h-6 w-6" strokeWidth={isShopActive ? 2.5 : 1.5} />
+            <span className="text-[10px] font-medium">Магазин</span>
+          </button>
+
           {/* Друзья */}
           <button
             onClick={() => {
@@ -118,7 +145,11 @@ export default function BottomNav() {
         </div>
       </nav>
 
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileModal
+        isOpen={profileOpen}
+        onClose={() => { setProfileOpen(false); setProfileInitialScreen(null); }}
+        initialScreen={profileInitialScreen}
+      />
       {isAdmin && <AdminModal isOpen={adminOpen} onClose={() => setAdminOpen(false)} />}
     </>
   );

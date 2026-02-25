@@ -237,6 +237,19 @@ function GuestView({ publicStats, weather, routeOfDay }) {
         Войти и начать
         <ArrowRight className="h-5 w-5" />
       </button>
+
+      {/* Footer */}
+      <div className="text-center pt-2 pb-2">
+        <p className="text-[11px] text-[var(--text-muted)]">
+          Ростов GO · 2024–2025
+        </p>
+        <button
+          onClick={() => window.dispatchEvent(new Event("open-about-screen"))}
+          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition underline underline-offset-2"
+        >
+          О приложении
+        </button>
+      </div>
     </div>
   );
 }
@@ -528,6 +541,15 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
         <StatCard icon={Ruler} value={dist.value} label={dist.unit} gradient="from-emerald-500/15 to-green-500/5" iconColor="text-emerald-500" delay={100} inView={statsInView} />
         <StatCard icon={Coins} value={userStats.coins} label="Монеты" gradient="from-yellow-500/15 to-amber-500/5" iconColor="text-yellow-500" delay={200} inView={statsInView} />
       </div>
+
+      {/* Маршрутики */}
+      {(user.routiks || 0) > 0 && (
+        <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500/10 to-indigo-500/5 border border-blue-500/20 px-4 py-2">
+          <span>🔷</span>
+          <span className="text-sm font-bold text-[var(--text-primary)]">{user.routiks}</span>
+          <span className="text-xs text-[var(--text-muted)]">маршрутиков</span>
+        </div>
+      )}
 
       {/* Погода */}
       <WeatherWidget weather={weather} />
