@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle, LifeBuoy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
@@ -47,6 +47,9 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   const [savingUsername, setSavingUsername] = useState(false);
   const [usernameMsg, setUsernameMsg] = useState({ text: "", ok: false });
 
+  // Support
+  const [supportTicketId, setSupportTicketId] = useState(null);
+
   // Password change
   const [showPassword, setShowPassword] = useState(false);
   const [pwdMode, setPwdMode] = useState("change"); // "change" | "forgot" | "code"
@@ -62,6 +65,27 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
       setScreen(initialScreen);
     }
   }, [isOpen, initialScreen]);
+
+  // Event: открыть экран поддержки (из уведомлений / главной)
+  useEffect(() => {
+    const handler = (e) => {
+      const ticketId = e.detail?.ticketId || null;
+      setSupportTicketId(ticketId);
+      setScreen(ticketId ? "support-detail" : "support");
+      // Открыть модал если закрыт — через ProfileModal isOpen управляется извне,
+      // dispatch open-profile-modal чтобы открыть
+      if (!isOpen) {
+        window.dispatchEvent(new Event("open-profile-modal"));
+        // Повторно установить экран после открытия
+        setTimeout(() => {
+          setSupportTicketId(ticketId);
+          setScreen(ticketId ? "support-detail" : "support");
+        }, 50);
+      }
+    };
+    window.addEventListener("open-support-screen", handler);
+    return () => window.removeEventListener("open-support-screen", handler);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,6 +122,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
       setConfirmPwd("");
       setResetCode("");
       setPwdMsg({ text: "", ok: false });
+      setSupportTicketId(null);
     }
   }, [isOpen]);
 
@@ -438,6 +463,26 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   const btnOutline = "flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]";
 
   const primaryRoleColor = user?.roles?.[0]?.color || null;
+
+  // === Экраны поддержки ===
+  if (user && (screen === "support" || screen === "support-new" || screen === "support-detail")) {
+    return (
+      <SupportScreens
+        screen={screen}
+        setScreen={setScreen}
+        ticketId={supportTicketId}
+        setTicketId={setSupportTicketId}
+        modalShell={modalShell}
+        backBtn={backBtn}
+        closeBtn={closeBtn}
+        inputCls={inputCls}
+        btnPrimary={btnPrimary}
+        btnOutline={btnOutline}
+        authFetch={authFetch}
+        user={user}
+      />
+    );
+  }
 
   // === Экран: О приложении ===
   if (screen === "about") {
@@ -824,6 +869,10 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
             <Package className="h-4 w-4" />
             Магазин
           </Link>
+          <button onClick={() => { setScreen("support"); setError(""); }} className={btnOutline}>
+            <LifeBuoy className="h-4 w-4" />
+            Поддержка
+          </button>
           <Link
             href={`/users/${user.username}`}
             onClick={onClose}
@@ -1110,6 +1159,288 @@ function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user
       </div>
     </>
   );
+}
+
+function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, backBtn, closeBtn, inputCls, btnPrimary, btnOutline, authFetch, user }) {
+  const [tickets, setTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [ticketData, setTicketData] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [newSubject, setNewSubject] = useState("");
+  const [newMessage, setNewMessage] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const messagesEndRef = useRef(null);
+
+  // Загрузка списка тикетов
+  useEffect(() => {
+    if (screen === "support") {
+      setLoadingTickets(true);
+      authFetch("/api/tickets")
+        .then((r) => r.json())
+        .then((data) => setTickets(Array.isArray(data) ? data : []))
+        .catch(() => setTickets([]))
+        .finally(() => setLoadingTickets(false));
+    }
+  }, [screen, authFetch]);
+
+  // Загрузка деталей тикета
+  useEffect(() => {
+    if (screen === "support-detail" && ticketId) {
+      setLoadingDetail(true);
+      authFetch(`/api/tickets/${ticketId}`)
+        .then((r) => r.json())
+        .then((data) => setTicketData(data))
+        .catch(() => setTicketData(null))
+        .finally(() => setLoadingDetail(false));
+    }
+  }, [screen, ticketId, authFetch]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (ticketData?.messages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [ticketData?.messages?.length]);
+
+  const handleCreateTicket = async () => {
+    const subj = newSubject.trim();
+    const msg = newMessage.trim();
+    if (!subj || !msg) {
+      setError("Заполните тему и сообщение");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await authFetch("/api/tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: subj, message: msg }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setNewSubject("");
+      setNewMessage("");
+      setTicketId(data.id);
+      setScreen("support-detail");
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReply = async () => {
+    const text = replyText.trim();
+    if (!text) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await authFetch(`/api/tickets/${ticketId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setReplyText("");
+      // Перезагрузить тикет
+      const fresh = await authFetch(`/api/tickets/${ticketId}`);
+      setTicketData(await fresh.json());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const statusBadge = (status) => (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === "open" ? "bg-green-500/15 text-green-500" : "bg-[var(--text-muted)]/15 text-[var(--text-muted)]"}`}>
+      {status === "open" ? "Открыт" : "Закрыт"}
+    </span>
+  );
+
+  function timeAgo(date) {
+    const diff = Date.now() - new Date(date).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "только что";
+    if (min < 60) return `${min} мин`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} ч`;
+    const d = Math.floor(hr / 24);
+    return `${d} дн`;
+  }
+
+  // === Список тикетов ===
+  if (screen === "support") {
+    return modalShell(
+      <>
+        {backBtn("profile")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-teal-500/20">
+            <LifeBuoy className="h-8 w-8 text-teal-500" />
+          </div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Поддержка</h2>
+        </div>
+        <div className="space-y-2">
+          <button onClick={() => { setScreen("support-new"); setError(""); }} className={btnPrimary}>
+            <Send className="h-4 w-4" />
+            Новое обращение
+          </button>
+          {loadingTickets ? (
+            <div className="py-6 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+          ) : tickets.length === 0 ? (
+            <div className="py-6 text-center text-sm text-[var(--text-muted)]">У вас пока нет обращений</div>
+          ) : (
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              {tickets.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setTicketId(t.id); setScreen("support-detail"); setReplyText(""); setError(""); }}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 text-left transition hover:opacity-80"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
+                      {statusBadge(t.status)}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // === Создание тикета ===
+  if (screen === "support-new") {
+    return modalShell(
+      <>
+        {backBtn("support")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Новое обращение</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Опишите вашу проблему или предложение</p>
+        </div>
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={newSubject}
+            onChange={(e) => setNewSubject(e.target.value.slice(0, 100))}
+            placeholder="Тема обращения"
+            className={inputCls}
+          />
+          <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newSubject.length}/100</div>
+          <textarea
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value.slice(0, 1000))}
+            placeholder="Ваше сообщение..."
+            rows={5}
+            className={`${inputCls} resize-none`}
+          />
+          <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newMessage.length}/1000</div>
+          {error && <p className="text-center text-xs text-red-400">{error}</p>}
+          <button onClick={handleCreateTicket} disabled={submitting} className={btnPrimary}>
+            <Send className="h-4 w-4" />
+            {submitting ? "Отправка..." : "Отправить"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // === Детали тикета ===
+  if (screen === "support-detail") {
+    if (loadingDetail) {
+      return modalShell(
+        <>
+          {backBtn("support")}
+          {closeBtn}
+          <div className="py-10 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+        </>
+      );
+    }
+
+    if (!ticketData) {
+      return modalShell(
+        <>
+          {backBtn("support")}
+          {closeBtn}
+          <div className="py-10 text-center text-sm text-[var(--text-muted)]">Не удалось загрузить</div>
+        </>
+      );
+    }
+
+    return modalShell(
+      <>
+        {backBtn("support")}
+        {closeBtn}
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-base font-bold text-[var(--text-primary)] truncate flex-1">{ticketData.subject}</h2>
+            {statusBadge(ticketData.status)}
+          </div>
+          <span className="text-[10px] text-[var(--text-muted)]">Создано {timeAgo(ticketData.createdAt)}</span>
+        </div>
+
+        {/* Лента сообщений */}
+        <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-3 pr-1">
+          {(ticketData.messages || []).map((m) => {
+            const isUser = m.senderType === "user";
+            return (
+              <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${isUser ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-teal-500/15 text-[var(--text-primary)]"}`}>
+                  {!isUser && (
+                    <p className="text-[10px] font-bold text-teal-500 mb-0.5">Поддержка</p>
+                  )}
+                  <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>
+                  <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Поле ввода */}
+        {ticketData.status === "open" ? (
+          <div className="space-y-2">
+            {error && <p className="text-center text-xs text-red-400">{error}</p>}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value.slice(0, 1000))}
+                onKeyDown={(e) => e.key === "Enter" && handleReply()}
+                placeholder="Написать..."
+                className={`${inputCls} flex-1`}
+              />
+              <button
+                onClick={handleReply}
+                disabled={submitting || !replyText.trim()}
+                className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl bg-teal-500 text-white transition hover:bg-teal-600 disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-2 text-sm text-[var(--text-muted)]">Обращение закрыто</div>
+        )}
+      </>
+    );
+  }
+
+  return null;
 }
 
 function SettingsScreen({ modalShell, backBtn, closeBtn, onClose, setScreen }) {

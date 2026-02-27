@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users, Coins } from "lucide-react";
+import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users, Coins, LifeBuoy } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useUnreadCount from "@/hooks/useUnreadCount";
@@ -33,6 +33,7 @@ const ICON_MAP = {
   coin_gift: Gift,
   coin_admin: Coins,
   admin_broadcast: Megaphone,
+  ticket_reply: LifeBuoy,
 };
 
 const COLOR_MAP = {
@@ -45,6 +46,7 @@ const COLOR_MAP = {
   coin_gift: "text-yellow-500",
   coin_admin: "text-amber-500",
   admin_broadcast: "text-red-500",
+  ticket_reply: "text-teal-500",
 };
 
 function getNotificationText(n) {
@@ -70,6 +72,8 @@ function getNotificationText(n) {
       return `${d.username || "Кто-то"} отправил вам сообщение`;
     case "admin_broadcast":
       return d.message || "Объявление от администрации";
+    case "ticket_reply":
+      return "Поддержка ответила на ваше обращение";
     default:
       return "Новое уведомление";
   }
@@ -89,6 +93,8 @@ function getNotificationLink(n) {
     case "coin_gift":
       return d.username ? `/users/${d.username}` : null;
     case "coin_admin":
+      return null;
+    case "ticket_reply":
       return null;
     default:
       return null;
@@ -273,6 +279,12 @@ export default function NotificationBell({ inline = false }) {
       return;
     }
 
+    if (n.type === "ticket_reply" && n.data?.ticketId) {
+      setOpen(false);
+      window.dispatchEvent(new CustomEvent("open-support-screen", { detail: { ticketId: n.data.ticketId } }));
+      return;
+    }
+
     if (n.type === "new_message" && n.data?.userId) {
       setOpen(false);
       router.push("/friends");
@@ -321,7 +333,7 @@ export default function NotificationBell({ inline = false }) {
             {notifications.map((n) => {
               const Icon = ICON_MAP[n.type] || Bell;
               const colorCls = COLOR_MAP[n.type] || "text-[var(--text-secondary)]";
-              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin" || n.type === "new_message";
+              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin" || n.type === "new_message" || n.type === "ticket_reply";
               return (
                 <div
                   key={n.id}

@@ -720,5 +720,18 @@ export async function POST(request) {
   }
   if (equippedUpdated > 0) log.push(`Обновлены equippedItems у ${equippedUpdated} пользователей`);
 
+  // 19. Индексы для тикет-системы
+  await db.collection("tickets").createIndex({ userId: 1, createdAt: -1 });
+  await db.collection("tickets").createIndex({ status: 1, updatedAt: -1 });
+  await db.collection("ticket_messages").createIndex({ ticketId: 1, createdAt: 1 });
+  log.push("Индексы tickets и ticket_messages созданы");
+
+  // Добавить feedback.manage в роль admin
+  await db.collection("roles").updateOne(
+    { slug: "admin" },
+    { $addToSet: { permissions: "feedback.manage" } }
+  );
+  log.push("feedback.manage добавлен в роль admin");
+
   return NextResponse.json({ success: true, log });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag, LifeBuoy } from "lucide-react";
 import { useUser } from "./UserProvider";
 import { useNavigationGuard } from "./NavigationGuardProvider";
 
@@ -108,6 +108,13 @@ export default function AdminModal({ isOpen, onClose }) {
       description: "Управление товарами и курсом валюты",
       action: () => { navigate("/admin/shop"); onClose(); },
       visible: hasPermission("shop.manage"),
+    },
+    {
+      icon: LifeBuoy,
+      title: "Обращения",
+      description: "Ответы на обращения пользователей",
+      action: () => { navigate("/admin/tickets"); onClose(); },
+      visible: hasPermission("feedback.manage"),
     },
   ].filter((s) => s.visible);
 

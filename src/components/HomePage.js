@@ -7,7 +7,7 @@ import {
   Footprints, Trophy, Compass, Map, Sun, Cloud,
   CloudRain, CloudSnow, CloudLightning,
   Medal, Crown, Star, ChevronRight,
-  Shield, Zap, Flame, Globe, Gem, MessageCircle, Moon, X,
+  Shield, Zap, Flame, Globe, Gem, MessageCircle, Moon, X, LifeBuoy,
 } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@/components/UserProvider";
@@ -585,6 +585,17 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
 
         {/* Маршрут дня */}
         <RouteOfDay route={routeOfDay} />
+
+        {/* Поддержка */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-support-screen"))}
+          className="flex w-full items-center gap-3 rounded-2xl bg-gradient-to-r from-teal-500/10 to-cyan-500/5 border border-teal-500/20 px-4 py-3 transition hover:from-teal-500/15 active:scale-[0.98] text-left"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-500/20 shrink-0">
+            <LifeBuoy className="h-5 w-5 text-teal-500" />
+          </div>
+          <span className="text-sm font-medium text-[var(--text-secondary)]">Нужна помощь? Напишите нам</span>
+        </button>
       </div>
 
       {/* Достижения */}
