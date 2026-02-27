@@ -465,7 +465,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   const primaryRoleColor = user?.roles?.[0]?.color || null;
 
   // === Экраны поддержки ===
-  if (user && (screen === "support" || screen === "support-new" || screen === "support-detail")) {
+  if (user && (screen === "support" || screen === "support-new" || screen === "support-detail" || screen === "support-email")) {
     return (
       <SupportScreens
         screen={screen}
@@ -1161,6 +1161,99 @@ function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user
   );
 }
 
+function EmailFeedbackScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user }) {
+  const [name, setName] = useState(user?.username || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleSend = async () => {
+    if (!email.trim() || !message.trim()) {
+      setResult({ ok: false, text: "Заполните email и сообщение" });
+      return;
+    }
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), message: message.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка отправки");
+      setResult({ ok: true, text: "Отправлено!" });
+      setMessage("");
+    } catch (e) {
+      setResult({ ok: false, text: e.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return modalShell(
+    <>
+      {backBtn("support")}
+      {closeBtn}
+      <div className="flex flex-col items-center mb-4">
+        <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/20">
+          <Mail className="h-8 w-8 text-blue-500" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Написать на почту</h2>
+        <p className="text-xs text-[var(--text-muted)] mt-1">Ответ придёт на ваш email</p>
+      </div>
+
+      {result?.ok ? (
+        <div className="flex flex-col items-center py-6">
+          <CheckCircle className="h-12 w-12 text-green-500 mb-3" />
+          <p className="text-sm font-semibold text-green-500">{result.text}</p>
+          <button
+            onClick={() => setResult(null)}
+            className="mt-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+          >
+            Отправить ещё
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 100))}
+            placeholder="Имя"
+            className={inputCls}
+          />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email *"
+            className={inputCls}
+          />
+          <div>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, 1000))}
+              placeholder="Ваше сообщение *"
+              rows={5}
+              className={`${inputCls} resize-none`}
+            />
+            <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">{message.length}/1000</div>
+          </div>
+          {result && !result.ok && (
+            <p className="text-center text-xs text-red-400">{result.text}</p>
+          )}
+          <button onClick={handleSend} disabled={sending} className={btnPrimary}>
+            <Send className="h-4 w-4" />
+            {sending ? "Отправка..." : "Отправить"}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, backBtn, closeBtn, inputCls, btnPrimary, btnOutline, authFetch, user }) {
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
@@ -1317,6 +1410,22 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
             </div>
           )}
         </div>
+
+        {/* Написать на почту */}
+        <div className="border-t border-[var(--border-color)] mt-4 pt-4">
+          <button
+            onClick={() => setScreen("support-email")}
+            className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 transition hover:opacity-80"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15">
+              <Mail className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Написать на почту</p>
+              <p className="text-[11px] text-[var(--text-muted)]">Ответ на email в течение дня</p>
+            </div>
+          </button>
+        </div>
       </>
     );
   }
@@ -1356,6 +1465,18 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
         </div>
       </>
     );
+  }
+
+  // === Email-форма ===
+  if (screen === "support-email") {
+    return <EmailFeedbackScreen
+      modalShell={modalShell}
+      backBtn={backBtn}
+      closeBtn={closeBtn}
+      inputCls={inputCls}
+      btnPrimary={btnPrimary}
+      user={user}
+    />;
   }
 
   // === Детали тикета ===
