@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission } from "@/lib/adminAuth";
 
 const FAKE_REVIEWS = [
   {
@@ -27,8 +27,8 @@ const FAKE_REVIEWS = [
 
 // POST /api/admin/seed-reviews — superadmin only, одноразовый посев
 export async function POST(request) {
-  const perm = await requirePermission(request, "reviews.manage");
-  if (perm.error) return perm.error;
+  const { error } = await requirePermission(request, "reviews.manage");
+  if (error) return error;
 
   const db = await getDb();
 
