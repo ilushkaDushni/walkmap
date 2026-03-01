@@ -15,6 +15,8 @@ export default function UserProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
   const [bannedUsername, setBannedUsername] = useState(null);
+  const [banReason, setBanReason] = useState(null);
+  const [banExpiresAt, setBanExpiresAt] = useState(null);
   const accessTokenRef = useRef(null);
 
   // Preview mode state
@@ -64,6 +66,8 @@ export default function UserProvider({ children }) {
           if (res.status === 403 && data.banned) {
             setIsBanned(true);
             setBannedUsername(data.username || null);
+            setBanReason(data.banReason || null);
+            setBanExpiresAt(data.banExpiresAt || null);
           }
           accessTokenRef.current = null;
           setRealUser(null);
@@ -93,6 +97,13 @@ export default function UserProvider({ children }) {
   useEffect(() => {
     refreshSession().finally(() => setLoading(false));
   }, [refreshSession]);
+
+  // Apply equipped appTheme on user load
+  useEffect(() => {
+    if (realUser?.equippedItems?.appTheme?.cssData) {
+      window.dispatchEvent(new CustomEvent("apply-app-theme", { detail: realUser.equippedItems.appTheme }));
+    }
+  }, [realUser?.equippedItems?.appTheme]);
 
   // Fetch wrapper that adds Authorization header and auto-refreshes on 401
   const authFetch = useCallback(async (url, options = {}) => {
@@ -129,6 +140,8 @@ export default function UserProvider({ children }) {
       if (res.status === 403 && data.banned) {
         setIsBanned(true);
         setBannedUsername(data.username || username);
+        setBanReason(data.banReason || null);
+        setBanExpiresAt(data.banExpiresAt || null);
         return null;
       }
       throw new Error(data.error || "Ошибка входа");
@@ -173,6 +186,8 @@ export default function UserProvider({ children }) {
     setPreview(null);
     setIsBanned(false);
     setBannedUsername(null);
+    setBanReason(null);
+    setBanExpiresAt(null);
   }, []);
 
   // Проверка прав: ALL (AND) — проверяет по реальным правам если в preview, чтобы hasPermission("roles.preview") работал корректно
@@ -195,7 +210,8 @@ export default function UserProvider({ children }) {
 
   return (
     <UserContext.Provider value={{
-      user, loading, isBanned, bannedUsername, login, register, verify, logout, authFetch,
+      user, loading, isBanned, bannedUsername, banReason, banExpiresAt,
+      login, register, verify, logout, authFetch,
       hasPermission, hasAnyPermission, hasRealPermission, updateUser,
       startPreview, stopPreview, isPreviewMode, previewRole: preview?.role || null,
     }}>

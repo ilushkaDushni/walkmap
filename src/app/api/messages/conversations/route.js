@@ -18,6 +18,7 @@ export async function GET(request) {
         $or: [
           { conversationKey: { $regex: `^${userId}_` } },
           { conversationKey: { $regex: `_${userId}$` } },
+          { conversationKey: `admin_${userId}` },
         ],
       },
     },
@@ -40,11 +41,13 @@ export async function GET(request) {
     { $sort: { "lastMessage.createdAt": -1 } },
   ]).toArray();
 
-  // Собираем ID собеседников
-  const friendIds = conversations.map((c) => {
+  // Собираем ID собеседников (для не-admin диалогов)
+  const friendIds = [];
+  for (const c of conversations) {
+    if (c._id.startsWith("admin_")) continue;
     const parts = c._id.split("_");
-    return parts[0] === userId ? parts[1] : parts[0];
-  });
+    friendIds.push(parts[0] === userId ? parts[1] : parts[0]);
+  }
 
   // Загружаем данные собеседников
   const friends = friendIds.length > 0
@@ -60,10 +63,29 @@ export async function GET(request) {
   }
 
   const serialized = conversations.map((c) => {
+    const isAdmin = c._id.startsWith("admin_");
+    const msg = c.lastMessage;
+
+    if (isAdmin) {
+      return {
+        conversationKey: c._id,
+        friendId: userId,
+        friendUsername: "Администрация",
+        friendAvatarUrl: null,
+        isAdminConversation: true,
+        lastMessage: {
+          text: msg.text,
+          senderId: msg.senderId,
+          createdAt: msg.createdAt,
+          type: msg.type,
+        },
+        unread: c.unread,
+      };
+    }
+
     const parts = c._id.split("_");
     const friendId = parts[0] === userId ? parts[1] : parts[0];
     const friend = friendMap[friendId] || {};
-    const msg = c.lastMessage;
 
     return {
       conversationKey: c._id,

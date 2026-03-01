@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Users, UserPlus, Search, MessageCircle, Check, X, Clock, Eye } from "lucide-react";
+import { Users, UserPlus, Search, MessageCircle, Check, X, Clock, Eye, Shield } from "lucide-react";
 import { useUser } from "@/components/UserProvider";
 import UserAvatar from "@/components/UserAvatar";
 import ChatView from "@/components/ChatView";
@@ -25,6 +25,8 @@ export default function FriendsPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [chatFriendId, setChatFriendId] = useState(null);
+  const [adminChatOpen, setAdminChatOpen] = useState(false);
+  const [adminConversation, setAdminConversation] = useState(null); // { unread }
   const [unreadMap, setUnreadMap] = useState({}); // { friendId: count }
   const [contextMenu, setContextMenu] = useState(null); // { x, y, friend }
   const contextRef = useRef(null);
@@ -65,10 +67,16 @@ export default function FriendsPage() {
       if (res.ok) {
         const data = await res.json();
         const map = {};
+        let adminConv = null;
         for (const c of data.conversations || []) {
+          if (c.isAdminConversation) {
+            adminConv = { unread: c.unread };
+            continue;
+          }
           if (c.unread > 0) map[c.friendId] = c.unread;
         }
         setUnreadMap(map);
+        setAdminConversation(adminConv);
       }
     } catch { /* ignore */ }
   }, [authFetch]);
@@ -86,8 +94,16 @@ export default function FriendsPage() {
       const friendId = e.detail?.friendId;
       if (friendId) setChatFriendId(friendId);
     };
+    const adminHandler = () => {
+      setChatFriendId(null);
+      setAdminChatOpen(true);
+    };
     window.addEventListener("open-chat", handler);
-    return () => window.removeEventListener("open-chat", handler);
+    window.addEventListener("open-admin-chat", adminHandler);
+    return () => {
+      window.removeEventListener("open-chat", handler);
+      window.removeEventListener("open-admin-chat", adminHandler);
+    };
   }, []);
 
   const handleSearch = useCallback(async (q) => {
@@ -163,8 +179,27 @@ export default function FriendsPage() {
     } catch { /* ignore */ }
   };
 
+  // При открытии чата — сразу убираем бейдж непрочитанных для этого друга
+  useEffect(() => {
+    if (!chatFriendId) return;
+    setUnreadMap((prev) => {
+      if (!prev[chatFriendId]) return prev;
+      const next = { ...prev };
+      delete next[chatFriendId];
+      return next;
+    });
+  }, [chatFriendId]);
+
+  // При открытии admin чата — убираем бейдж
+  useEffect(() => {
+    if (adminChatOpen) {
+      setAdminConversation((prev) => prev ? { ...prev, unread: 0 } : prev);
+    }
+  }, [adminChatOpen]);
+
   const handleCloseChat = useCallback(() => {
     setChatFriendId(null);
+    setAdminChatOpen(false);
     loadUnread();
   }, [loadUnread]);
 
@@ -192,7 +227,10 @@ export default function FriendsPage() {
     );
   }
 
-  const chatFriend = friends.find((f) => f.id === chatFriendId);
+  const chatFriend = adminChatOpen
+    ? { username: "Администрация" }
+    : friends.find((f) => f.id === chatFriendId);
+  const activeChatId = adminChatOpen ? user.id : chatFriendId;
 
   const renderTabs = () => (
     <div className="flex gap-1 mb-4 rounded-2xl bg-[var(--bg-elevated)] p-1">
@@ -221,7 +259,7 @@ export default function FriendsPage() {
   const renderFriendItem = (f) => (
     <button
       key={f.id}
-      onClick={() => setChatFriendId(f.id)}
+      onClick={() => { setAdminChatOpen(false); setChatFriendId(f.id); }}
       onContextMenu={(e) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, friend: f });
@@ -252,7 +290,33 @@ export default function FriendsPage() {
     <>
       {tab === "friends" && (
         <div className="space-y-2">
-          {friends.length === 0 ? (
+          {/* Закреплённый элемент "Администрация" */}
+          {adminConversation && (
+            <button
+              onClick={() => { setChatFriendId(null); setAdminChatOpen(true); }}
+              className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 ${
+                adminChatOpen ? "ring-2 ring-red-500" : ""
+              }`}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/15 shrink-0">
+                <Shield className="h-5 w-5 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-500">Администрация</p>
+                <p className="text-xs text-[var(--text-muted)] truncate">Чат с поддержкой</p>
+              </div>
+              <div className="relative shrink-0">
+                <MessageCircle className="h-4 w-4 text-[var(--text-muted)]" />
+                {adminConversation.unread > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                    {adminConversation.unread > 99 ? "99+" : adminConversation.unread}
+                  </span>
+                )}
+              </div>
+            </button>
+          )}
+
+          {friends.length === 0 && !adminConversation ? (
             <div className="py-12 text-center">
               <Users className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-3 opacity-40" />
               <p className="text-sm text-[var(--text-muted)]">У вас пока нет друзей</p>
@@ -410,12 +474,13 @@ export default function FriendsPage() {
   return (
     <>
       {/* Mobile: overlay чат */}
-      {chatFriendId && (
+      {activeChatId && (
         <div className="md:hidden">
           <ChatView
-            friendId={chatFriendId}
+            friendId={activeChatId}
             friend={chatFriend}
             onBack={handleCloseChat}
+            adminMode={adminChatOpen}
           />
         </div>
       )}
@@ -431,12 +496,13 @@ export default function FriendsPage() {
 
         {/* Чат или пустое состояние */}
         <div className="flex-1 min-w-0">
-          {chatFriendId ? (
+          {activeChatId ? (
             <ChatView
-              friendId={chatFriendId}
+              friendId={activeChatId}
               friend={chatFriend}
               onBack={handleCloseChat}
               inline
+              adminMode={adminChatOpen}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
@@ -448,7 +514,7 @@ export default function FriendsPage() {
       </div>
 
       {/* Mobile: обычный layout */}
-      <div className={`md:hidden ${chatFriendId ? "hidden" : ""}`}>
+      <div className={`md:hidden ${activeChatId ? "hidden" : ""}`}>
         <div className="px-4 py-4 max-w-lg mx-auto">
           <h1 className="text-xl font-bold text-[var(--text-primary)] mb-4">Друзья</h1>
           {renderTabs()}

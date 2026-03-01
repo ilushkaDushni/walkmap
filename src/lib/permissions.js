@@ -25,6 +25,7 @@ export const PERMISSION_REGISTRY = {
   "shop.manage":            { label: "Управление магазином",    group: "Магазин" },
   "shop.edit":              { label: "Редактирование товаров",  group: "Магазин" },
   "feedback.manage":        { label: "Управление обращениями",  group: "Поддержка" },
+  "reviews.manage":         { label: "Управление отзывами",     group: "Отзывы" },
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_REGISTRY);

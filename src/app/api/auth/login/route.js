@@ -24,7 +24,22 @@ export async function POST(request) {
   }
 
   if (user.banned && !isSuperadmin(user)) {
-    return NextResponse.json({ error: "Аккаунт заблокирован", banned: true, username: user.username }, { status: 403 });
+    // Проверка истёкшего бана
+    if (user.banExpiresAt && new Date(user.banExpiresAt) <= new Date()) {
+      await db.collection("users").updateOne(
+        { _id: user._id },
+        { $set: { banned: false, banReason: null, bannedAt: null, bannedBy: null, banExpiresAt: null } }
+      );
+      // Бан истёк — продолжаем логин
+    } else {
+      return NextResponse.json({
+        error: "Аккаунт заблокирован",
+        banned: true,
+        username: user.username,
+        banReason: user.banReason || null,
+        banExpiresAt: user.banExpiresAt || null,
+      }, { status: 403 });
+    }
   }
 
   const userId = user._id.toString();

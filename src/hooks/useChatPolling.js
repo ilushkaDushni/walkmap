@@ -5,7 +5,7 @@ import { useUser } from "@/components/UserProvider";
 
 let tempIdCounter = 0;
 
-export default function useChatPolling(conversationKey, { interval = 5000, enabled = true } = {}) {
+export default function useChatPolling(conversationKey, { interval = 5000, enabled = true, adminMode = false } = {}) {
   const { authFetch } = useUser();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +153,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
       const res = await authFetch(`/api/messages/${conversationKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, routeId, replyToId }),
+        body: JSON.stringify({ text, routeId, replyToId, adminMode: adminMode || undefined }),
       });
       if (res.ok) {
         const msg = await res.json();
@@ -174,7 +174,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
       );
     }
     return null;
-  }, [authFetch, conversationKey]);
+  }, [authFetch, conversationKey, adminMode]);
 
   // Retry failed message
   const retryMessage = useCallback(async (tempId) => {
@@ -189,7 +189,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
       const res = await authFetch(`/api/messages/${conversationKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg.text, routeId: msg.routeId, replyToId: msg.replyToId }),
+        body: JSON.stringify({ text: msg.text, routeId: msg.routeId, replyToId: msg.replyToId, adminMode: adminMode || undefined }),
       });
       if (res.ok) {
         const serverMsg = await res.json();

@@ -51,6 +51,7 @@ export async function GET(request, { params }) {
 
   return NextResponse.json({
     id: ticket._id.toString(),
+    ticketNumber: ticket.ticketNumber || null,
     subject: ticket.subject,
     status: ticket.status,
     userId: ticket.userId,
@@ -66,6 +67,7 @@ export async function GET(request, { params }) {
       senderType: m.senderType,
       sender: senderMap[m.senderId] || { username: "Удалён", avatarUrl: null },
       text: m.text,
+      imageUrl: m.imageUrl || null,
       createdAt: m.createdAt,
     })),
   });

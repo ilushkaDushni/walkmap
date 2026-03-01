@@ -4,7 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserProvider";
 import UserAvatar from "@/components/UserAvatar";
-import { ArrowLeft, Search, LifeBuoy, Send, X, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Search, LifeBuoy, Send, X, Lock, Unlock, Smile, Paperclip } from "lucide-react";
+
+const EMOJI_LIST = [
+  "😊", "👍", "❤️", "🎉", "✅", "👋", "🙏", "💪",
+  "🔥", "⭐", "💡", "🚀", "😄", "😅", "🤔", "👀",
+  "✨", "💬", "📌", "🛠️", "⚡", "🎯", "📝", "🤝",
+  "😉", "👌", "💯", "🙂", "☺️", "🫡",
+];
 
 function timeAgo(date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -35,7 +42,12 @@ export default function AdminTicketsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replying, setReplying] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState(null);
   const messagesEndRef = useRef(null);
+  const replyInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!loading && !hasPermission("feedback.manage")) {
@@ -81,6 +93,8 @@ export default function AdminTicketsPage() {
     setSelectedId(ticketId);
     setLoadingDetail(true);
     setReplyText("");
+    setShowEmoji(false);
+    setPendingImageUrl(null);
     try {
       const res = await authFetch(`/api/admin/tickets/${ticketId}`);
       if (res.ok) setDetail(await res.json());
@@ -91,6 +105,24 @@ export default function AdminTicketsPage() {
     }
   };
 
+  // Polling: обновлять сообщения каждые 5 секунд при открытом тикете
+  useEffect(() => {
+    if (!selectedId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`/api/admin/tickets/${selectedId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDetail((prev) => {
+            if (!prev || data.messages?.length !== prev.messages?.length) return data;
+            return prev;
+          });
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedId, authFetch]);
+
   useEffect(() => {
     if (detail?.messages) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -99,16 +131,18 @@ export default function AdminTicketsPage() {
 
   const handleReply = async () => {
     const text = replyText.trim();
-    if (!text || !selectedId) return;
+    if ((!text && !pendingImageUrl) || !selectedId) return;
     setReplying(true);
     try {
       const res = await authFetch(`/api/admin/tickets/${selectedId}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, imageUrl: pendingImageUrl }),
       });
       if (res.ok) {
         setReplyText("");
+        setPendingImageUrl(null);
+        setShowEmoji(false);
         await loadDetail(selectedId);
         fetchTickets();
       }
@@ -135,6 +169,32 @@ export default function AdminTicketsPage() {
     } catch {
       // ignore
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "photo");
+      const res = await authFetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (res.ok) setPendingImageUrl(data.url);
+    } catch {
+      // ignore
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const insertEmoji = (emoji) => {
+    setReplyText((prev) => prev + emoji);
+    setShowEmoji(false);
+    replyInputRef.current?.focus();
   };
 
   if (loading || !hasPermission("feedback.manage")) return null;
@@ -196,7 +256,10 @@ export default function AdminTicketsPage() {
                 <>
                   <UserAvatar username={detail.user?.username || "?"} avatarUrl={detail.user?.avatarUrl} size="sm" />
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-[var(--text-primary)] truncate">{detail.subject}</p>
+                    <p className="text-sm font-bold text-[var(--text-primary)] truncate">
+                      {detail.ticketNumber && <span className="text-teal-500">#{detail.ticketNumber} </span>}
+                      {detail.subject}
+                    </p>
                     <p className="text-[10px] text-[var(--text-muted)]">{detail.user?.username} · {detail.user?.email}</p>
                   </div>
                   {statusBadge(detail.status)}
@@ -237,7 +300,10 @@ export default function AdminTicketsPage() {
                         <p className="text-[10px] font-bold mb-0.5" style={{ color: isAdmin ? "#14b8a6" : "var(--text-muted)" }}>
                           {m.sender?.username || "Удалён"} {isAdmin && "· Поддержка"}
                         </p>
-                        <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>
+                        {m.imageUrl && (
+                          <img src={m.imageUrl} alt="" className="rounded-xl max-w-full mb-1 cursor-pointer" onClick={() => window.open(m.imageUrl, "_blank")} />
+                        )}
+                        {m.text && <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>}
                         <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
                       </div>
                     </div>
@@ -248,8 +314,41 @@ export default function AdminTicketsPage() {
 
               {/* Ответ */}
               <div className="px-4 py-3 border-t border-[var(--border-color)]">
-                <div className="flex gap-2">
+                {pendingImageUrl && (
+                  <div className="relative inline-block mb-2">
+                    <img src={pendingImageUrl} alt="" className="h-16 rounded-lg" />
+                    <button onClick={() => setPendingImageUrl(null)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                {/* Эмодзи-пикер */}
+                {showEmoji && (
+                  <div className="mb-2 p-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] grid grid-cols-10 gap-1">
+                    {EMOJI_LIST.map((e) => (
+                      <button key={e} onClick={() => insertEmoji(e)} className="text-lg hover:scale-125 transition p-0.5">
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 items-end">
+                  <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-50"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowEmoji((v) => !v)}
+                    className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg transition ${showEmoji ? "text-teal-500 bg-teal-500/10" : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"}`}
+                  >
+                    <Smile className="h-4 w-4" />
+                  </button>
                   <input
+                    ref={replyInputRef}
                     type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value.slice(0, 1000))}
@@ -259,7 +358,7 @@ export default function AdminTicketsPage() {
                   />
                   <button
                     onClick={handleReply}
-                    disabled={replying || !replyText.trim()}
+                    disabled={replying || (!replyText.trim() && !pendingImageUrl)}
                     className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-teal-500 text-white transition hover:bg-teal-600 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
@@ -296,6 +395,7 @@ export default function AdminTicketsPage() {
               <UserAvatar username={t.user?.username || "?"} avatarUrl={t.user?.avatarUrl} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
+                  {t.ticketNumber && <span className="text-[10px] font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
                   <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
                   {statusBadge(t.status)}
                 </div>

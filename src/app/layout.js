@@ -8,6 +8,7 @@ import MessageToast from "@/components/MessageToast";
 import NotificationBell from "@/components/NotificationBell";
 import LobbyController from "@/components/LobbyController";
 import UpdateModal from "@/components/UpdateModal";
+import TutorialOverlay from "@/components/TutorialOverlay";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
 import NavigationGuardProvider from "@/components/NavigationGuardProvider";
@@ -42,7 +43,7 @@ export default function RootLayout({ children }) {
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}`,
+            __html: `try{const t=localStorage.getItem('theme');document.documentElement.setAttribute('data-theme',t||'light')}catch(e){}`,
           }}
         />
       </head>
@@ -83,6 +84,7 @@ export default function RootLayout({ children }) {
 
             {/* Нижняя навигация */}
             <BottomNav />
+            <TutorialOverlay />
           </NavigationGuardProvider>
           </UserProvider>
         </ThemeProvider>

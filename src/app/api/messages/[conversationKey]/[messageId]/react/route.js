@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
+import { isAdminConversationKey, getTargetUserIdFromAdminKey } from "@/lib/conversationAccess";
+import { resolveUserPermissions } from "@/lib/permissions";
 
 const ALLOWED_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
@@ -13,9 +15,19 @@ export async function PATCH(request, { params }) {
   const { conversationKey, messageId } = await params;
   const userId = auth.user._id.toString();
 
-  const parts = conversationKey.split("_");
-  if (!parts.includes(userId)) {
-    return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
+  if (isAdminConversationKey(conversationKey)) {
+    const targetUserId = getTargetUserIdFromAdminKey(conversationKey);
+    if (userId !== targetUserId) {
+      const perms = await resolveUserPermissions(auth.user);
+      if (!perms.includes("users.view")) {
+        return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
+      }
+    }
+  } else {
+    const parts = conversationKey.split("_");
+    if (!parts.includes(userId)) {
+      return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
+    }
   }
 
   const { emoji } = await request.json();

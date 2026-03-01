@@ -15,9 +15,21 @@ export async function POST(request) {
   }
 
   const db = await getDb();
+
+  // Rate limiting: макс 5 попыток ввода кода за 15 минут
+  const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+  const attempts = await db.collection("reset_attempts").countDocuments({
+    email,
+    createdAt: { $gt: fifteenMinAgo },
+  });
+  if (attempts >= 5) {
+    return NextResponse.json({ error: "Слишком много попыток, подождите 15 минут" }, { status: 429 });
+  }
+
   const reset = await db.collection("password_resets").findOne({ email, code });
 
   if (!reset) {
+    await db.collection("reset_attempts").insertOne({ email, createdAt: new Date() });
     return NextResponse.json({ error: "Неверный код" }, { status: 400 });
   }
 

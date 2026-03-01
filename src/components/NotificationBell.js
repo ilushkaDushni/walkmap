@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users, Coins, LifeBuoy } from "lucide-react";
+import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck, Gift, Megaphone, Users, Coins, LifeBuoy, PackageMinus, PackagePlus, ShieldAlert } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useUnreadCount from "@/hooks/useUnreadCount";
@@ -34,6 +34,9 @@ const ICON_MAP = {
   coin_admin: Coins,
   admin_broadcast: Megaphone,
   ticket_reply: LifeBuoy,
+  item_revoke: PackageMinus,
+  item_gift: PackagePlus,
+  profanity_alert: ShieldAlert,
 };
 
 const COLOR_MAP = {
@@ -47,6 +50,9 @@ const COLOR_MAP = {
   coin_admin: "text-amber-500",
   admin_broadcast: "text-red-500",
   ticket_reply: "text-teal-500",
+  item_revoke: "text-red-500",
+  item_gift: "text-green-500",
+  profanity_alert: "text-orange-500",
 };
 
 function getNotificationText(n) {
@@ -74,6 +80,12 @@ function getNotificationText(n) {
       return d.message || "Объявление от администрации";
     case "ticket_reply":
       return "Поддержка ответила на ваше обращение";
+    case "item_revoke":
+      return `Предмет «${d.itemName || "?"}» изъят. Причина: ${d.reason || "не указана"}`;
+    case "item_gift":
+      return `Администратор подарил вам «${d.itemName || "?"}»!`;
+    case "profanity_alert":
+      return `${d.username || "Кто-то"} попытался опубликовать нецензурный комментарий`;
     default:
       return "Новое уведомление";
   }
@@ -96,6 +108,12 @@ function getNotificationLink(n) {
       return null;
     case "ticket_reply":
       return null;
+    case "item_revoke":
+      return null;
+    case "item_gift":
+      return null;
+    case "profanity_alert":
+      return d.routeId ? `/routes/${d.routeId}` : null;
     default:
       return null;
   }
@@ -333,7 +351,7 @@ export default function NotificationBell({ inline = false }) {
             {notifications.map((n) => {
               const Icon = ICON_MAP[n.type] || Bell;
               const colorCls = COLOR_MAP[n.type] || "text-[var(--text-secondary)]";
-              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin" || n.type === "new_message" || n.type === "ticket_reply";
+              const hasLink = !!getNotificationLink(n) || (n.type === "achievement" && n.data?.slug) || n.type === "coin_gift" || n.type === "coin_admin" || n.type === "new_message" || n.type === "ticket_reply" || n.type === "profanity_alert";
               return (
                 <div
                   key={n.id}
@@ -349,10 +367,16 @@ export default function NotificationBell({ inline = false }) {
                     <p className={`text-sm ${!n.read ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}>
                       {getNotificationText(n)}
                     </p>
-                    {n.data?.message && (n.type === "coin_gift" || n.type === "coin_admin") && (
+                    {n.data?.message && (n.type === "coin_gift" || n.type === "coin_admin" || n.type === "item_gift") && (
                       <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.message}&raquo;</p>
                     )}
+                    {n.type === "item_revoke" && n.data?.refundRoutiks > 0 && (
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">Возврат: {n.data.refundRoutiks} руб.</p>
+                    )}
                     {n.type === "new_message" && n.data?.text && (
+                      <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.text}&raquo;</p>
+                    )}
+                    {n.type === "profanity_alert" && n.data?.text && (
                       <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.text}&raquo;</p>
                     )}
                     <span className="text-[10px] text-[var(--text-muted)] mt-0.5">{timeAgo(n.createdAt)}</span>
@@ -482,6 +506,7 @@ export default function NotificationBell({ inline = false }) {
     return (
       <div className="relative">
         <button
+          data-tutorial="notifications"
           onClick={() => { setFromTop(false); setOpen(!open); }}
           className="relative flex h-10 w-10 items-center justify-center rounded-xl hover:bg-[var(--bg-elevated)] transition"
         >
@@ -510,6 +535,7 @@ export default function NotificationBell({ inline = false }) {
   return (
     <>
       <button
+        data-tutorial="notifications"
         onClick={() => { setFromTop(false); setOpen(!open); }}
         className="fixed bottom-24 right-4 z-[55] flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-lg transition-all hover:scale-105 active:scale-95"
       >

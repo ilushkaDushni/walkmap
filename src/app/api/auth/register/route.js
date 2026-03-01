@@ -2,6 +2,7 @@ import { getDb } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
+import { randomInt } from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -14,6 +15,11 @@ export async function POST(request) {
 
   if (password.length < 6) {
     return NextResponse.json({ error: "Пароль минимум 6 символов" }, { status: 400 });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
   }
 
   const db = await getDb();
@@ -30,8 +36,8 @@ export async function POST(request) {
     return NextResponse.json({ error: "Логин уже занят" }, { status: 409 });
   }
 
-  // Генерация 6-значного кода
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  // Генерация 6-значного кода (криптографически стойкий)
+  const code = randomInt(100000, 1000000).toString();
   const passwordHash = await bcrypt.hash(password, 10);
 
   // Сохраняем pending-верификацию (перезаписываем если уже есть)

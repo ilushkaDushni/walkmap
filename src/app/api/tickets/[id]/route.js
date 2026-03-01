@@ -30,8 +30,25 @@ export async function GET(request, { params }) {
     .sort({ createdAt: 1 })
     .toArray();
 
+  // Lookup admin senders for admin messages
+  const adminSenderIds = [...new Set(messages.filter((m) => m.senderType === "admin").map((m) => m.senderId))];
+  const senderMap = {};
+  if (adminSenderIds.length > 0) {
+    const senders = await db
+      .collection("users")
+      .find(
+        { _id: { $in: adminSenderIds.map((sid) => new ObjectId(sid)) } },
+        { projection: { username: 1, avatarUrl: 1 } }
+      )
+      .toArray();
+    for (const s of senders) {
+      senderMap[s._id.toString()] = { username: s.username, avatarUrl: s.avatarUrl || null };
+    }
+  }
+
   return NextResponse.json({
     id: ticket._id.toString(),
+    ticketNumber: ticket.ticketNumber || null,
     subject: ticket.subject,
     status: ticket.status,
     createdAt: ticket.createdAt,
@@ -42,6 +59,8 @@ export async function GET(request, { params }) {
       senderId: m.senderId,
       senderType: m.senderType,
       text: m.text,
+      imageUrl: m.imageUrl || null,
+      sender: m.senderType === "admin" ? (senderMap[m.senderId] || { username: "Поддержка", avatarUrl: null }) : null,
       createdAt: m.createdAt,
     })),
   });

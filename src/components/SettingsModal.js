@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { X, Moon, Sun, Bell, Globe, Info } from "lucide-react";
+import { X, Bell, Globe, Info, GraduationCap } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import ThemePicker from "./ThemePicker";
 import { APP_VERSION } from "@/lib/version";
 
 export default function SettingsModal({ isOpen, onClose }) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (isOpen) {
@@ -44,21 +44,10 @@ export default function SettingsModal({ isOpen, onClose }) {
           <h2 className="mb-4 text-lg font-bold text-[var(--text-primary)]">Настройки</h2>
 
           <div className="space-y-3">
-            {/* Переключатель темы */}
-            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
-              <div className="flex items-center gap-3">
-                {isDark ? (
-                  <Moon className="h-5 w-5 text-[var(--text-secondary)]" />
-                ) : (
-                  <Sun className="h-5 w-5 text-[var(--text-secondary)]" />
-                )}
-                <span className="text-sm text-[var(--text-secondary)]">Тёмная тема</span>
-              </div>
-              <button onClick={toggleTheme} className="relative">
-                <div className={`h-6 w-10 rounded-full p-0.5 transition-colors ${isDark ? "bg-green-500" : "bg-[var(--bg-main)]"}`}>
-                  <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${isDark ? "translate-x-4" : "translate-x-0"}`} />
-                </div>
-              </button>
+            {/* Тема оформления */}
+            <div className="rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+              <span className="text-sm text-[var(--text-secondary)] block mb-2">Тема оформления</span>
+              <ThemePicker currentTheme={theme} onSelect={setTheme} />
             </div>
 
             <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 opacity-60">
@@ -76,6 +65,20 @@ export default function SettingsModal({ isOpen, onClose }) {
               </div>
               <span className="rounded-full bg-[var(--bg-main)] px-2 py-0.5 text-xs text-[var(--text-muted)]">Скоро</span>
             </div>
+
+            <button
+              onClick={() => {
+                onClose();
+                setTimeout(() => window.dispatchEvent(new Event("start-tutorial")), 300);
+              }}
+              className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
+            >
+              <div className="flex items-center gap-3">
+                <GraduationCap className="h-5 w-5 text-[var(--text-secondary)]" />
+                <span className="text-sm text-[var(--text-secondary)]">Пройти обучение</span>
+              </div>
+              <span className="text-sm text-[var(--text-muted)]">&rarr;</span>
+            </button>
 
             <button
               onClick={() => {

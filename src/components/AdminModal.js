@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag, LifeBuoy } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag, LifeBuoy, Mail } from "lucide-react";
 import { useUser } from "./UserProvider";
 import { useNavigationGuard } from "./NavigationGuardProvider";
 
@@ -10,10 +10,23 @@ export default function AdminModal({ isOpen, onClose }) {
   const { navigate } = useNavigationGuard();
   const [migrateStatus, setMigrateStatus] = useState(null); // null | "loading" | "done" | "error"
   const [migrateLog, setMigrateLog] = useState([]);
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
+  const [adminMsgCount, setAdminMsgCount] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      // Загрузить количество открытых тикетов и непрочитанных сообщений
+      if (hasPermission("feedback.manage")) {
+        authFetch("/api/admin/tickets/unread-count")
+          .then((r) => r.json())
+          .then((d) => setOpenTicketsCount(d.count || 0))
+          .catch(() => {});
+        authFetch("/api/admin/messages/unread-count")
+          .then((r) => r.json())
+          .then((d) => setAdminMsgCount(d.count || 0))
+          .catch(() => {});
+      }
     } else {
       document.body.style.overflow = "";
       setMigrateStatus(null);
@@ -110,11 +123,20 @@ export default function AdminModal({ isOpen, onClose }) {
       visible: hasPermission("shop.manage"),
     },
     {
+      icon: Mail,
+      title: "Сообщения",
+      description: "Чат с пользователями",
+      action: () => { navigate("/admin/messages"); onClose(); },
+      visible: hasPermission("feedback.manage"),
+      badge: adminMsgCount > 0 ? adminMsgCount : null,
+    },
+    {
       icon: LifeBuoy,
       title: "Обращения",
       description: "Ответы на обращения пользователей",
       action: () => { navigate("/admin/tickets"); onClose(); },
       visible: hasPermission("feedback.manage"),
+      badge: openTicketsCount > 0 ? openTicketsCount : null,
     },
   ].filter((s) => s.visible);
 
@@ -147,15 +169,20 @@ export default function AdminModal({ isOpen, onClose }) {
 
           {/* Секции */}
           <div className="space-y-2">
-            {sections.map(({ icon: Icon, title, description, action }) => (
+            {sections.map(({ icon: Icon, title, description, action, badge }) => (
               <button
                 key={title}
                 onClick={action || undefined}
                 disabled={!action}
                 className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-4 text-left transition hover:opacity-80 disabled:opacity-50"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)]">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)]">
                   <Icon className="h-5 w-5 text-[var(--text-secondary)]" />
+                  {badge != null && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {badge}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>

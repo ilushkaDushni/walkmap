@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+:root,
+[data-theme="dark"] {
   --bg-main: #2a2a2a;
   --bg-surface: #353535;
   --bg-elevated: #4a4a4a;
@@ -22,6 +23,126 @@
   --text-secondary: #666666;
   --text-muted: #999999;
   --border-color: #e0e0e0;
+}
+
+[data-theme="midnight"] {
+  --bg-main: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-elevated: #334155;
+  --bg-subtle: #162033;
+  --bg-header: #0b1120;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #334155;
+}
+
+[data-theme="forest"] {
+  --bg-main: #0f1f15;
+  --bg-surface: #1a2e22;
+  --bg-elevated: #2d4a38;
+  --bg-subtle: #15281c;
+  --bg-header: #0a1810;
+  --text-primary: #d1e7dd;
+  --text-secondary: #8fb89e;
+  --text-muted: #5e8a6e;
+  --border-color: #2d4a38;
+}
+
+[data-theme="sunset"] {
+  --bg-main: #1c1210;
+  --bg-surface: #2a1f1a;
+  --bg-elevated: #3d2e25;
+  --bg-subtle: #221815;
+  --bg-header: #150e0c;
+  --text-primary: #f0ddd5;
+  --text-secondary: #b89a8a;
+  --text-muted: #8a6e5e;
+  --border-color: #3d2e25;
+}
+
+[data-theme="lavender"] {
+  --bg-main: #f0e6ff;
+  --bg-surface: #faf5ff;
+  --bg-elevated: #ede5f5;
+  --bg-subtle: #f5eeff;
+  --bg-header: #faf5ff;
+  --text-primary: #2d1b4e;
+  --text-secondary: #6b5b7b;
+  --text-muted: #9b8aab;
+  --border-color: #d8cce8;
+}
+
+[data-theme="rose"] {
+  --bg-main: #fce4ec;
+  --bg-surface: #fff0f4;
+  --bg-elevated: #f8d2dc;
+  --bg-subtle: #fdeef2;
+  --bg-header: #fff0f4;
+  --text-primary: #5c1a2a;
+  --text-secondary: #8b4a5e;
+  --text-muted: #b88a98;
+  --border-color: #f0c0cc;
+}
+
+[data-theme="peach"] {
+  --bg-main: #fff5ee;
+  --bg-surface: #fffaf7;
+  --bg-elevated: #f5e6d8;
+  --bg-subtle: #fff8f2;
+  --bg-header: #fffaf7;
+  --text-primary: #4a2c1a;
+  --text-secondary: #7b5b4b;
+  --text-muted: #ab8a7a;
+  --border-color: #e8d5c5;
+}
+
+[data-theme="ocean"] {
+  --bg-main: #e8f4f8;
+  --bg-surface: #f5fbff;
+  --bg-elevated: #d5e8ef;
+  --bg-subtle: #edf6fa;
+  --bg-header: #f5fbff;
+  --text-primary: #1a3545;
+  --text-secondary: #4b6b7b;
+  --text-muted: #7a99a8;
+  --border-color: #c5d8e5;
+}
+
+[data-theme="mint"] {
+  --bg-main: #e8f5f0;
+  --bg-surface: #f5fffa;
+  --bg-elevated: #d5ebe2;
+  --bg-subtle: #edf8f3;
+  --bg-header: #f5fffa;
+  --text-primary: #1a3a2a;
+  --text-secondary: #4b7b5b;
+  --text-muted: #7aab8a;
+  --border-color: #c5e5d5;
+}
+
+[data-theme="sand"] {
+  --bg-main: #f5f0e8;
+  --bg-surface: #fffcf5;
+  --bg-elevated: #ebe2d5;
+  --bg-subtle: #f8f3eb;
+  --bg-header: #fffcf5;
+  --text-primary: #3a2e1a;
+  --text-secondary: #7b6b4b;
+  --text-muted: #ab9a7a;
+  --border-color: #e5d8c5;
+}
+
+[data-theme="sky"] {
+  --bg-main: #eaf2ff;
+  --bg-surface: #f5f9ff;
+  --bg-elevated: #dbe6f5;
+  --bg-subtle: #eff5ff;
+  --bg-header: #f5f9ff;
+  --text-primary: #1a2540;
+  --text-secondary: #4b5b80;
+  --text-muted: #7a8ab0;
+  --border-color: #c8d5e8;
 }
 
 @theme inline {
@@ -91,6 +212,41 @@ button:focus, a:focus {
 
 .animate-slide-up {
   animation: slide-up 0.25s ease-out;
+}
+
+@keyframes slide-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+.animate-slide-out-down {
+  animation: slide-out-down 0.2s ease-in forwards;
+}
+
+/* Rules page staggered entrance */
+@keyframes rules-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.rules-animate {
+  opacity: 0;
+  animation: rules-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 0.07s);
 }
 
 @keyframes slide-down {
@@ -266,4 +422,101 @@ textarea::-webkit-scrollbar {
 }
 .animate-frame-rainbow {
   animation: frame-rainbow 4s linear infinite;
+}
+
+/* Дашборд: анимированный градиентный фон */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Дашборд: плавающие декоративные элементы */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Дашборд: блик (shine) на кнопке */
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: shine 4s ease-in-out infinite;
+}
+
+/* Дашборд: мягкое свечение */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
+}
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Счётчик "Сейчас гуляют" — пульсирующая зелёная точка */
+@keyframes online-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.4;
+  }
+}
+.animate-online-dot {
+  animation: online-pulse 2s ease-in-out infinite;
+}
+
+/* Dust particles — 4 варианта дрейфа */
+@keyframes dust-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: var(--dust-o, 0.3); }
+  90% { opacity: var(--dust-o, 0.3); }
+  25% { transform: translate(30px, -25px) scale(1.2); }
+  50% { transform: translate(-20px, -45px) scale(0.8); }
+  75% { transform: translate(25px, -15px) scale(1.1); }
+}
+@keyframes dust-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: var(--dust-o, 0.3); }
+  90% { opacity: var(--dust-o, 0.3); }
+  25% { transform: translate(-30px, -18px) scale(0.9); }
+  50% { transform: translate(25px, -40px) scale(1.3); }
+  75% { transform: translate(-20px, -28px) scale(1); }
+}
+@keyframes dust-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: var(--dust-o, 0.3); }
+  90% { opacity: var(--dust-o, 0.3); }
+  25% { transform: translate(18px, 12px) scale(1.1); }
+  50% { transform: translate(-28px, -22px) scale(0.9); }
+  75% { transform: translate(12px, -35px) scale(1.2); }
+}
+@keyframes dust-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
+  10% { opacity: var(--dust-o, 0.3); }
+  90% { opacity: var(--dust-o, 0.3); }
+  25% { transform: translate(-18px, -35px) scale(1.3); }
+  50% { transform: translate(35px, -12px) scale(0.8); }
+  75% { transform: translate(-12px, 18px) scale(1.1); }
 }

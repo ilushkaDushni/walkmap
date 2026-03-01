@@ -47,16 +47,31 @@ export async function POST(request) {
 
   // Проверка бана (суперадмин не может быть забанен)
   if (user.banned && !isSuperadmin(user)) {
-    await db.collection("refresh_tokens").deleteMany({ userId: stored.userId });
-    const res = NextResponse.json({ error: "Аккаунт заблокирован", banned: true, username: user.username }, { status: 403 });
-    res.cookies.set("refreshToken", "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
-    return res;
+    // Проверка истёкшего бана
+    if (user.banExpiresAt && new Date(user.banExpiresAt) <= new Date()) {
+      await db.collection("users").updateOne(
+        { _id: user._id },
+        { $set: { banned: false, banReason: null, bannedAt: null, bannedBy: null, banExpiresAt: null } }
+      );
+      // Бан истёк — продолжаем refresh нормально
+    } else {
+      await db.collection("refresh_tokens").deleteMany({ userId: stored.userId });
+      const res = NextResponse.json({
+        error: "Аккаунт заблокирован",
+        banned: true,
+        username: user.username,
+        banReason: user.banReason || null,
+        banExpiresAt: user.banExpiresAt || null,
+      }, { status: 403 });
+      res.cookies.set("refreshToken", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
+      return res;
+    }
   }
 
   // Rotate: delete old refresh token, create new one

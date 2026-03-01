@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon, Shield } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useChatPolling from "@/hooks/useChatPolling";
@@ -343,6 +343,15 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
             </div>
           )}
 
+          {/* Admin badge */}
+          {msg.type === "admin" && (
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500">
+                {msg.senderUsername ? `ОТ АДМИНА ${msg.senderUsername}` : "Администрация"}
+              </span>
+            </div>
+          )}
+
           {/* Text */}
           {msg.text && (
             <p className={`${isImageOnly ? "px-3 pt-1" : ""} ${fontClass} break-words whitespace-pre-wrap leading-snug`}>{msg.text}</p>
@@ -428,7 +437,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
   );
 }
 
-export default function ChatView({ friendId, friend, onBack, inline = false }) {
+export default function ChatView({ friendId, friend, onBack, inline = false, adminMode = false }) {
   const { user, authFetch: chatAuthFetch } = useUser();
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
@@ -445,7 +454,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   const topSentinelRef = useRef(null);
   const { count } = useUnreadCount();
 
-  const conversationKey = user ? [user.id, friendId].sort().join("_") : null;
+  const conversationKey = adminMode
+    ? `admin_${friendId}`
+    : user ? [user.id, friendId].sort().join("_") : null;
   const {
     messages, loading, hasMore, loadingOlder, typingUsers,
     sendMessage, sendImage, retryMessage, deleteMessage, toggleReaction,
@@ -453,6 +464,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   } = useChatPolling(conversationKey, {
     interval: 5000,
     enabled: !!conversationKey,
+    adminMode,
   });
 
   // Загрузка купленных тем чата
@@ -710,6 +722,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
   const friendOnline = isOnline(friend?.lastActivityAt);
   const friendStatus = formatLastSeen(friend?.lastActivityAt);
   const isTyping = typingUsers.length > 0;
+  const isAdminChatAsUser = adminMode && friendId === user?.id;
 
   return (
     <div className={inline ? "flex flex-col h-full bg-[var(--bg-surface)]" : "fixed inset-0 z-[56] bg-[var(--bg-surface)] flex flex-col"}>
@@ -722,19 +735,25 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <UserAvatar
-            username={friend?.username || "?"}
-            avatarUrl={friend?.avatarUrl}
-            size="sm"
-            online={friendOnline}
-          />
+          {isAdminChatAsUser ? (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/15 shrink-0">
+              <Shield className="h-4 w-4 text-red-500" />
+            </div>
+          ) : (
+            <UserAvatar
+              username={friend?.username || "?"}
+              avatarUrl={friend?.avatarUrl}
+              size="sm"
+              online={friendOnline}
+            />
+          )}
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate leading-tight">
-              {friend?.username || "Чат"}
+              {isAdminChatAsUser ? "Администрация" : (friend?.username || "Чат")}
             </p>
             {isTyping ? (
               <p className="text-[11px] leading-tight text-[var(--text-muted)]">печатает...</p>
-            ) : friend?.lastActivityAt != null ? (
+            ) : !isAdminChatAsUser && friend?.lastActivityAt != null ? (
               <p className={`text-[11px] leading-tight ${friendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
                 {friendStatus}
               </p>
@@ -770,7 +789,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-4 py-3"
         style={chatTheme.bg ? {
-          background: chatTheme.bg,
+          backgroundImage: chatTheme.bg,
           backgroundSize: chatTheme.bgSize || "auto",
         } : undefined}
       >
@@ -888,7 +907,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false }) {
 
       {/* Input */}
       <div className={`px-4 py-3 shrink-0 ${inline ? "" : "pb-[env(safe-area-inset-bottom,12px)]"}`}>
-        <div className={`flex items-end gap-2 max-w-2xl mx-auto ${inline ? "relative -left-40" : ""}`}>
+        <div className="flex items-end gap-2 max-w-2xl mx-auto">
           {/* Emoji button */}
           <div className="relative shrink-0">
             <button

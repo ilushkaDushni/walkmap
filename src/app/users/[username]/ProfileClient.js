@@ -301,7 +301,7 @@ export default function ProfileClient({ profile }) {
             {achievementSet.size}<span className="text-[var(--text-muted)]">/{ACHIEVEMENT_REGISTRY.length}</span>
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           {ACHIEVEMENT_REGISTRY.map((a) => {
             const Icon = ICON_MAP[a.icon] || Trophy;
             const colors = COLOR_CLASSES[a.color] || COLOR_CLASSES.blue;
@@ -310,7 +310,7 @@ export default function ProfileClient({ profile }) {
             return (
               <div
                 key={a.slug}
-                className={`flex flex-col items-center rounded-xl py-2.5 px-1 transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"}`}
+                className={`flex flex-col items-center rounded-xl py-2.5 px-1 w-[calc(33.333%-0.375rem)] sm:w-[calc(25%-0.375rem)] transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"}`}
                 title={`${a.title}: ${a.desc}`}
               >
                 <Icon className={`h-5 w-5 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />

@@ -640,6 +640,118 @@ export async function POST(request) {
       imageUrl: null,
     },
 
+    // ═══ ТЕМЫ ПРИЛОЖЕНИЯ ═══
+    {
+      name: "Океан",
+      slug: "apptheme-ocean",
+      category: "appTheme",
+      description: "Глубокий синий океан — тёмная тема для любителей моря",
+      price: 5,
+      rarity: "rare",
+      cssData: {
+        id: "ocean",
+        isDark: true,
+        "--bg-main": "#0a1628",
+        "--bg-surface": "#0f2035",
+        "--bg-elevated": "#1a3350",
+        "--bg-subtle": "#0d1b2e",
+        "--bg-header": "#071220",
+        "--text-primary": "#c8e0f4",
+        "--text-secondary": "#6b9cc8",
+        "--text-muted": "#3d6d96",
+        "--border-color": "#1a3350",
+      },
+      imageUrl: null,
+    },
+    {
+      name: "Вишня",
+      slug: "apptheme-cherry",
+      category: "appTheme",
+      description: "Тёмные вишнёвые тона — загадочно и стильно",
+      price: 5,
+      rarity: "rare",
+      cssData: {
+        id: "cherry",
+        isDark: true,
+        "--bg-main": "#1a0a10",
+        "--bg-surface": "#2a1520",
+        "--bg-elevated": "#3d2530",
+        "--bg-subtle": "#221018",
+        "--bg-header": "#140810",
+        "--text-primary": "#f0d0d8",
+        "--text-secondary": "#b87888",
+        "--text-muted": "#8a5565",
+        "--border-color": "#3d2530",
+      },
+      imageUrl: null,
+    },
+    {
+      name: "Нуар",
+      slug: "apptheme-noir",
+      category: "appTheme",
+      description: "Чистый чёрный — идеален для OLED экранов",
+      price: 8,
+      rarity: "epic",
+      cssData: {
+        id: "noir",
+        isDark: true,
+        "--bg-main": "#000000",
+        "--bg-surface": "#0a0a0a",
+        "--bg-elevated": "#1a1a1a",
+        "--bg-subtle": "#050505",
+        "--bg-header": "#000000",
+        "--text-primary": "#e0e0e0",
+        "--text-secondary": "#888888",
+        "--text-muted": "#555555",
+        "--border-color": "#1a1a1a",
+      },
+      imageUrl: null,
+    },
+    {
+      name: "Аметист",
+      slug: "apptheme-amethyst",
+      category: "appTheme",
+      description: "Насыщенный фиолетовый — для ценителей роскоши",
+      price: 8,
+      rarity: "epic",
+      cssData: {
+        id: "amethyst",
+        isDark: true,
+        "--bg-main": "#120a20",
+        "--bg-surface": "#1e1435",
+        "--bg-elevated": "#302450",
+        "--bg-subtle": "#18102a",
+        "--bg-header": "#0e0818",
+        "--text-primary": "#dcd0f0",
+        "--text-secondary": "#9a88c0",
+        "--text-muted": "#6b5890",
+        "--border-color": "#302450",
+      },
+      imageUrl: null,
+    },
+    {
+      name: "Золото",
+      slug: "apptheme-gold",
+      category: "appTheme",
+      description: "Роскошная тёмно-золотая тема для истинных легенд",
+      price: 15,
+      rarity: "legendary",
+      cssData: {
+        id: "gold",
+        isDark: true,
+        "--bg-main": "#1a1508",
+        "--bg-surface": "#252010",
+        "--bg-elevated": "#3a3018",
+        "--bg-subtle": "#201a0c",
+        "--bg-header": "#141005",
+        "--text-primary": "#f0e8d0",
+        "--text-secondary": "#c0a868",
+        "--text-muted": "#8a7840",
+        "--border-color": "#3a3018",
+      },
+      imageUrl: null,
+    },
+
     // ═══ БАННЕРЫ ═══
     {
       name: "Ростов набережная",
@@ -732,6 +844,45 @@ export async function POST(request) {
     { $addToSet: { permissions: "feedback.manage" } }
   );
   log.push("feedback.manage добавлен в роль admin");
+
+  // 21. Индексы для отзывов
+  await db.collection("reviews").createIndex({ createdAt: -1 });
+  await db.collection("reviews").createIndex({ userId: 1, createdAt: -1 });
+  log.push("Индексы reviews созданы");
+
+  // Добавить reviews.manage в роль admin
+  await db.collection("roles").updateOne(
+    { slug: "admin" },
+    { $addToSet: { permissions: "reviews.manage" } }
+  );
+  log.push("reviews.manage добавлен в роль admin");
+
+  // 20. Миграция ticketNumber для существующих тикетов
+  const ticketsWithoutNumber = await db.collection("tickets")
+    .find({ ticketNumber: { $exists: false } })
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  if (ticketsWithoutNumber.length > 0) {
+    // Определяем максимальный существующий номер
+    const maxExisting = await db.collection("tickets")
+      .find({ ticketNumber: { $exists: true } })
+      .sort({ ticketNumber: -1 })
+      .limit(1)
+      .toArray();
+    let nextNumber = (maxExisting[0]?.ticketNumber || 0) + 1;
+
+    for (const t of ticketsWithoutNumber) {
+      await db.collection("tickets").updateOne(
+        { _id: t._id },
+        { $set: { ticketNumber: nextNumber++ } }
+      );
+    }
+    log.push(`Присвоен ticketNumber ${ticketsWithoutNumber.length} тикетам`);
+  }
+
+  await db.collection("tickets").createIndex({ ticketNumber: -1 });
+  log.push("Индекс tickets.ticketNumber создан");
 
   return NextResponse.json({ success: true, log });
 }

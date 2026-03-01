@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
 import { checkAndGrantAchievements } from "@/lib/achievementEngine";
+import { checkProfanity, checkFlood, notifyModeratorsAboutViolation } from "@/lib/profanity";
 
 // GET /api/routes/[id]/comments — public, paginated (только top-level с вложенными replies)
 export async function GET(request, { params }) {
@@ -119,6 +120,38 @@ export async function POST(request, { params }) {
   const trimmed = text.trim();
   if (trimmed.length === 0 || trimmed.length > 500) {
     return NextResponse.json({ error: "Комментарий от 1 до 500 символов" }, { status: 400 });
+  }
+
+  // Profanity check (до flood — чтобы мат всегда показывал свою ошибку)
+  const profanity = checkProfanity(trimmed);
+  if (profanity.hasProfanity) {
+    // Fire-and-forget: получаем route title и уведомляем модераторов
+    const db = await getDb();
+    const route = await db.collection("routes").findOne(
+      { _id: new ObjectId(id) },
+      { projection: { title: 1 } }
+    );
+    notifyModeratorsAboutViolation({
+      userId: auth.user._id.toString(),
+      username: auth.user.username,
+      text: trimmed,
+      routeId: id,
+      routeTitle: route?.title || "",
+    });
+    return NextResponse.json(
+      { error: "Комментарий содержит недопустимые выражения" },
+      { status: 400 }
+    );
+  }
+
+  // Flood check (после profanity — мат всегда показывает свою ошибку, а не кулдаун)
+  const flood = checkFlood(auth.user._id.toString());
+  if (flood.isFlooding) {
+    const secs = Math.ceil(flood.retryAfterMs / 1000);
+    return NextResponse.json(
+      { error: `Подождите ${secs} сек. перед отправкой следующего комментария` },
+      { status: 429 }
+    );
   }
 
   const db = await getDb();

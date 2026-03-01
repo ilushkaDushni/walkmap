@@ -56,6 +56,19 @@ export default function ShopItemCard({ item, owned, equipped, onClick }) {
     if (item.category === "chatTheme" && item.cssData?.bubble) {
       return <ChatThemePreview cssData={item.cssData} />;
     }
+    if (item.category === "appTheme" && item.cssData?.["--bg-main"]) {
+      const css = item.cssData;
+      return (
+        <div className="w-full h-full rounded-xl overflow-hidden relative" style={{ backgroundColor: css["--bg-main"] }}>
+          <div className="absolute top-2 left-2 right-2 h-2.5 rounded-full" style={{ backgroundColor: css["--bg-header"] }} />
+          <div className="absolute top-6 left-2 w-[55%] h-2 rounded" style={{ backgroundColor: css["--bg-surface"] }} />
+          <div className="absolute top-10 left-2 right-2 bottom-2 rounded-lg" style={{ backgroundColor: css["--bg-surface"] }}>
+            <div className="absolute top-1.5 left-2 w-[60%] h-1.5 rounded" style={{ backgroundColor: css["--text-primary"], opacity: 0.7 }} />
+            <div className="absolute top-4.5 left-2 w-[40%] h-1 rounded" style={{ backgroundColor: css["--text-secondary"], opacity: 0.5 }} />
+          </div>
+        </div>
+      );
+    }
     if (item.category === "usernameColor" && item.cssData?.color) {
       return (
         <div className="flex flex-col items-center gap-1.5">

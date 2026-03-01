@@ -88,8 +88,58 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Нельзя забанить суперадмина" }, { status: 403 });
     }
     update.banned = !!body.banned;
+
     if (update.banned) {
+      // Причина бана
+      const banReason = typeof body.banReason === "string" ? body.banReason.trim().slice(0, 500) : "";
+      update.banReason = banReason || null;
+      update.bannedAt = new Date();
+      update.bannedBy = callerId;
+
+      // Длительность: 0 или undefined = перманентный, число дней = временный
+      const banDuration = Number(body.banDuration);
+      if (banDuration > 0) {
+        update.banExpiresAt = new Date(Date.now() + banDuration * 24 * 60 * 60 * 1000);
+      } else {
+        update.banExpiresAt = null;
+      }
+
       await db.collection("refresh_tokens").deleteMany({ userId: id });
+
+      // Запись в историю банов
+      await db.collection("ban_history").insertOne({
+        userId: id,
+        action: "ban",
+        reason: update.banReason,
+        duration: banDuration > 0 ? banDuration : null,
+        bannedBy: callerId,
+        bannedByUsername: caller.username,
+        createdAt: new Date(),
+      });
+
+      // Уведомление пользователю
+      await createNotification(id, "account_banned", {
+        reason: update.banReason,
+        duration: banDuration > 0 ? banDuration : null,
+        adminUsername: caller.username,
+      });
+    } else {
+      // Разбан
+      update.banReason = null;
+      update.bannedAt = null;
+      update.bannedBy = null;
+      update.banExpiresAt = null;
+
+      // Запись в историю банов
+      await db.collection("ban_history").insertOne({
+        userId: id,
+        action: "unban",
+        reason: typeof body.unbanReason === "string" ? body.unbanReason.trim().slice(0, 500) : null,
+        duration: null,
+        bannedBy: callerId,
+        bannedByUsername: caller.username,
+        createdAt: new Date(),
+      });
     }
   }
 

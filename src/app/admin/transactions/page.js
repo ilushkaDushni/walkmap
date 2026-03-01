@@ -13,6 +13,8 @@ const TYPE_LABELS = {
   admin_add: { label: "Админ +", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
   admin_subtract: { label: "Админ −", color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
   lobby_completion: { label: "Лобби", color: "text-cyan-600 bg-cyan-50 dark:bg-cyan-950/30" },
+  admin_revoke: { label: "Изъятие", color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
+  admin_gift: { label: "Подарок предмета", color: "text-green-600 bg-green-50 dark:bg-green-950/30" },
 };
 
 const ALL_TYPES = Object.keys(TYPE_LABELS);

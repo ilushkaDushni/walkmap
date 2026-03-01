@@ -177,6 +177,41 @@ function BannerPreview({ item, user }) {
   );
 }
 
+function AppThemePreview({ item }) {
+  const css = item.cssData || {};
+  return (
+    <div className="py-2">
+      <div className="rounded-2xl overflow-hidden h-48 relative" style={{ backgroundColor: css["--bg-main"] || "#2a2a2a" }}>
+        {/* Header */}
+        <div className="h-8 px-3 flex items-center" style={{ backgroundColor: css["--bg-header"] || "#1e1e1e" }}>
+          <div className="w-16 h-2.5 rounded-full" style={{ backgroundColor: css["--text-primary"] || "#fff", opacity: 0.8 }} />
+        </div>
+        {/* Content */}
+        <div className="px-3 pt-2 space-y-2">
+          {/* Card 1 */}
+          <div className="rounded-xl p-2.5" style={{ backgroundColor: css["--bg-surface"] || "#353535" }}>
+            <div className="w-[70%] h-2.5 rounded mb-1.5" style={{ backgroundColor: css["--text-primary"] || "#fff", opacity: 0.8 }} />
+            <div className="w-[50%] h-2 rounded mb-1" style={{ backgroundColor: css["--text-secondary"] || "#b0b0b0", opacity: 0.6 }} />
+            <div className="w-[30%] h-1.5 rounded" style={{ backgroundColor: css["--text-muted"] || "#808080", opacity: 0.5 }} />
+          </div>
+          {/* Card 2 */}
+          <div className="rounded-xl p-2.5" style={{ backgroundColor: css["--bg-surface"] || "#353535" }}>
+            <div className="w-[55%] h-2.5 rounded mb-1.5" style={{ backgroundColor: css["--text-primary"] || "#fff", opacity: 0.8 }} />
+            <div className="w-[40%] h-2 rounded" style={{ backgroundColor: css["--text-secondary"] || "#b0b0b0", opacity: 0.6 }} />
+          </div>
+          {/* Bottom bar */}
+          <div className="absolute bottom-0 left-0 right-0 h-7 flex items-center justify-around px-6" style={{ backgroundColor: css["--bg-surface"] || "#353535", borderTop: `1px solid ${css["--border-color"] || "#4a4a4a"}` }}>
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: css["--text-muted"] || "#808080", opacity: 0.5 }} />
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: css["--text-muted"] || "#808080", opacity: 0.5 }} />
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: css["--text-muted"] || "#808080", opacity: 0.5 }} />
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-[var(--text-muted)] text-center mt-3">Так будет выглядеть приложение</p>
+    </div>
+  );
+}
+
 function GenericPreview({ item }) {
   return (
     <div className="aspect-video rounded-xl bg-[var(--bg-elevated)] flex items-center justify-center overflow-hidden">
@@ -204,6 +239,7 @@ export default function ShopItemModal({ item, owned, equipped, routiks, user, on
       case "title": return <TitlePreview item={item} user={user} />;
       case "chatTheme": return <ChatThemePreview item={item} />;
       case "banner": return <BannerPreview item={item} user={user} />;
+      case "appTheme": return <AppThemePreview item={item} />;
       default: return <GenericPreview item={item} />;
     }
   };
@@ -316,6 +352,18 @@ function renderCardPreview(item) {
           }>Привет!</div>
         <div className="absolute bottom-3 right-4 rounded-lg rounded-br-sm px-2.5 py-1 text-[10px]"
           style={{ backgroundColor: css.bubble, color: css.bubbleText }}>Как дела?</div>
+      </div>
+    );
+  }
+  if (item.category === "appTheme" && item.cssData?.["--bg-main"]) {
+    const css = item.cssData;
+    return (
+      <div className="w-full h-full relative" style={{ backgroundColor: css["--bg-main"] }}>
+        <div className="absolute top-2 left-2 right-2 h-3 rounded-full" style={{ backgroundColor: css["--bg-header"] }} />
+        <div className="absolute top-7 left-2 right-2 bottom-2 rounded-lg" style={{ backgroundColor: css["--bg-surface"] }}>
+          <div className="absolute top-2 left-2 w-[60%] h-2 rounded" style={{ backgroundColor: css["--text-primary"], opacity: 0.7 }} />
+          <div className="absolute top-5 left-2 w-[40%] h-1.5 rounded" style={{ backgroundColor: css["--text-secondary"], opacity: 0.5 }} />
+        </div>
       </div>
     );
   }

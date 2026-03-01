@@ -31,6 +31,7 @@ export async function GET(request) {
 
   const result = tickets.map((t) => ({
     id: t._id.toString(),
+    ticketNumber: t.ticketNumber || null,
     subject: t.subject,
     status: t.status,
     messageCount: countMap[t._id.toString()] || 0,
@@ -66,18 +67,29 @@ export async function POST(request) {
   const body = await request.json();
   const subject = (body.subject || "").trim().slice(0, 100);
   const message = (body.message || "").trim().slice(0, 1000);
+  const imageUrl = (body.imageUrl || "").trim() || null;
 
-  if (!subject || !message) {
+  if (!subject || (!message && !imageUrl)) {
     return NextResponse.json(
       { error: "Заполните тему и сообщение" },
       { status: 400 }
     );
   }
 
+  // Определяем ticketNumber — максимальный + 1
+  const lastTicket = await db
+    .collection("tickets")
+    .find({}, { projection: { ticketNumber: 1 } })
+    .sort({ ticketNumber: -1 })
+    .limit(1)
+    .toArray();
+  const ticketNumber = (lastTicket[0]?.ticketNumber || 0) + 1;
+
   const ticket = {
     userId,
     subject,
     status: "open",
+    ticketNumber,
     createdAt: now,
     updatedAt: now,
     closedAt: null,
@@ -86,16 +98,20 @@ export async function POST(request) {
   const result = await db.collection("tickets").insertOne(ticket);
   const ticketId = result.insertedId.toString();
 
-  await db.collection("ticket_messages").insertOne({
+  const firstMsg = {
     ticketId,
     senderId: userId,
     senderType: "user",
     text: message,
     createdAt: now,
-  });
+  };
+  if (imageUrl) firstMsg.imageUrl = imageUrl;
+
+  await db.collection("ticket_messages").insertOne(firstMsg);
 
   return NextResponse.json({
     id: ticketId,
+    ticketNumber,
     subject,
     status: "open",
     createdAt: now,

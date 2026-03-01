@@ -30,20 +30,24 @@ export async function POST(request, { params }) {
 
   const body = await request.json();
   const text = (body.text || "").trim().slice(0, 1000);
+  const imageUrl = (body.imageUrl || "").trim() || null;
 
-  if (!text) {
+  if (!text && !imageUrl) {
     return NextResponse.json({ error: "Сообщение не может быть пустым" }, { status: 400 });
   }
 
   const now = new Date();
 
-  await db.collection("ticket_messages").insertOne({
+  const msg = {
     ticketId: id,
     senderId: user._id.toString(),
     senderType: "user",
     text,
     createdAt: now,
-  });
+  };
+  if (imageUrl) msg.imageUrl = imageUrl;
+
+  await db.collection("ticket_messages").insertOne(msg);
 
   await db.collection("tickets").updateOne(
     { _id: new ObjectId(id) },

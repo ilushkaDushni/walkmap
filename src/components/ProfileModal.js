@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle, LifeBuoy } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle, LifeBuoy, Paperclip, GraduationCap, Star, Pin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
-import { useTheme } from "./ThemeProvider";
+import { useTheme, FREE_THEMES } from "./ThemeProvider";
+import ThemePicker from "./ThemePicker";
 import UserAvatar from "./UserAvatar";
 import AvatarCropper from "./AvatarCropper";
 import { APP_VERSION } from "@/lib/version";
@@ -50,6 +51,17 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   // Support
   const [supportTicketId, setSupportTicketId] = useState(null);
 
+  // Closing animation
+  const [closing, setClosing] = useState(false);
+  const animateClose = (cb) => {
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      onClose();
+      if (cb) cb();
+    }, 200);
+  };
+
   // Password change
   const [showPassword, setShowPassword] = useState(false);
   const [pwdMode, setPwdMode] = useState("change"); // "change" | "forgot" | "code"
@@ -85,6 +97,19 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
     };
     window.addEventListener("open-support-screen", handler);
     return () => window.removeEventListener("open-support-screen", handler);
+  }, [isOpen]);
+
+  // Event: открыть экран отзывов (из главной)
+  useEffect(() => {
+    const handler = () => {
+      setScreen("reviews");
+      if (!isOpen) {
+        window.dispatchEvent(new Event("open-profile-modal"));
+        setTimeout(() => setScreen("reviews"), 50);
+      }
+    };
+    window.addEventListener("open-reviews-screen", handler);
+    return () => window.removeEventListener("open-reviews-screen", handler);
   }, [isOpen]);
 
   useEffect(() => {
@@ -293,6 +318,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
       }
       onClose();
       router.push("/");
+      setTimeout(() => window.dispatchEvent(new Event("tutorial-new-user")), 1000);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -420,16 +446,16 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
 
   const backdrop = (
     <div
-      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity"
-      onClick={onClose}
+      className={`fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${closing ? "opacity-0" : "opacity-100"}`}
+      onClick={() => animateClose()}
     />
   );
 
   const modalShell = (children) => (
     <>
       {backdrop}
-      <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-md animate-slide-up">
-        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors">
+      <div className={`fixed inset-x-4 bottom-36 z-[70] mx-auto max-w-md ${closing ? "animate-slide-out-down" : "animate-slide-up"}`}>
+        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors max-h-[75dvh] overflow-y-auto">
           {children}
         </div>
       </div>
@@ -438,7 +464,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
 
   const closeBtn = (
     <button
-      onClick={onClose}
+      onClick={() => animateClose()}
       className="absolute right-6 top-6 text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
     >
       <X className="h-5 w-5" />
@@ -472,14 +498,29 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
         setScreen={setScreen}
         ticketId={supportTicketId}
         setTicketId={setSupportTicketId}
+        onClose={onClose}
         modalShell={modalShell}
         backBtn={backBtn}
         closeBtn={closeBtn}
         inputCls={inputCls}
         btnPrimary={btnPrimary}
-        btnOutline={btnOutline}
         authFetch={authFetch}
         user={user}
+      />
+    );
+  }
+
+  // === Экран: Отзывы ===
+  if (screen === "reviews") {
+    return (
+      <ReviewsScreen
+        modalShell={modalShell}
+        backBtn={backBtn}
+        closeBtn={closeBtn}
+        inputCls={inputCls}
+        btnPrimary={btnPrimary}
+        user={user}
+        authFetch={authFetch}
       />
     );
   }
@@ -495,6 +536,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
         btnPrimary={btnPrimary}
         user={user}
         goBack={user ? "settings" : "profile"}
+        animateClose={animateClose}
       />
     );
   }
@@ -570,7 +612,11 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                 {submitting ? "Сохранение..." : "Сохранить"}
               </button>
               <button
-                onClick={() => { onClose(); router.push("/"); }}
+                onClick={() => {
+                  onClose();
+                  router.push("/");
+                  setTimeout(() => window.dispatchEvent(new Event("tutorial-new-user")), 1000);
+                }}
                 className={btnOutline}
               >
                 Пропустить
@@ -873,6 +919,10 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
             <LifeBuoy className="h-4 w-4" />
             Поддержка
           </button>
+          <button onClick={() => { setScreen("reviews"); setError(""); }} className={btnOutline}>
+            <Star className="h-4 w-4" />
+            Отзывы
+          </button>
           <Link
             href={`/users/${user.username}`}
             onClick={onClose}
@@ -913,6 +963,10 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
           <button onClick={() => setScreen("register")} className={btnOutline}>
             <UserPlus className="h-4 w-4" />
             Зарегистрироваться
+          </button>
+          <button onClick={() => setScreen("reviews")} className={btnOutline}>
+            <Star className="h-4 w-4" />
+            Отзывы
           </button>
           <button
             onClick={() => setScreen("about")}
@@ -1053,7 +1107,232 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   return null;
 }
 
-function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user, goBack }) {
+function ReviewsScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user, authFetch }) {
+  const [reviews, setReviews] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const LIMIT = 20;
+
+  const loadReviews = async (off = 0, append = false) => {
+    try {
+      const res = await fetch(`/api/reviews?limit=${LIMIT}&offset=${off}`);
+      const data = await res.json();
+      setReviews((prev) => append ? [...prev, ...data.reviews] : data.reviews);
+      setTotal(data.total);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadReviews(); }, []);
+
+  const handleSubmit = async () => {
+    if (!rating) { setError("Выберите оценку"); return; }
+    if (!text.trim()) { setError("Напишите отзыв"); return; }
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await authFetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, text: text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setReviews((prev) => [data, ...prev]);
+      setTotal((t) => t + 1);
+      setRating(0);
+      setText("");
+      setSuccess("Отзыв отправлен!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      const res = await authFetch(`/api/reviews/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Ошибка");
+      }
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+      setTotal((t) => t - 1);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleToggleFeatured = async (id, currentFeatured) => {
+    try {
+      const res = await authFetch(`/api/reviews/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featured: !currentFeatured }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setReviews((prev) => prev.map((r) => r.id === id ? { ...r, featured: data.featured } : r));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const newOffset = offset + LIMIT;
+    setOffset(newOffset);
+    loadReviews(newOffset, true);
+  };
+
+  const canManage = user?.permissions?.includes("reviews.manage");
+
+  function timeAgo(date) {
+    const diff = Date.now() - new Date(date).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return "только что";
+    if (min < 60) return `${min} мин`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} ч`;
+    const d = Math.floor(hr / 24);
+    return `${d} дн`;
+  }
+
+  return modalShell(
+    <>
+      {backBtn("profile")}
+      {closeBtn}
+      <div className="pt-8">
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-500/20">
+            <Star className="h-8 w-8 text-yellow-500" />
+          </div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Отзывы</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{total} отзывов</p>
+        </div>
+
+        {/* Форма — только для авторизованных */}
+        {user && (
+          <div className="mb-4 rounded-2xl bg-[var(--bg-elevated)] p-4">
+            <div className="flex justify-center gap-1 mb-3">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setRating(s)}
+                  onMouseEnter={() => setHoverRating(s)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="p-1 transition active:scale-90"
+                >
+                  <Star
+                    className={`h-7 w-7 transition ${
+                      s <= (hoverRating || rating)
+                        ? "text-yellow-400 fill-yellow-400"
+                        : "text-[var(--text-muted)]/30"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, 500))}
+              placeholder="Напишите свой отзыв..."
+              rows={3}
+              className={`${inputCls} resize-none`}
+            />
+            <div className="flex items-center justify-between mt-1 mb-2">
+              <span className="text-[10px] text-[var(--text-muted)]">{text.length}/500</span>
+            </div>
+            {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
+            {success && <p className="text-xs text-green-500 mb-2">{success}</p>}
+            <button onClick={handleSubmit} disabled={submitting} className={btnPrimary}>
+              <Star className="h-4 w-4" />
+              {submitting ? "Отправка..." : "Оставить отзыв"}
+            </button>
+          </div>
+        )}
+
+        {/* Список отзывов */}
+        {loading ? (
+          <div className="py-6 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+        ) : reviews.length === 0 ? (
+          <div className="py-6 text-center text-sm text-[var(--text-muted)]">Пока нет отзывов</div>
+        ) : (
+          <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+            {reviews.map((r) => (
+              <div key={r.id} className="rounded-2xl bg-[var(--bg-elevated)] p-3">
+                <div className="flex items-center gap-2.5 mb-2">
+                  {r.avatarUrl ? (
+                    <img src={r.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-green-500 to-emerald-500 shrink-0">
+                      <span className="text-xs font-bold text-white">{(r.username || "?")[0].toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[var(--text-primary)] truncate">{r.username}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
+                    </div>
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: 5 }, (_, j) => (
+                        <Star key={j} className={`h-3 w-3 ${j < r.rating ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-muted)]/30"}`} />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    {canManage && (
+                      <button
+                        onClick={() => handleToggleFeatured(r.id, r.featured)}
+                        className={`p-1 transition ${r.featured ? "text-green-500" : "text-[var(--text-muted)] hover:text-green-500"}`}
+                        title={r.featured ? "Убрать с главной" : "Показать на главной"}
+                      >
+                        <Pin className={`h-3.5 w-3.5 ${r.featured ? "fill-green-500" : ""}`} />
+                      </button>
+                    )}
+                    {(user && (r.userId === user.id || canManage)) && (
+                      <button
+                        onClick={() => handleDelete(r.id)}
+                        className="p-1 text-[var(--text-muted)] hover:text-red-400 transition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{r.text}</p>
+              </div>
+            ))}
+            {reviews.length < total && (
+              <button
+                onClick={handleLoadMore}
+                className="w-full text-center text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition py-2"
+              >
+                Загрузить ещё
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user, goBack, animateClose }) {
+  const router = useRouter();
   const [name, setName] = useState(user?.username || "");
   const [email, setEmail] = useState(user?.email || "");
   const [message, setMessage] = useState("");
@@ -1103,6 +1382,15 @@ function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user
       <div className="text-center mb-4">
         <span className="text-[10px] text-[var(--text-muted)]">Версия {APP_VERSION}</span>
       </div>
+
+      {/* Правила сообщества */}
+      <button
+        onClick={() => animateClose(() => router.push("/rules"))}
+        className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 mb-4 no-underline transition hover:opacity-80"
+      >
+        <span className="text-sm font-medium text-[var(--text-primary)]">Правила сообщества</span>
+        <Shield className="h-4 w-4 text-[var(--text-muted)]" />
+      </button>
 
       {/* Форма обратной связи */}
       <div className="border-t border-[var(--border-color)] pt-4">
@@ -1254,7 +1542,7 @@ function EmailFeedbackScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrima
   );
 }
 
-function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, backBtn, closeBtn, inputCls, btnPrimary, btnOutline, authFetch, user }) {
+function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, modalShell, backBtn, closeBtn, inputCls, btnPrimary, authFetch, user }) {
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [ticketData, setTicketData] = useState(null);
@@ -1264,7 +1552,10 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState(null);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Загрузка списка тикетов
   useEffect(() => {
@@ -1290,6 +1581,24 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
     }
   }, [screen, ticketId, authFetch]);
 
+  // Polling: обновлять сообщения каждые 5 секунд пока тикет открыт
+  useEffect(() => {
+    if (screen !== "support-detail" || !ticketId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`/api/tickets/${ticketId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTicketData((prev) => {
+            if (!prev || data.messages?.length !== prev.messages?.length) return data;
+            return prev;
+          });
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [screen, ticketId, authFetch]);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     if (ticketData?.messages) {
@@ -1300,7 +1609,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
   const handleCreateTicket = async () => {
     const subj = newSubject.trim();
     const msg = newMessage.trim();
-    if (!subj || !msg) {
+    if (!subj || (!msg && !pendingImageUrl)) {
       setError("Заполните тему и сообщение");
       return;
     }
@@ -1310,12 +1619,13 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
       const res = await authFetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: subj, message: msg }),
+        body: JSON.stringify({ subject: subj, message: msg, imageUrl: pendingImageUrl }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
       setNewSubject("");
       setNewMessage("");
+      setPendingImageUrl(null);
       setTicketId(data.id);
       setScreen("support-detail");
     } catch (e) {
@@ -1327,25 +1637,49 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
 
   const handleReply = async () => {
     const text = replyText.trim();
-    if (!text) return;
+    if (!text && !pendingImageUrl) return;
     setSubmitting(true);
     setError("");
     try {
       const res = await authFetch(`/api/tickets/${ticketId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, imageUrl: pendingImageUrl }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
       setReplyText("");
-      // Перезагрузить тикет
+      setPendingImageUrl(null);
       const fresh = await authFetch(`/api/tickets/${ticketId}`);
       setTicketData(await fresh.json());
     } catch (e) {
       setError(e.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Максимальный размер — 5 МБ");
+      return;
+    }
+    setUploadingImage(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await authFetch("/api/tickets/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+      setPendingImageUrl(data.url);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -1372,59 +1706,62 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
       <>
         {backBtn("profile")}
         {closeBtn}
-        <div className="flex flex-col items-center mb-4">
-          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-teal-500/20">
-            <LifeBuoy className="h-8 w-8 text-teal-500" />
+        <div className="pt-8">
+          <div className="flex flex-col items-center mb-4">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-teal-500/20">
+              <LifeBuoy className="h-8 w-8 text-teal-500" />
+            </div>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">Поддержка</h2>
           </div>
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">Поддержка</h2>
-        </div>
-        <div className="space-y-2">
-          <button onClick={() => { setScreen("support-new"); setError(""); }} className={btnPrimary}>
-            <Send className="h-4 w-4" />
-            Новое обращение
-          </button>
-          {loadingTickets ? (
-            <div className="py-6 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
-          ) : tickets.length === 0 ? (
-            <div className="py-6 text-center text-sm text-[var(--text-muted)]">У вас пока нет обращений</div>
-          ) : (
-            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-              {tickets.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => { setTicketId(t.id); setScreen("support-detail"); setReplyText(""); setError(""); }}
-                  className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 text-left transition hover:opacity-80"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
-                      {statusBadge(t.status)}
+          <div className="space-y-2">
+            <button onClick={() => { setScreen("support-new"); setError(""); }} className={btnPrimary}>
+              <Send className="h-4 w-4" />
+              Новое обращение
+            </button>
+            {loadingTickets ? (
+              <div className="py-6 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+            ) : tickets.length === 0 ? (
+              <div className="py-6 text-center text-sm text-[var(--text-muted)]">У вас пока нет обращений</div>
+            ) : (
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                {tickets.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setTicketId(t.id); setScreen("support-detail"); setReplyText(""); setError(""); setPendingImageUrl(null); }}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 text-left transition hover:opacity-80"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        {t.ticketNumber && <span className="text-[10px] font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
+                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
+                        {statusBadge(t.status)}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
+                        <span className="text-[10px] text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* Написать на почту */}
-        <div className="border-t border-[var(--border-color)] mt-4 pt-4">
-          <button
-            onClick={() => setScreen("support-email")}
-            className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 transition hover:opacity-80"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15">
-              <Mail className="h-4 w-4 text-blue-500" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Написать на почту</p>
-              <p className="text-[11px] text-[var(--text-muted)]">Ответ на email в течение дня</p>
-            </div>
-          </button>
+          {/* Написать на почту */}
+          <div className="border-t border-[var(--border-color)] mt-4 pt-4">
+            <button
+              onClick={() => setScreen("support-email")}
+              className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] p-3 transition hover:opacity-80"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15">
+                <Mail className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Написать на почту</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Ответ на email в течение дня</p>
+              </div>
+            </button>
+          </div>
         </div>
       </>
     );
@@ -1436,32 +1773,52 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
       <>
         {backBtn("support")}
         {closeBtn}
-        <div className="flex flex-col items-center mb-4">
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">Новое обращение</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-1">Опишите вашу проблему или предложение</p>
-        </div>
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={newSubject}
-            onChange={(e) => setNewSubject(e.target.value.slice(0, 100))}
-            placeholder="Тема обращения"
-            className={inputCls}
-          />
-          <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newSubject.length}/100</div>
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value.slice(0, 1000))}
-            placeholder="Ваше сообщение..."
-            rows={5}
-            className={`${inputCls} resize-none`}
-          />
-          <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newMessage.length}/1000</div>
-          {error && <p className="text-center text-xs text-red-400">{error}</p>}
-          <button onClick={handleCreateTicket} disabled={submitting} className={btnPrimary}>
-            <Send className="h-4 w-4" />
-            {submitting ? "Отправка..." : "Отправить"}
-          </button>
+        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+        <div className="pt-8">
+          <div className="flex flex-col items-center mb-4">
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">Новое обращение</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Опишите вашу проблему или предложение</p>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={newSubject}
+              onChange={(e) => setNewSubject(e.target.value.slice(0, 100))}
+              placeholder="Тема обращения"
+              className={inputCls}
+            />
+            <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newSubject.length}/100</div>
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value.slice(0, 1000))}
+              placeholder="Ваше сообщение..."
+              rows={4}
+              className={`${inputCls} resize-none`}
+            />
+            <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newMessage.length}/1000</div>
+            {/* Фото */}
+            {pendingImageUrl && (
+              <div className="relative inline-block">
+                <img src={pendingImageUrl} alt="" className="h-20 rounded-xl" />
+                <button onClick={() => setPendingImageUrl(null)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition disabled:opacity-50"
+            >
+              <Paperclip className="h-4 w-4" />
+              {uploadingImage ? "Загрузка..." : pendingImageUrl ? "Заменить фото" : "Прикрепить фото"}
+            </button>
+            {error && <p className="text-center text-xs text-red-400">{error}</p>}
+            <button onClick={handleCreateTicket} disabled={submitting} className={btnPrimary}>
+              <Send className="h-4 w-4" />
+              {submitting ? "Отправка..." : "Отправить"}
+            </button>
+          </div>
         </div>
       </>
     );
@@ -1486,7 +1843,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
         <>
           {backBtn("support")}
           {closeBtn}
-          <div className="py-10 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+          <div className="pt-8 py-10 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
         </>
       );
     }
@@ -1496,7 +1853,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
         <>
           {backBtn("support")}
           {closeBtn}
-          <div className="py-10 text-center text-sm text-[var(--text-muted)]">Не удалось загрузить</div>
+          <div className="pt-8 py-10 text-center text-sm text-[var(--text-muted)]">Не удалось загрузить</div>
         </>
       );
     }
@@ -1505,58 +1862,85 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
       <>
         {backBtn("support")}
         {closeBtn}
-        <div className="mb-3">
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-base font-bold text-[var(--text-primary)] truncate flex-1">{ticketData.subject}</h2>
-            {statusBadge(ticketData.status)}
-          </div>
-          <span className="text-[10px] text-[var(--text-muted)]">Создано {timeAgo(ticketData.createdAt)}</span>
-        </div>
-
-        {/* Лента сообщений */}
-        <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-3 pr-1">
-          {(ticketData.messages || []).map((m) => {
-            const isUser = m.senderType === "user";
-            return (
-              <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${isUser ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-teal-500/15 text-[var(--text-primary)]"}`}>
-                  {!isUser && (
-                    <p className="text-[10px] font-bold text-teal-500 mb-0.5">Поддержка</p>
-                  )}
-                  <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>
-                  <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Поле ввода */}
-        {ticketData.status === "open" ? (
-          <div className="space-y-2">
-            {error && <p className="text-center text-xs text-red-400">{error}</p>}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value.slice(0, 1000))}
-                onKeyDown={(e) => e.key === "Enter" && handleReply()}
-                placeholder="Написать..."
-                className={`${inputCls} flex-1`}
-              />
-              <button
-                onClick={handleReply}
-                disabled={submitting || !replyText.trim()}
-                className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl bg-teal-500 text-white transition hover:bg-teal-600 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+        <div className="pt-8">
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              {ticketData.ticketNumber && <span className="text-xs font-bold text-teal-500">#{ticketData.ticketNumber}</span>}
+              <h2 className="text-base font-bold text-[var(--text-primary)] truncate flex-1">{ticketData.subject}</h2>
+              {statusBadge(ticketData.status)}
             </div>
+            <span className="text-[10px] text-[var(--text-muted)]">Создано {timeAgo(ticketData.createdAt)}</span>
           </div>
-        ) : (
-          <div className="text-center py-2 text-sm text-[var(--text-muted)]">Обращение закрыто</div>
-        )}
+
+          {/* Лента сообщений */}
+          <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-3 pr-1">
+            {(ticketData.messages || []).map((m) => {
+              const isUser = m.senderType === "user";
+              return (
+                <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                  {!isUser && m.sender && (
+                    <div className="shrink-0 mr-2 mt-1">
+                      <UserAvatar username={m.sender.username || "Поддержка"} avatarUrl={m.sender.avatarUrl} size="sm" />
+                    </div>
+                  )}
+                  <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${isUser ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-teal-500/15 text-[var(--text-primary)]"}`}>
+                    {!isUser && (
+                      <p className="text-[10px] font-bold text-teal-500 mb-0.5">{m.sender?.username || "Поддержка"}</p>
+                    )}
+                    {m.imageUrl && (
+                      <img src={m.imageUrl} alt="" className="rounded-xl max-w-full mb-1 cursor-pointer" onClick={() => window.open(m.imageUrl, "_blank")} />
+                    )}
+                    {m.text && <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>}
+                    <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Поле ввода */}
+          {ticketData.status === "open" ? (
+            <div className="space-y-2">
+              {error && <p className="text-center text-xs text-red-400">{error}</p>}
+              {pendingImageUrl && (
+                <div className="relative inline-block">
+                  <img src={pendingImageUrl} alt="" className="h-16 rounded-lg" />
+                  <button onClick={() => setPendingImageUrl(null)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 items-end">
+                <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-50"
+                >
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value.slice(0, 1000))}
+                  onKeyDown={(e) => e.key === "Enter" && handleReply()}
+                  placeholder="Написать..."
+                  className={`${inputCls} flex-1`}
+                />
+                <button
+                  onClick={handleReply}
+                  disabled={submitting || (!replyText.trim() && !pendingImageUrl)}
+                  className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl bg-teal-500 text-white transition hover:bg-teal-600 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-2 text-sm text-[var(--text-muted)]">Обращение закрыто</div>
+          )}
+        </div>
       </>
     );
   }
@@ -1565,8 +1949,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, modalShell, 
 }
 
 function SettingsScreen({ modalShell, backBtn, closeBtn, onClose, setScreen }) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme, setTheme } = useTheme();
 
   return modalShell(
     <>
@@ -1579,15 +1962,26 @@ function SettingsScreen({ modalShell, backBtn, closeBtn, onClose, setScreen }) {
         <h2 className="text-lg font-bold text-[var(--text-primary)]">Настройки</h2>
       </div>
       <div className="space-y-3">
-        {/* Тёмная тема */}
-        <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
-          <span className="text-sm text-[var(--text-secondary)]">Тёмная тема</span>
-          <button onClick={toggleTheme} className="relative">
-            <div className={`h-6 w-10 rounded-full p-0.5 transition-colors ${isDark ? "bg-green-500" : "bg-[var(--bg-main)]"}`}>
-              <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${isDark ? "translate-x-4" : "translate-x-0"}`} />
-            </div>
-          </button>
+        {/* Тема */}
+        <div className="rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
+          <span className="text-sm text-[var(--text-secondary)] block mb-2">Тема оформления</span>
+          <ThemePicker currentTheme={theme} onSelect={setTheme} />
         </div>
+
+        {/* Пройти обучение */}
+        <button
+          onClick={() => {
+            onClose();
+            setTimeout(() => window.dispatchEvent(new Event("start-tutorial")), 300);
+          }}
+          className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
+        >
+          <div className="flex items-center gap-3">
+            <GraduationCap className="h-5 w-5 text-[var(--text-secondary)]" />
+            <span className="text-sm text-[var(--text-secondary)]">Пройти обучение</span>
+          </div>
+          <span className="text-sm text-[var(--text-muted)]">&rarr;</span>
+        </button>
 
         {/* Версия */}
         <button

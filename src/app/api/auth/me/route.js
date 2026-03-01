@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/mongodb";
 import { verifyAccessToken } from "@/lib/tokens";
+import { buildUserResponse } from "@/lib/permissions";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
@@ -31,11 +32,6 @@ export async function GET(request) {
   }
 
   return NextResponse.json({
-    user: {
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
+    user: await buildUserResponse(user),
   });
 }

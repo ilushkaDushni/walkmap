@@ -95,6 +95,10 @@ export default function ShopPage() {
       if (res.ok) {
         const data = await res.json();
         updateUser({ equippedItems: data.equippedItems });
+        // Применить appTheme если экипировали тему приложения
+        if (data.equippedItems?.appTheme) {
+          window.dispatchEvent(new CustomEvent("apply-app-theme", { detail: data.equippedItems.appTheme }));
+        }
         await fetchInventory();
         setSelectedItem(null);
       }
@@ -112,6 +116,10 @@ export default function ShopPage() {
       if (res.ok) {
         const data = await res.json();
         updateUser({ equippedItems: data.equippedItems });
+        // Если сняли appTheme — убрать кастомные переменные
+        if (selectedItem?.category === "appTheme") {
+          window.dispatchEvent(new CustomEvent("apply-app-theme", { detail: null }));
+        }
         await fetchInventory();
         setSelectedItem(null);
       }

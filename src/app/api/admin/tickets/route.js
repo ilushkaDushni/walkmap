@@ -65,6 +65,7 @@ export async function GET(request) {
 
   const result = tickets.map((t) => ({
     id: t._id.toString(),
+    ticketNumber: t.ticketNumber || null,
     subject: t.subject,
     status: t.status,
     userId: t.userId,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { Resend } from "resend";
+import { randomInt } from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -19,9 +20,19 @@ export async function POST(request) {
     return NextResponse.json({ ok: true });
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  // Rate limiting: макс 3 запроса на email за 1 час
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentAttempts = await db.collection("password_resets").countDocuments({
+    email,
+    createdAt: { $gt: oneHourAgo },
+  });
+  if (recentAttempts >= 3) {
+    return NextResponse.json({ ok: true }); // не раскрываем лимит
+  }
 
-  await db.collection("password_resets").deleteMany({ email });
+  const code = randomInt(100000, 1000000).toString();
+
+  await db.collection("password_resets").deleteMany({ email, expiresAt: { $lt: new Date() } });
   await db.collection("password_resets").insertOne({
     email,
     userId: user._id.toString(),

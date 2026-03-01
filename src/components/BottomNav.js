@@ -11,12 +11,22 @@ import useUnreadMessages from "@/hooks/useUnreadMessages";
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { user, hasPermission } = useUser();
+  const { user, hasPermission, authFetch } = useUser();
   const { navigate } = useNavigationGuard();
   const { count: unreadMsgCount } = useUnreadMessages();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileInitialScreen, setProfileInitialScreen] = useState(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mq.matches);
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     const handler = () => setProfileOpen(true);
@@ -32,6 +42,22 @@ export default function BottomNav() {
     };
   }, []);
 
+  // Polling открытых тикетов + непрочитанных admin-сообщений для админа
+  useEffect(() => {
+    if (!hasPermission("feedback.manage")) return;
+    const fetchCount = () => {
+      Promise.all([
+        authFetch("/api/admin/tickets/unread-count").then((r) => r.json()).catch(() => ({ count: 0 })),
+        authFetch("/api/admin/messages/unread-count").then((r) => r.json()).catch(() => ({ count: 0 })),
+      ]).then(([tickets, msgs]) => {
+        setOpenTicketsCount((tickets.count || 0) + (msgs.count || 0));
+      });
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, [hasPermission, authFetch]);
+
   const isHome = pathname === "/";
   const isRoutesActive = pathname === "/routes" || pathname.startsWith("/routes/");
   const isFriendsActive = pathname === "/friends";
@@ -40,10 +66,11 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className={`fixed bottom-4 left-4 right-4 z-50 ${isFriendsActive ? "md:hidden" : ""}`}>
+      <nav className="fixed bottom-4 left-4 right-4 z-50" style={isFriendsActive && isDesktop ? { display: "none" } : undefined}>
         <div className="mx-auto flex max-w-md items-center justify-around rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-2 py-3 shadow-2xl transition-colors">
           {/* Главная */}
           <button
+            data-tutorial="nav-home"
             onClick={() => navigate("/")}
             className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               isHome ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -55,6 +82,7 @@ export default function BottomNav() {
 
           {/* Маршруты */}
           <button
+            data-tutorial="nav-routes"
             onClick={() => {
               if (!user) {
                 window.dispatchEvent(new Event("open-profile-modal"));
@@ -78,13 +106,21 @@ export default function BottomNav() {
                 adminOpen ? "text-amber-500" : "text-[var(--text-muted)] hover:text-amber-500"
               }`}
             >
-              <Shield className="h-6 w-6" strokeWidth={adminOpen ? 2.5 : 1.5} />
+              <div className="relative">
+                <Shield className="h-6 w-6" strokeWidth={adminOpen ? 2.5 : 1.5} />
+                {openTicketsCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white border border-[var(--bg-surface)]">
+                    {openTicketsCount > 9 ? "9+" : openTicketsCount}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-medium">Админ</span>
             </button>
           )}
 
           {/* Магазин */}
           <button
+            data-tutorial="nav-shop"
             onClick={() => {
               if (!user) {
                 window.dispatchEvent(new Event("open-profile-modal"));
@@ -102,6 +138,7 @@ export default function BottomNav() {
 
           {/* Друзья */}
           <button
+            data-tutorial="nav-friends"
             onClick={() => {
               if (!user) {
                 window.dispatchEvent(new Event("open-profile-modal"));
@@ -134,6 +171,7 @@ export default function BottomNav() {
 
           {/* Профиль */}
           <button
+            data-tutorial="nav-profile"
             onClick={() => setProfileOpen(true)}
             className={`flex flex-col items-center gap-1 px-2 py-1 transition ${
               profileOpen ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"

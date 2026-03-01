@@ -339,6 +339,7 @@ export default function RouteMapLeaflet({ route }) {
   const activeSegmentGeoJson = useMemo(() => {
     if (!currentEvent || !started || gpsMode === "gps_active") return null;
     if (currentEvent.type !== "segment") return null;
+    if (!dirPath || dirPath.length < 2) return null;
     const i = currentEvent.data.pathIndex;
     if (i == null || i < 0 || i >= dirPath.length - 1) return null;
     const segStart = { lat: dirPath[i].lat, lng: dirPath[i].lng };
