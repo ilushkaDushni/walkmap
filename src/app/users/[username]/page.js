@@ -48,6 +48,7 @@ async function fetchProfile(username) {
     roles,
     stats,
     achievements,
+    equippedItems: user.equippedItems || null,
   };
 }
 
