@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // POST /api/friends/accept — принять заявку в друзья
 export async function POST(request) {
@@ -35,11 +36,13 @@ export async function POST(request) {
   );
 
   // Уведомление отправителю заявки
-  await createNotification(requesterId, "friend_accept", {
+  const notifData = {
     userId,
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
-  });
+  };
+  await createNotification(requesterId, "friend_accept", notifData);
+  pushNotification(requesterId, { type: "friend_accept", ...notifData });
 
   return NextResponse.json({ ok: true });
 }

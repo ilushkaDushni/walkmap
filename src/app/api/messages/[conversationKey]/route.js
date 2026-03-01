@@ -182,8 +182,10 @@ export async function POST(request, { params }) {
 
   const db = await getDb();
 
-  // ─── Модерация (пропуск для admin-сообщений) ───────────────
-  if (!isAdminBypass) {
+  // ─── Модерация (пропуск для admin-сообщений и приватных чатов друзей) ───
+  // В личных чатах между друзьями модерация не нужна
+  const isPrivateChat = !isAdminConvPost && !isAdminBypass;
+  if (!isAdminBypass && !isPrivateChat) {
     // Проверка мата
     const { hasProfanity, matchedWords } = checkProfanity(trimmed);
     if (hasProfanity) {

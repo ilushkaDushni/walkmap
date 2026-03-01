@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MessageCircle, X, Gift, Coins, LifeBuoy, Shield } from "lucide-react";
+import { MessageCircle, X, Gift, Coins, LifeBuoy, Shield, UserPlus, UserCheck, MessageSquare, Users, Trophy, Package, Ban } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import { useRouter } from "next/navigation";
@@ -33,8 +33,17 @@ export default function MessageToast() {
 
   // SSE — мгновенный тост
   useNotificationSSE(useCallback((data) => {
+    if (data.type === "typing") {
+      window.dispatchEvent(new CustomEvent("chat-typing", {
+        detail: { conversationKey: data.conversationKey, userId: data.userId },
+      }));
+      return;
+    }
     if (data.type === "new_message") {
       const ck = data.conversationKey;
+      if (ck) {
+        window.dispatchEvent(new CustomEvent("new-chat-message", { detail: { conversationKey: ck } }));
+      }
       if (ck && activeChatsRef.current.has(ck)) return;
       setToast({
         id: Date.now().toString(),
@@ -66,6 +75,9 @@ export default function MessageToast() {
       });
     } else if (data.type === "admin_message") {
       const ck = data.conversationKey;
+      if (ck) {
+        window.dispatchEvent(new CustomEvent("new-chat-message", { detail: { conversationKey: ck } }));
+      }
       if (ck && activeChatsRef.current.has(ck)) return;
       setToast({
         id: Date.now().toString(),
@@ -80,6 +92,63 @@ export default function MessageToast() {
         username: data.adminUsername || "Поддержка",
         text: "ответила на ваше обращение",
         ticketId: data.ticketId,
+      });
+    } else if (data.type === "friend_request") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "friend_request",
+        username: data.username || "Кто-то",
+        avatarUrl: data.avatarUrl || null,
+        text: "хочет добавить вас в друзья",
+      });
+    } else if (data.type === "friend_accept") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "friend_accept",
+        username: data.username || "Кто-то",
+        avatarUrl: data.avatarUrl || null,
+        text: "принял вашу заявку в друзья",
+      });
+    } else if (data.type === "comment_reply") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "comment_reply",
+        username: data.username || "Кто-то",
+        text: "ответил на ваш комментарий",
+        routeId: data.routeId,
+      });
+    } else if (data.type === "lobby_invite") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "lobby_invite",
+        username: data.username || "Кто-то",
+        avatarUrl: data.avatarUrl || null,
+        text: `приглашает в лобби: ${data.routeTitle || "маршрут"}`,
+        joinCode: data.joinCode,
+      });
+    } else if (data.type === "item_gift") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "item_gift",
+        username: data.adminUsername || "Администратор",
+        text: `Вам подарен предмет: ${data.itemName || ""}`,
+        message: data.message || "",
+      });
+    } else if (data.type === "item_revoke") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "item_revoke",
+        username: data.adminUsername || "Администратор",
+        text: `Предмет изъят: ${data.itemName || ""}`,
+        message: data.reason || "",
+      });
+    } else if (data.type === "account_banned") {
+      setToast({
+        id: Date.now().toString(),
+        toastType: "account_banned",
+        username: data.adminUsername || "Администратор",
+        text: data.duration ? `Вы забанены на ${data.duration} дн.` : "Вы забанены",
+        message: data.reason || "",
       });
     } else {
       return;
@@ -100,7 +169,7 @@ export default function MessageToast() {
         const data = await res.json();
         const notifications = data.notifications || [];
 
-        const TOAST_TYPES = ["new_message", "coin_gift", "coin_admin", "admin_message", "ticket_reply"];
+        const TOAST_TYPES = ["new_message", "coin_gift", "coin_admin", "admin_message", "ticket_reply", "friend_request", "friend_accept", "comment_reply", "lobby_invite", "item_gift", "item_revoke", "account_banned"];
         for (const n of notifications) {
           if (!TOAST_TYPES.includes(n.type) || n.read) continue;
           if (shownIdsRef.current.has(n.id)) continue;
@@ -147,6 +216,60 @@ export default function MessageToast() {
               text: "ответила на ваше обращение",
               ticketId: n.data?.ticketId,
             });
+          } else if (n.type === "friend_request") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "friend_request",
+              username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
+              text: "хочет добавить вас в друзья",
+            });
+          } else if (n.type === "friend_accept") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "friend_accept",
+              username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
+              text: "принял вашу заявку в друзья",
+            });
+          } else if (n.type === "comment_reply") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "comment_reply",
+              username: n.data?.username || "Кто-то",
+              text: "ответил на ваш комментарий",
+              routeId: n.data?.routeId,
+            });
+          } else if (n.type === "lobby_invite") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "lobby_invite",
+              username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
+              text: `приглашает в лобби: ${n.data?.routeTitle || "маршрут"}`,
+              joinCode: n.data?.joinCode,
+            });
+          } else if (n.type === "item_gift") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "item_gift",
+              username: n.data?.adminUsername || "Администратор",
+              text: `Вам подарен предмет: ${n.data?.itemName || ""}`,
+              message: n.data?.message || "",
+            });
+          } else if (n.type === "item_revoke") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "item_revoke",
+              username: n.data?.adminUsername || "Администратор",
+              text: `Предмет изъят: ${n.data?.itemName || ""}`,
+              message: n.data?.reason || "",
+            });
+          } else if (n.type === "account_banned") {
+            shownIdsRef.current.add(n.id);
+            setToast({
+              id: n.id, toastType: "account_banned",
+              username: n.data?.adminUsername || "Администратор",
+              text: n.data?.duration ? `Вы забанены на ${n.data.duration} дн.` : "Вы забанены",
+              message: n.data?.reason || "",
+            });
           }
           break;
         }
@@ -186,7 +309,18 @@ export default function MessageToast() {
       window.dispatchEvent(new CustomEvent("open-support-screen", { detail: { ticketId: toast.ticketId } }));
       return;
     }
-    if (toast.toastType === "coin_gift" || toast.toastType === "coin_admin") {
+    if (toast.toastType === "coin_gift" || toast.toastType === "coin_admin" || toast.toastType === "item_gift" || toast.toastType === "item_revoke" || toast.toastType === "account_banned") {
+      return;
+    }
+    if (toast.toastType === "comment_reply" && toast.routeId) {
+      router.push(`/routes/${toast.routeId}`);
+      return;
+    }
+    if (toast.toastType === "friend_request" || toast.toastType === "friend_accept") {
+      router.push("/friends");
+      return;
+    }
+    if (toast.toastType === "lobby_invite") {
       return;
     }
     if (toast.toastType === "admin_message") {
@@ -210,6 +344,13 @@ export default function MessageToast() {
     : toast.toastType === "coin_admin" ? <Coins className="h-4 w-4 text-amber-500 shrink-0" />
     : toast.toastType === "ticket_reply" ? <LifeBuoy className="h-4 w-4 text-teal-500 shrink-0" />
     : toast.toastType === "admin_message" ? <Shield className="h-4 w-4 text-red-500 shrink-0" />
+    : toast.toastType === "friend_request" ? <UserPlus className="h-4 w-4 text-blue-500 shrink-0" />
+    : toast.toastType === "friend_accept" ? <UserCheck className="h-4 w-4 text-green-500 shrink-0" />
+    : toast.toastType === "comment_reply" ? <MessageSquare className="h-4 w-4 text-purple-500 shrink-0" />
+    : toast.toastType === "lobby_invite" ? <Users className="h-4 w-4 text-indigo-500 shrink-0" />
+    : toast.toastType === "item_gift" ? <Package className="h-4 w-4 text-emerald-500 shrink-0" />
+    : toast.toastType === "item_revoke" ? <Package className="h-4 w-4 text-red-500 shrink-0" />
+    : toast.toastType === "account_banned" ? <Ban className="h-4 w-4 text-red-500 shrink-0" />
     : <MessageCircle className="h-4 w-4 text-blue-500 shrink-0" />;
 
   return (
@@ -231,6 +372,14 @@ export default function MessageToast() {
         ) : toast.toastType === "admin_message" ? (
           <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
             <Shield className="h-4 w-4 text-red-500" />
+          </div>
+        ) : toast.toastType === "item_gift" ? (
+          <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <Package className="h-4 w-4 text-emerald-500" />
+          </div>
+        ) : toast.toastType === "item_revoke" || toast.toastType === "account_banned" ? (
+          <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+            {toast.toastType === "account_banned" ? <Ban className="h-4 w-4 text-red-500" /> : <Package className="h-4 w-4 text-red-500" />}
           </div>
         ) : (
           <UserAvatar username={toast.username} size="sm" />

@@ -125,6 +125,37 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     };
   }, [enabled, conversationKey, interval, fetchInitial, fetchIncremental, markRead]);
 
+  // SSE → мгновенный fetch новых сообщений
+  useEffect(() => {
+    if (!enabled || !conversationKey) return;
+    const handler = (e) => {
+      if (e.detail?.conversationKey === conversationKey) {
+        fetchIncremental().then(() => markRead());
+      }
+    };
+    window.addEventListener("new-chat-message", handler);
+    return () => window.removeEventListener("new-chat-message", handler);
+  }, [enabled, conversationKey, fetchIncremental, markRead]);
+
+  // SSE → typing indicator
+  useEffect(() => {
+    if (!enabled || !conversationKey) return;
+    const handler = (e) => {
+      if (e.detail?.conversationKey === conversationKey) {
+        const typingUserId = e.detail.userId;
+        setTypingUsers((prev) => {
+          if (prev.includes(typingUserId)) return prev;
+          return [...prev, typingUserId];
+        });
+        setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((id) => id !== typingUserId));
+        }, 4000);
+      }
+    };
+    window.addEventListener("chat-typing", handler);
+    return () => window.removeEventListener("chat-typing", handler);
+  }, [enabled, conversationKey]);
+
   // Optimistic send
   const sendMessage = useCallback(async (text, routeId = null, replyToId = null) => {
     if (!authFetch || !conversationKey) return null;

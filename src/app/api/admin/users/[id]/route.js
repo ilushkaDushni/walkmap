@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/adminAuth";
 import { resolveUserPermissions, isSuperadmin, getTopPosition, getAllRoles } from "@/lib/permissions";
 import { logCoinTransaction } from "@/lib/coinTransactions";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // PUT /api/admin/users/[id] — обновить пользователя (split permissions)
 export async function PUT(request, { params }) {
@@ -118,11 +119,13 @@ export async function PUT(request, { params }) {
       });
 
       // Уведомление пользователю
-      await createNotification(id, "account_banned", {
+      const banData = {
         reason: update.banReason,
         duration: banDuration > 0 ? banDuration : null,
         adminUsername: caller.username,
-      });
+      };
+      await createNotification(id, "account_banned", banData);
+      pushNotification(id, { type: "account_banned", ...banData });
     } else {
       // Разбан
       update.banReason = null;
@@ -180,11 +183,13 @@ export async function PUT(request, { params }) {
         meta: { adminId: callerId, adminUsername: caller.username, ...(coinMsg && { message: coinMsg }) },
       });
       // Уведомление пользователю о начислении/списании
-      await createNotification(id, "coin_admin", {
+      const coinData = {
         amount: delta,
         adminUsername: caller.username,
         ...(coinMsg && { message: coinMsg }),
-      });
+      };
+      await createNotification(id, "coin_admin", coinData);
+      pushNotification(id, { type: "coin_admin", ...coinData });
     }
   }
 

@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 import { checkAndGrantAchievements } from "@/lib/achievementEngine";
 import { checkProfanity, checkFlood, notifyModeratorsAboutViolation } from "@/lib/profanity";
 
@@ -190,14 +191,16 @@ export async function POST(request, { params }) {
   if (resolvedParentId) {
     const parentComment = await db.collection("comments").findOne({ _id: new ObjectId(resolvedParentId) });
     if (parentComment && parentComment.userId !== auth.user._id.toString()) {
-      await createNotification(parentComment.userId, "comment_reply", {
+      const replyData = {
         commentId: result.insertedId.toString(),
         parentCommentId: resolvedParentId,
         routeId: id,
         routeTitle: route.title || "",
         username: auth.user.username,
         text: trimmed.slice(0, 100),
-      });
+      };
+      await createNotification(parentComment.userId, "comment_reply", replyData);
+      pushNotification(parentComment.userId, { type: "comment_reply", ...replyData });
     }
   }
 

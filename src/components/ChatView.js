@@ -462,7 +462,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
     sendMessage, sendImage, retryMessage, deleteMessage, toggleReaction,
     editMessage, loadOlder, sendTyping, clearMessages,
   } = useChatPolling(conversationKey, {
-    interval: 5000,
+    interval: 15000,
     enabled: !!conversationKey,
     adminMode,
   });

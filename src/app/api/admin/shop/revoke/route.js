@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // POST /api/admin/shop/revoke — изъять предмет у юзера
 export async function POST(request) {
@@ -93,12 +94,14 @@ export async function POST(request) {
   });
 
   // Уведомление
-  await createNotification(userId, "item_revoke", {
+  const notifData = {
     itemName,
     reason: reason.trim(),
     refundRoutiks,
     adminUsername,
-  });
+  };
+  await createNotification(userId, "item_revoke", notifData);
+  pushNotification(userId, { type: "item_revoke", ...notifData });
 
   return NextResponse.json({ ok: true, refundRoutiks });
 }

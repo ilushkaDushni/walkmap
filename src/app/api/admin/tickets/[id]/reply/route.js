@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // POST /api/admin/tickets/[id]/reply — ответ админа
 export async function POST(request, { params }) {
@@ -48,11 +49,13 @@ export async function POST(request, { params }) {
   );
 
   // Уведомление пользователю
-  await createNotification(ticket.userId, "ticket_reply", {
+  const notifData = {
     ticketId: id,
     subject: ticket.subject,
     adminUsername: user.username,
-  });
+  };
+  await createNotification(ticket.userId, "ticket_reply", notifData);
+  pushNotification(ticket.userId, { type: "ticket_reply", ...notifData });
 
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 import { logCoinTransaction } from "@/lib/coinTransactions";
 
 // POST /api/friends/gift-coins — перевод монет другу
@@ -78,13 +79,15 @@ export async function POST(request) {
   });
 
   // Уведомление получателю
-  await createNotification(friendId, "coin_gift", {
+  const notifData = {
     userId,
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
     amount: parsedAmount,
     ...(trimmedMessage && { message: trimmedMessage }),
-  });
+  };
+  await createNotification(friendId, "coin_gift", notifData);
+  pushNotification(friendId, { type: "coin_gift", ...notifData });
 
   return NextResponse.json({
     ok: true,

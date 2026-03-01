@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
+import { pushNotification } from "@/lib/sse";
 
 // POST /api/lobbies/[id]/invite — пригласить друга
 export async function POST(request, { params }) {
@@ -43,14 +44,16 @@ export async function POST(request, { params }) {
   const route = await db.collection("routes").findOne({ _id: new ObjectId(lobby.routeId) });
 
   // Уведомление
-  await createNotification(friendId, "lobby_invite", {
+  const notifData = {
     lobbyId: id,
     joinCode: lobby.joinCode,
     routeId: lobby.routeId,
     routeTitle: route?.title || "",
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
-  });
+  };
+  await createNotification(friendId, "lobby_invite", notifData);
+  pushNotification(friendId, { type: "lobby_invite", ...notifData });
 
   return NextResponse.json({ ok: true });
 }
