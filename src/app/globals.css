@@ -158,6 +158,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Скрыть BottomNav на десктопе когда открыта страница друзей */
+@media (min-width: 768px) {
+  body:has([data-friends-desktop]) [data-bottom-nav] {
+    display: none !important;
+  }
+}
+
 button, a {
   -webkit-tap-highlight-color: transparent;
   outline: none;

@@ -7,7 +7,6 @@ import AchievementToast from "@/components/AchievementToast";
 import MessageToast from "@/components/MessageToast";
 import NotificationBell from "@/components/NotificationBell";
 import LobbyController from "@/components/LobbyController";
-import UpdateModal from "@/components/UpdateModal";
 import TutorialOverlay from "@/components/TutorialOverlay";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
@@ -54,7 +53,6 @@ export default function RootLayout({ children }) {
             <BanModal />
             <AchievementToast />
             <MessageToast />
-            <UpdateModal />
             <PreviewBanner />
             {/* Шапка */}
             <header className="sticky top-0 z-50 bg-[var(--bg-header)] border-b border-[var(--border-color)] transition-colors">

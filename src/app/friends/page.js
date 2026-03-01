@@ -486,7 +486,7 @@ export default function FriendsPage() {
       )}
 
       {/* Desktop: split layout */}
-      <div className="hidden md:flex h-[calc(100dvh-57px)] overflow-hidden -mb-24">
+      <div data-friends-desktop className="hidden md:flex h-[calc(100dvh-57px)] overflow-hidden -mb-24">
         {/* Сайдбар */}
         <div className="w-80 border-r border-[var(--border-color)] overflow-y-auto p-4 shrink-0">
           <h1 className="text-xl font-bold text-[var(--text-primary)] mb-4">Друзья</h1>

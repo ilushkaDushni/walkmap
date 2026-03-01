@@ -66,7 +66,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-4 left-4 right-4 z-50" style={isFriendsActive && isDesktop ? { display: "none" } : undefined}>
+      <nav data-bottom-nav className="fixed bottom-4 left-4 right-4 z-50" style={isFriendsActive && isDesktop ? { display: "none" } : undefined}>
         <div className="mx-auto flex max-w-md items-center justify-around rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-2 py-3 shadow-2xl transition-colors">
           {/* Главная */}
           <button
