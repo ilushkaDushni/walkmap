@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { isAdminConversationKey, getTargetUserIdFromAdminKey } from "@/lib/conversationAccess";
 import { resolveUserPermissions } from "@/lib/permissions";
+import { pushNotification } from "@/lib/sse";
 
 // PATCH /api/messages/[conversationKey]/read — пометить сообщения как прочитанные
 export async function PATCH(request, { params }) {
@@ -62,6 +63,20 @@ export async function PATCH(request, { params }) {
     ]},
     { $set: { lastActivityAt: new Date() } }
   );
+
+  // SSE push отправителю — его сообщения прочитаны (для галочек ✓✓)
+  if (result.modifiedCount > 0) {
+    let senderId;
+    if (isAdminConv) {
+      // Не пушим read receipts для admin-чатов
+    } else {
+      const parts = conversationKey.split("_");
+      senderId = parts.find((p) => p !== userId);
+    }
+    if (senderId) {
+      pushNotification(senderId, { type: "message_read", conversationKey });
+    }
+  }
 
   return NextResponse.json({ updated: result.modifiedCount });
 }

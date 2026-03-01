@@ -30,6 +30,7 @@ export default function FriendsPage() {
   const [unreadMap, setUnreadMap] = useState({}); // { friendId: count }
   const [contextMenu, setContextMenu] = useState(null); // { x, y, friend }
   const contextRef = useRef(null);
+  const chatFriendIdRef = useRef(null);
 
   // Перенаправление гостей
   useEffect(() => {
@@ -68,18 +69,19 @@ export default function FriendsPage() {
         const data = await res.json();
         const map = {};
         let adminConv = null;
+        const activeFriend = chatFriendIdRef.current;
         for (const c of data.conversations || []) {
           if (c.isAdminConversation) {
-            adminConv = { unread: c.unread };
+            adminConv = { unread: adminChatOpen ? 0 : c.unread };
             continue;
           }
-          if (c.unread > 0) map[c.friendId] = c.unread;
+          if (c.unread > 0 && c.friendId !== activeFriend) map[c.friendId] = c.unread;
         }
         setUnreadMap(map);
         setAdminConversation(adminConv);
       }
     } catch { /* ignore */ }
-  }, [authFetch]);
+  }, [authFetch, adminChatOpen]);
 
   useEffect(() => {
     if (!user) return;
@@ -181,6 +183,7 @@ export default function FriendsPage() {
 
   // При открытии чата — сразу убираем бейдж непрочитанных для этого друга
   useEffect(() => {
+    chatFriendIdRef.current = chatFriendId;
     if (!chatFriendId) return;
     setUnreadMap((prev) => {
       if (!prev[chatFriendId]) return prev;
@@ -188,6 +191,17 @@ export default function FriendsPage() {
       delete next[chatFriendId];
       return next;
     });
+    // Также слушаем приход новых сообщений — сбрасываем бейдж, пока чат открыт
+    const handler = () => {
+      setUnreadMap((prev) => {
+        if (!prev[chatFriendId]) return prev;
+        const next = { ...prev };
+        delete next[chatFriendId];
+        return next;
+      });
+    };
+    window.addEventListener("refresh-unread", handler);
+    return () => window.removeEventListener("refresh-unread", handler);
   }, [chatFriendId]);
 
   // При открытии admin чата — убираем бейдж

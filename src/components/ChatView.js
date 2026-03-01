@@ -228,6 +228,8 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
   const [lightbox, setLightbox] = useState(false);
+  const [imgRetry, setImgRetry] = useState(0);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -320,15 +322,34 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
           {/* Image */}
           {msg.type === "image" && msg.imageUrl && (
             <div className="relative">
+              {imgFailed ? (
+                <div
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-color)] px-6 py-8 cursor-pointer"
+                  onClick={() => { setImgFailed(false); setImgRetry((r) => r + 1); }}
+                >
+                  <ImageIcon className="h-8 w-8 text-[var(--text-muted)] opacity-40" />
+                  <span className="text-[11px] text-[var(--text-muted)]">Не удалось загрузить</span>
+                  <span className="text-[10px] text-green-500 font-medium">Нажмите для повтора</span>
+                </div>
+              ) : (
               <img
-                src={msg.imageUrl}
+                src={msg.imageUrl + (imgRetry ? `?r=${imgRetry}` : "")}
                 alt=""
                 className="rounded-2xl max-w-full max-h-80 object-cover cursor-pointer"
                 style={isImageOnly ? { display: "block" } : undefined}
                 onClick={() => setLightbox(true)}
+                onError={() => {
+                  if (imgRetry < 2) {
+                    // Авто-ретрай с кэш-бастингом
+                    setTimeout(() => setImgRetry((r) => r + 1), 2000);
+                  } else {
+                    setImgFailed(true);
+                  }
+                }}
               />
+              )}
               {/* Time overlay for image-only messages */}
-              {isImageOnly && (
+              {isImageOnly && !imgFailed && (
                 <div className="absolute bottom-1.5 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/50 text-white">
                   {msg.editedAt && <span className="text-[9px]">ред.</span>}
                   <span className="text-[10px]">{timeShort(msg.createdAt)}</span>

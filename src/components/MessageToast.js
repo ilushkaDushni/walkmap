@@ -39,6 +39,12 @@ export default function MessageToast() {
       }));
       return;
     }
+    if (data.type === "message_read") {
+      window.dispatchEvent(new CustomEvent("chat-messages-read", {
+        detail: { conversationKey: data.conversationKey },
+      }));
+      return;
+    }
     if (data.type === "new_message") {
       const ck = data.conversationKey;
       if (ck) {

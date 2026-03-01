@@ -91,11 +91,12 @@ export async function GET(request, { params }) {
     }
   }
 
-  // Typing indicators (пигибэк)
+  // Typing indicators (пигибэк) — только свежие (< 5 сек)
   let typingUsers = [];
   try {
+    const typingCutoff = new Date(Date.now() - 5000);
     const typingDocs = await db.collection("typing_indicators")
-      .find({ conversationKey, userId: { $ne: userId } })
+      .find({ conversationKey, userId: { $ne: userId }, updatedAt: { $gt: typingCutoff } })
       .toArray();
     typingUsers = typingDocs.map((t) => t.userId);
   } catch {

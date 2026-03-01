@@ -103,6 +103,8 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     if (!authFetch || !conversationKey) return;
     try {
       await authFetch(`/api/messages/${conversationKey}/read`, { method: "PATCH" });
+      // Обновляем бейджи непрочитанных после прочтения
+      window.dispatchEvent(new Event("refresh-unread"));
     } catch {
       // ignore
     }
@@ -137,7 +139,26 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     return () => window.removeEventListener("new-chat-message", handler);
   }, [enabled, conversationKey, fetchIncremental, markRead]);
 
-  // SSE → typing indicator
+  // SSE → read receipts (собеседник прочитал наши сообщения → ✓✓)
+  useEffect(() => {
+    if (!enabled || !conversationKey) return;
+    const handler = (e) => {
+      if (e.detail?.conversationKey === conversationKey) {
+        const now = new Date().toISOString();
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.readAt || m._status === "sending" || m._status === "error") return m;
+            return { ...m, readAt: now };
+          })
+        );
+      }
+    };
+    window.addEventListener("chat-messages-read", handler);
+    return () => window.removeEventListener("chat-messages-read", handler);
+  }, [enabled, conversationKey]);
+
+  // SSE → typing indicator (per-user timeout tracking)
+  const typingTimeoutsRef = useRef(new Map());
   useEffect(() => {
     if (!enabled || !conversationKey) return;
     const handler = (e) => {
@@ -147,13 +168,23 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
           if (prev.includes(typingUserId)) return prev;
           return [...prev, typingUserId];
         });
-        setTimeout(() => {
+        // Сбрасываем старый таймаут для этого юзера
+        const oldTimer = typingTimeoutsRef.current.get(typingUserId);
+        if (oldTimer) clearTimeout(oldTimer);
+        const timer = setTimeout(() => {
           setTypingUsers((prev) => prev.filter((id) => id !== typingUserId));
+          typingTimeoutsRef.current.delete(typingUserId);
         }, 4000);
+        typingTimeoutsRef.current.set(typingUserId, timer);
       }
     };
     window.addEventListener("chat-typing", handler);
-    return () => window.removeEventListener("chat-typing", handler);
+    return () => {
+      window.removeEventListener("chat-typing", handler);
+      // Чистим все таймауты при unmount
+      for (const t of typingTimeoutsRef.current.values()) clearTimeout(t);
+      typingTimeoutsRef.current.clear();
+    };
   }, [enabled, conversationKey]);
 
   // Optimistic send

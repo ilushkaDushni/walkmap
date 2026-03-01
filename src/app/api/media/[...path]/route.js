@@ -18,8 +18,20 @@ export async function GET(request, { params }) {
 
   try {
     const { body, contentType } = await getFile(key);
-    const arrayBuf = await body.arrayBuffer();
 
+    // Стримим ответ вместо буферизации в память
+    const stream = body.body;
+    if (stream) {
+      return new Response(stream, {
+        headers: {
+          "Content-Type": contentType || "application/octet-stream",
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    }
+
+    // Fallback: буферизация если нет ReadableStream
+    const arrayBuf = await body.arrayBuffer();
     return new Response(arrayBuf, {
       headers: {
         "Content-Type": contentType || "application/octet-stream",
