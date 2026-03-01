@@ -8,6 +8,7 @@ import MessageToast from "@/components/MessageToast";
 import NotificationBell from "@/components/NotificationBell";
 import LobbyController from "@/components/LobbyController";
 import TutorialOverlay from "@/components/TutorialOverlay";
+import UpdateModal from "@/components/UpdateModal";
 import ThemeProvider from "@/components/ThemeProvider";
 import UserProvider from "@/components/UserProvider";
 import NavigationGuardProvider from "@/components/NavigationGuardProvider";
@@ -83,6 +84,7 @@ export default function RootLayout({ children }) {
             {/* Нижняя навигация */}
             <BottomNav />
             <TutorialOverlay />
+            <UpdateModal />
           </NavigationGuardProvider>
           </UserProvider>
         </ThemeProvider>

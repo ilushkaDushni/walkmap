@@ -19,6 +19,7 @@ const CATEGORIES = [
 
 export default function ShopPage() {
   const { user, authFetch, updateUser } = useUser();
+  const [tab, setTab] = useState("shop");
   const [category, setCategory] = useState(null);
   const [items, setItems] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -128,12 +129,44 @@ export default function ShopPage() {
 
   const currentCatLabel = CATEGORIES.find((c) => c.id === category)?.label || "Все";
 
+  // Filtered inventory for inventory tab
+  const filteredInventory = category
+    ? inventory.filter((inv) => inv.category === category)
+    : inventory;
+
+  // Count items per category in inventory
+  const inventoryCounts = inventory.reduce((acc, inv) => {
+    acc[inv.category] = (acc[inv.category] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="min-h-screen bg-[var(--bg-main)] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[var(--bg-main)] border-b border-[var(--border-color)]">
         <div className="px-4 py-3 max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Магазин</h1>
+          <div className="flex items-center gap-1 bg-[var(--bg-surface)] rounded-xl p-0.5 border border-[var(--border-color)]">
+            <button
+              onClick={() => setTab("shop")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                tab === "shop"
+                  ? "bg-[var(--text-primary)] text-[var(--bg-main)] shadow-sm"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              🛒 Магазин
+            </button>
+            <button
+              onClick={() => setTab("inventory")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                tab === "inventory"
+                  ? "bg-[var(--text-primary)] text-[var(--bg-main)] shadow-sm"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              📦 Инвентарь
+            </button>
+          </div>
           {user && (
             <div className="flex items-center gap-3">
               <button
@@ -162,21 +195,27 @@ export default function ShopPage() {
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block w-[220px] shrink-0 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto py-4 pl-4 pr-2">
           <nav className="space-y-0.5">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id || "all"}
-                onClick={() => setCategory(cat.id)}
-                className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-left text-sm transition ${
-                  category === cat.id
-                    ? "bg-[var(--bg-surface)] text-[var(--text-primary)] font-semibold shadow-sm border border-[var(--border-color)]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                <span className="text-base">{cat.icon}</span>
-                <span className="flex-1">{cat.label}</span>
-                {category === cat.id && <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />}
-              </button>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const count = tab === "inventory" ? (cat.id ? inventoryCounts[cat.id] || 0 : inventory.length) : null;
+              return (
+                <button
+                  key={cat.id || "all"}
+                  onClick={() => setCategory(cat.id)}
+                  className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-left text-sm transition ${
+                    category === cat.id
+                      ? "bg-[var(--bg-surface)] text-[var(--text-primary)] font-semibold shadow-sm border border-[var(--border-color)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <span className="text-base">{cat.icon}</span>
+                  <span className="flex-1">{cat.label}</span>
+                  {tab === "inventory" && count !== null && (
+                    <span className="text-xs text-[var(--text-muted)]">{count}</span>
+                  )}
+                  {category === cat.id && <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />}
+                </button>
+              );
+            })}
           </nav>
         </aside>
 
@@ -184,20 +223,26 @@ export default function ShopPage() {
         <main className="flex-1 min-w-0 px-4 py-4">
           {/* Mobile category tabs */}
           <div className="lg:hidden flex gap-1.5 overflow-x-auto scrollbar-none pb-3 -mx-1 px-1">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id || "all"}
-                onClick={() => setCategory(cat.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition ${
-                  category === cat.id
-                    ? "bg-[var(--text-primary)] text-[var(--bg-main)]"
-                    : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-                }`}
-              >
-                <span>{cat.icon}</span>
-                {cat.label}
-              </button>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const count = tab === "inventory" ? (cat.id ? inventoryCounts[cat.id] || 0 : inventory.length) : null;
+              return (
+                <button
+                  key={cat.id || "all"}
+                  onClick={() => setCategory(cat.id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition ${
+                    category === cat.id
+                      ? "bg-[var(--text-primary)] text-[var(--bg-main)]"
+                      : "bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  {cat.label}
+                  {tab === "inventory" && count !== null && (
+                    <span className="opacity-70"> {count}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Category title (desktop) */}
@@ -206,26 +251,48 @@ export default function ShopPage() {
           </h2>
 
           {/* Grid */}
-          {loading ? (
-            <div className="py-12 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
-          ) : items.length === 0 ? (
+          {tab === "shop" ? (
+            loading ? (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">Загрузка...</div>
+            ) : items.length === 0 ? (
+              <div className="py-12 text-center text-sm text-[var(--text-muted)]">
+                {category ? "В этой категории пока ничего нет" : "Магазин пуст"}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {items.map((item) => {
+                  const inv = inventoryMap.get(item.id);
+                  return (
+                    <ShopItemCard
+                      key={item.id}
+                      item={item}
+                      owned={!!inv}
+                      equipped={inv?.equipped}
+                      onClick={() => setSelectedItem(item)}
+                    />
+                  );
+                })}
+              </div>
+            )
+          ) : !user ? (
             <div className="py-12 text-center text-sm text-[var(--text-muted)]">
-              {category ? "В этой категории пока ничего нет" : "Магазин пуст"}
+              Войдите, чтобы видеть инвентарь
+            </div>
+          ) : filteredInventory.length === 0 ? (
+            <div className="py-12 text-center text-sm text-[var(--text-muted)]">
+              {category ? "В этой категории пока ничего нет" : "Пока пусто — загляните в магазин"}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {items.map((item) => {
-                const inv = inventoryMap.get(item.id);
-                return (
-                  <ShopItemCard
-                    key={item.id}
-                    item={item}
-                    owned={!!inv}
-                    equipped={inv?.equipped}
-                    onClick={() => setSelectedItem(item)}
-                  />
-                );
-              })}
+              {filteredInventory.map((inv) => (
+                <ShopItemCard
+                  key={inv.id}
+                  item={inv}
+                  owned={true}
+                  equipped={inv.equipped}
+                  onClick={() => setSelectedItem(inv)}
+                />
+              ))}
             </div>
           )}
         </main>
