@@ -52,7 +52,7 @@ export default function AchievementModal({ slug, date, onClose }) {
 
         {/* Icon area */}
         <div className={`flex flex-col items-center pt-8 pb-4 ${colors.bg}`}>
-          <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${colors.bg} border-2 border-current ${colors.text}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${colors.bg} border-2 border-current ${colors.text} ${achievement.progress?.()?.special ? "shadow-[0_0_20px_rgba(251,146,60,0.4)]" : ""}`}>
             <Icon className={`h-8 w-8 ${colors.text}`} />
           </div>
         </div>

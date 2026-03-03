@@ -9,6 +9,7 @@ import {
   UserPlus, UserCheck, Clock, Gift, Trash2, X,
 } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
+import UserName from "@/components/UserName";
 import { useUser } from "@/components/UserProvider";
 import { ACHIEVEMENT_REGISTRY, COLOR_CLASSES } from "@/lib/achievements";
 import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
@@ -43,7 +44,7 @@ function getUserLevel(c) {
 }
 
 export default function ProfileClient({ profile }) {
-  const { id: profileId, username, bio, createdAt, roles, stats, achievements } = profile;
+  const { id: profileId, username, bio, createdAt, roles, stats, achievements, equippedItems } = profile;
   const { user, authFetch } = useUser();
   const router = useRouter();
   const primaryRoleColor = roles?.[0]?.color || null;
@@ -234,10 +235,29 @@ export default function ProfileClient({ profile }) {
         Назад
       </Link>
 
+      {/* Banner */}
+      {equippedItems?.banner?.cssData && (
+        <div
+          className="rounded-2xl mb-[-48px] relative z-0"
+          style={{
+            height: 140,
+            background: equippedItems.banner.cssData.gradient || equippedItems.banner.cssData.backgroundColor || "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            backgroundImage: equippedItems.banner.imageUrl ? `url(${equippedItems.banner.imageUrl})` : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+      )}
+
       {/* Header */}
-      <div className="flex flex-col items-center mb-6">
-        <UserAvatar username={username} avatarUrl={profile.avatarUrl} roleColor={primaryRoleColor} size="xl" online={isOnline(profile.lastActivityAt)} />
-        <h1 className="mt-3 text-2xl font-bold text-[var(--text-primary)]">{username}</h1>
+      <div className={`flex flex-col items-center mb-6 ${equippedItems?.banner?.cssData ? "relative z-10" : ""}`}>
+        <UserAvatar username={username} avatarUrl={profile.avatarUrl} roleColor={primaryRoleColor} size="xl" online={isOnline(profile.lastActivityAt)} equippedItems={equippedItems} />
+        <h1 className="mt-3 text-2xl font-bold" style={{ color: equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{username}</h1>
+        {equippedItems?.title?.cssData?.text && (
+          <span className="text-xs font-medium" style={{ color: equippedItems.title.cssData.color || "var(--text-muted)" }}>
+            {equippedItems.title.cssData.text}
+          </span>
+        )}
         <span className={`text-xs ${isOnline(profile.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
           {formatLastSeen(profile.lastActivityAt)}
         </span>
@@ -307,16 +327,17 @@ export default function ProfileClient({ profile }) {
             const colors = COLOR_CLASSES[a.color] || COLOR_CLASSES.blue;
             const ok = achievementSet.has(a.slug);
             const prog = a.progress(stats);
+            const isSpecial = ok && prog.special;
             return (
               <div
                 key={a.slug}
-                className={`flex flex-col items-center rounded-xl py-2.5 px-1 w-[calc(33.333%-0.375rem)] sm:w-[calc(25%-0.375rem)] transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"}`}
+                className={`flex flex-col items-center rounded-xl py-2.5 px-1 w-[calc(33.333%-0.375rem)] sm:w-[calc(25%-0.375rem)] transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"} ${isSpecial ? "ring-1 ring-orange-400/50 shadow-[0_0_12px_rgba(251,146,60,0.3)]" : ""}`}
                 title={`${a.title}: ${a.desc}`}
               >
                 <Icon className={`h-5 w-5 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />
                 <span className={`text-[9px] font-medium mt-1 text-center leading-tight ${ok ? colors.text : "text-[var(--text-muted)]"}`}>{a.title}</span>
                 <span className={`text-[8px] mt-0.5 ${ok ? colors.text : "text-[var(--text-muted)]"}`}>
-                  {prog.current}/{prog.target}{prog.unit ? ` ${prog.unit}` : ""}
+                  {prog.special ? prog.special : `${prog.current}/${prog.target}${prog.unit ? ` ${prog.unit}` : ""}`}
                 </span>
               </div>
             );

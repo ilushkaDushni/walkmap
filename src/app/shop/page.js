@@ -5,7 +5,7 @@ import { useUser } from "@/components/UserProvider";
 import ShopItemCard from "@/components/ShopItemCard";
 import ShopItemModal from "@/components/ShopItemModal";
 import CurrencyConverter from "@/components/CurrencyConverter";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Tag, Check } from "lucide-react";
 
 const CATEGORIES = [
   { id: null, label: "Все", icon: "🛒" },
@@ -26,6 +26,9 @@ export default function ShopPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showConverter, setShowConverter] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoState, setPromoState] = useState("idle"); // idle | loading | success | error
+  const [promoMsg, setPromoMsg] = useState("");
 
   const fetchShop = useCallback(async () => {
     try {
@@ -127,6 +130,35 @@ export default function ShopPage() {
     } catch { /* ignore */ }
   };
 
+  const redeemPromo = async () => {
+    if (!promoCode.trim() || !authFetch) return;
+    setPromoState("loading");
+    setPromoMsg("");
+    try {
+      const res = await authFetch("/api/promo/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPromoState("success");
+        setPromoMsg(`+${data.reward} монет!`);
+        updateUser({ coins: data.newBalance });
+        setPromoCode("");
+        setTimeout(() => setPromoState("idle"), 4000);
+      } else {
+        setPromoState("error");
+        setPromoMsg(data.error || "Ошибка");
+        setTimeout(() => setPromoState("idle"), 3000);
+      }
+    } catch {
+      setPromoState("error");
+      setPromoMsg("Ошибка сети");
+      setTimeout(() => setPromoState("idle"), 3000);
+    }
+  };
+
   const currentCatLabel = CATEGORIES.find((c) => c.id === category)?.label || "Все";
 
   // Filtered inventory for inventory tab
@@ -174,7 +206,7 @@ export default function ShopPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
               >
                 🪙 {user.coins || 0}
-                <span className="text-[var(--text-muted)]">→</span>
+                <span className="w-3" />
                 🔷 {user.routiks || 0}
               </button>
             </div>
@@ -187,6 +219,39 @@ export default function ShopPage() {
         <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
           <div className="max-w-md mx-auto lg:ml-[260px]">
             <CurrencyConverter onConvert={() => {}} />
+          </div>
+        </div>
+      )}
+
+      {/* Promo code */}
+      {user && (
+        <div className="px-4 py-2.5 border-b border-[var(--border-color)]">
+          <div className="max-w-md mx-auto lg:ml-[260px] flex items-center gap-2">
+            <Tag className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && redeemPromo()}
+              placeholder="Промокод"
+              className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent-color)]"
+              disabled={promoState === "loading"}
+            />
+            <button
+              onClick={redeemPromo}
+              disabled={!promoCode.trim() || promoState === "loading"}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--accent-color)] text-white disabled:opacity-40 transition"
+            >
+              {promoState === "loading" ? "..." : "Активировать"}
+            </button>
+            {promoMsg && (
+              <span className={`shrink-0 text-xs font-medium flex items-center gap-1 ${
+                promoState === "success" ? "text-emerald-500" : "text-red-500"
+              }`}>
+                {promoState === "success" && <Check className="h-3.5 w-3.5" />}
+                {promoMsg}
+              </span>
+            )}
           </div>
         </div>
       )}

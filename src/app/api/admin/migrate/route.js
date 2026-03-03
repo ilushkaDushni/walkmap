@@ -884,5 +884,28 @@ export async function POST(request) {
   await db.collection("tickets").createIndex({ ticketNumber: -1 });
   log.push("Индекс tickets.ticketNumber создан");
 
+  // 22. Промокоды — индекс + seed
+  await db.collection("promo_codes").createIndex({ code: 1 }, { unique: true });
+  log.push("Индекс promo_codes.code создан");
+
+  const promoCode = process.env.PROMO_CODE || "ROSTOVGO2026";
+  const existingPromo = await db.collection("promo_codes").findOne({ code: promoCode });
+  if (!existingPromo) {
+    await db.collection("promo_codes").insertOne({
+      code: promoCode,
+      reward: 150,
+      achievementSlug: "pioneer",
+      maxUses: 0,
+      usedCount: 0,
+      usedBy: [],
+      isActive: true,
+      expiresAt: null,
+      createdAt: now,
+    });
+    log.push(`Промокод "${promoCode}" создан (150 монет + pioneer)`);
+  } else {
+    log.push(`Промокод "${promoCode}" уже существует`);
+  }
+
   return NextResponse.json({ success: true, log });
 }

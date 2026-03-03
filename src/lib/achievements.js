@@ -177,6 +177,19 @@ export const ACHIEVEMENT_REGISTRY = [
     check: (s) => s.hasNightCompletion === true,
     progress: (s) => ({ current: s.hasNightCompletion ? 1 : 0, target: 1 }),
   },
+
+  // ── Промокоды ──
+  {
+    slug: "pioneer",
+    title: "Первопроходец",
+    desc: "Активировать эксклюзивный промокод",
+    flavor: "Вы были среди первых",
+    icon: "Star",
+    color: "orange",
+    reward: 150,
+    check: () => false, // только через промокод
+    progress: () => ({ current: 0, target: 1, special: "Промокод" }),
+  },
 ];
 
 // slug → определение
