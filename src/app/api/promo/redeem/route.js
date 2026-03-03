@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/adminAuth";
 import { getDb } from "@/lib/mongodb";
 import { logCoinTransaction } from "@/lib/coinTransactions";
-import { createAndPushNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/notifications";
 import { ACHIEVEMENT_MAP } from "@/lib/achievements";
 
 export async function POST(request) {
@@ -89,7 +89,7 @@ export async function POST(request) {
   // Уведомление о достижении
   if (promo.achievementSlug && ACHIEVEMENT_MAP[promo.achievementSlug]) {
     const ach = ACHIEVEMENT_MAP[promo.achievementSlug];
-    await createAndPushNotification(userId, "achievement", {
+    await createNotification(userId, "achievement", {
       achievementSlug: promo.achievementSlug,
       title: ach.title,
       reward: promo.reward,
