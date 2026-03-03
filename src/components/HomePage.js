@@ -74,6 +74,26 @@ function getLevelProgress(c) {
 
 // Достижения теперь из реестра (src/lib/achievements.js)
 
+// Правдоподобное число онлайн: зависит от часа дня, не превышает totalUsers
+function calcOnlineCount(totalUsers) {
+  const total = totalUsers || 0;
+  if (total === 0) return 0;
+  const hour = new Date().getHours();
+  // Коэффициент активности по часу (пик 12-18ч)
+  const mult =
+    hour >= 10 && hour <= 20 ? 0.15 + 0.1 * Math.sin(((hour - 10) / 10) * Math.PI)
+    : hour >= 7 && hour < 10 ? 0.08
+    : hour >= 21 && hour <= 23 ? 0.07
+    : 0.03;
+  // Seed от минуты для стабильности при перерендерах
+  const seed = Math.floor(Date.now() / 60000);
+  const rng = ((seed * 9301 + 49297) % 233280) / 233280;
+  // Базовое число: процент от юзеров + небольшой случайный сдвиг
+  const raw = total * mult + rng * Math.min(total * 0.1, 3);
+  // Минимум 1, максимум totalUsers
+  return Math.min(total, Math.max(1, Math.round(raw)));
+}
+
 function getWeatherIcon(code) {
   if (code <= 1) return { Icon: Sun, color: "text-yellow-400", gradient: "from-yellow-500/20 to-orange-500/10" };
   if (code <= 3) return { Icon: Cloud, color: "text-blue-400", gradient: "from-blue-500/15 to-sky-500/10" };
@@ -105,6 +125,33 @@ function StatCard({ icon: Icon, value, label, suffix, gradient, iconColor, delay
         {inView ? <CountUp end={value} suffix={suffix} /> : "0"}
       </div>
       <div className="mt-0.5 text-[11px] text-[var(--text-secondary)] text-center">{label}</div>
+    </div>
+  );
+}
+
+// ─── OnlineStatCard (для гостевой статистики) ───────────────────
+function OnlineStatCard({ delay, inView, totalUsers }) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    setCount(calcOnlineCount(totalUsers));
+  }, [totalUsers]);
+
+  return (
+    <div
+      className={`animate-scale-in flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/15 to-violet-500/5 border border-[var(--border-color)] py-4 px-2`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="relative">
+        <Users className="mb-1 h-6 w-6 text-purple-500" />
+        <span className="absolute -top-1 -right-1.5 flex h-2.5 w-2.5">
+          <span className="absolute inset-0 rounded-full bg-green-400 animate-online-dot" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+        </span>
+      </div>
+      <div className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+        {inView ? <CountUp end={count} /> : "0"}
+      </div>
+      <div className="mt-0.5 text-[11px] text-[var(--text-secondary)] text-center">Онлайн</div>
     </div>
   );
 }
@@ -222,19 +269,7 @@ function DustParticles({ count = 30 }) {
 function OnlineCounter({ totalUsers }) {
   const [count, setCount] = useState(0);
   useEffect(() => {
-    const hour = new Date().getHours();
-    // Коэффициент активности по часу дня (пик 12-18ч)
-    const hourMultiplier =
-      hour >= 10 && hour <= 20 ? 0.15 + 0.1 * Math.sin(((hour - 10) / 10) * Math.PI)
-      : hour >= 7 && hour < 10 ? 0.08
-      : hour >= 21 && hour <= 23 ? 0.07
-      : 0.03;
-    const base = Math.max(totalUsers || 20, 20);
-    // Seed от текущей минуты для стабильности
-    const seed = Math.floor(Date.now() / 60000);
-    const pseudoRandom = ((seed * 9301 + 49297) % 233280) / 233280;
-    const value = Math.max(3, Math.round(base * hourMultiplier + pseudoRandom * 5));
-    setCount(value);
+    setCount(calcOnlineCount(totalUsers));
   }, [totalUsers]);
 
   if (!count) return null;
@@ -350,14 +385,10 @@ function GuestView({ publicStats, weather, routeOfDay, featuredRoutes }) {
           <p className="mt-2 text-base text-white/80 font-medium">Больше, чем просто прогулка</p>
 
           {/* Инлайн-статистика в герое */}
-          <div className="flex justify-center gap-2.5 mt-5">
+          <div className="flex justify-center mt-5">
             <div className="flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5">
               <Route className="h-3.5 w-3.5 text-white/80" />
               <span className="text-xs font-bold text-white">{publicStats.totalRoutes} маршрутов</span>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full bg-white/15 backdrop-blur-sm px-3 py-1.5">
-              <Users className="h-3.5 w-3.5 text-white/80" />
-              <span className="text-xs font-bold text-white">{publicStats.totalUsers || 0}+ гуляют</span>
             </div>
           </div>
         </div>
@@ -371,7 +402,7 @@ function GuestView({ publicStats, weather, routeOfDay, featuredRoutes }) {
         <div ref={statsRef} className={`grid grid-cols-3 gap-3 ${statsInView ? "" : "opacity-0"}`}>
           <StatCard icon={Route} value={publicStats.totalRoutes} label="Маршрутов" gradient="from-green-500/15 to-emerald-500/5" iconColor="text-green-500" delay={0} inView={statsInView} />
           <StatCard icon={Ruler} value={dist.value} label={dist.unit} gradient="from-blue-500/15 to-sky-500/5" iconColor="text-blue-500" delay={100} inView={statsInView} />
-          <StatCard icon={Users} value={publicStats.totalUsers || 0} label="Гуляют" gradient="from-purple-500/15 to-violet-500/5" iconColor="text-purple-500" delay={200} inView={statsInView} />
+          <OnlineStatCard delay={200} inView={statsInView} totalUsers={publicStats.totalUsers} />
         </div>
 
         {/* ═══ ПОГОДА ═══ */}
@@ -484,6 +515,114 @@ function GuestView({ publicStats, weather, routeOfDay, featuredRoutes }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── TutorialRewardOverlay ────────────────────────────────────────
+function TutorialRewardOverlay() {
+  const [visible, setVisible] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [phase, setPhase] = useState("idle"); // idle | in | show | out
+
+  useEffect(() => {
+    const handler = (e) => {
+      const reward = e.detail?.amount || 100;
+      setAmount(reward);
+      setVisible(true);
+      setPhase("in");
+      setTimeout(() => setPhase("show"), 50);
+      setTimeout(() => setPhase("out"), 3200);
+      setTimeout(() => { setVisible(false); setPhase("idle"); }, 3800);
+    };
+    window.addEventListener("tutorial-reward", handler);
+    return () => window.removeEventListener("tutorial-reward", handler);
+  }, []);
+
+  if (!visible) return null;
+
+  return createPortal(
+    <div className={`fixed inset-0 z-[300] flex items-center justify-center pointer-events-none transition-opacity duration-500 ${phase === "out" ? "opacity-0" : phase !== "idle" ? "opacity-100" : "opacity-0"}`}>
+      <style>{`
+        @keyframes tr-bg { 0%{opacity:0} 100%{opacity:1} }
+        @keyframes tr-coin-pop { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.2) rotate(5deg);opacity:1} 100%{transform:scale(1) rotate(0);opacity:1} }
+        @keyframes tr-text-up { 0%{transform:translateY(30px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+        @keyframes tr-number { 0%{transform:scale(0.3);opacity:0} 50%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
+        @keyframes tr-shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes tr-ring { 0%{transform:scale(0.5);opacity:0.8} 100%{transform:scale(2.5);opacity:0} }
+        @keyframes tr-sparkle { 0%{transform:translate(-50%,-50%) scale(0);opacity:1} 50%{opacity:1} 100%{transform:translate(calc(-50% + var(--sx)),calc(-50% + var(--sy))) scale(0.5);opacity:0} }
+      `}</style>
+
+      {/* Soft backdrop */}
+      <div className="absolute inset-0 bg-black/40" style={{ animation: "tr-bg 0.4s ease-out both" }} />
+
+      {/* Content */}
+      <div className="relative flex flex-col items-center">
+        {/* Expanding rings */}
+        {[0, 0.3, 0.6].map((d, i) => (
+          <div
+            key={i}
+            className="absolute w-32 h-32 rounded-full border-2 border-yellow-400/30"
+            style={{ animation: `tr-ring 1.5s ease-out ${d}s infinite` }}
+          />
+        ))}
+
+        {/* Coin icon */}
+        <div
+          className="relative w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-2xl shadow-yellow-500/40"
+          style={{ animation: "tr-coin-pop 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.2s both" }}
+        >
+          <Coins size={44} className="text-white drop-shadow-lg" />
+
+          {/* Sparkle particles */}
+          {Array.from({ length: 16 }).map((_, i) => {
+            const angle = (i / 16) * Math.PI * 2;
+            const r = 70 + Math.random() * 50;
+            return (
+              <div
+                key={i}
+                className="absolute w-2 h-2 rounded-full bg-yellow-300"
+                style={{
+                  left: "50%", top: "50%",
+                  "--sx": `${Math.cos(angle) * r}px`,
+                  "--sy": `${Math.sin(angle) * r}px`,
+                  animation: `tr-sparkle 0.8s ease-out ${0.4 + i * 0.04}s both`,
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Amount */}
+        <div
+          className="mt-5 text-5xl font-black"
+          style={{
+            background: "linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24)",
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            animation: "tr-number 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.5s both, tr-shimmer 2s linear 1s infinite",
+          }}
+        >
+          +{amount}
+        </div>
+
+        {/* Label */}
+        <p
+          className="mt-2 text-lg font-bold text-white/90"
+          style={{ animation: "tr-text-up 0.5s ease-out 0.7s both" }}
+        >
+          Монет за обучение!
+        </p>
+
+        <p
+          className="mt-1 text-sm text-white/50"
+          style={{ animation: "tr-text-up 0.5s ease-out 0.9s both" }}
+        >
+          Добро пожаловать в Ростов GO
+        </p>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -787,6 +926,7 @@ function AuthenticatedView({ user, userStats, publicStats, weather, routeOfDay, 
 
   return (
     <div className="pb-24">
+      <TutorialRewardOverlay />
       {/* ═══ HERO — персональная карточка с градиентом ═══ */}
       <div className="relative overflow-hidden bg-gradient-to-br from-green-600 via-emerald-500 to-teal-500 animate-gradient px-5 pt-10 pb-8">
         {/* Пылинки */}

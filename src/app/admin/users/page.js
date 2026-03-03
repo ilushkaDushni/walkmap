@@ -318,107 +318,113 @@ function UserRow({ u, isSelf, allRoles, canAssignRoles, canBan, canManageCoins, 
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-2xl border p-3 transition ${
+      className={`rounded-2xl border p-3 transition ${
         u.banned
           ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
           : "border-[var(--border-color)] bg-[var(--bg-surface)]"
       }`}
     >
-      {/* Аватар */}
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm"
-        style={{ backgroundColor: avatarColor }}
-      >
-        {(u.username || "?")[0].toUpperCase()}
+      {/* Верхняя строка: аватар + ник + роли */}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-sm"
+          style={{ backgroundColor: avatarColor }}
+        >
+          {(u.username || "?")[0].toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+              {u.username}
+            </p>
+            {u.banned && <Ban className="h-3 w-3 text-red-500 shrink-0" />}
+          </div>
+          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+            {(u.roles || []).map((role) => (
+              <span
+                key={role.id}
+                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                style={{ backgroundColor: `${role.color}20`, color: role.color }}
+              >
+                {role.name}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Инфо */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-            {u.username}
-          </p>
-          {u.banned && <Ban className="h-3 w-3 text-red-500 shrink-0" />}
-        </div>
-        <div className="flex items-center gap-1 flex-wrap mt-0.5">
-          {(u.roles || []).map((role) => (
-            <span
-              key={role.id}
-              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
-              style={{ backgroundColor: `${role.color}20`, color: role.color }}
-            >
-              {role.name}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] mt-0.5">
+      {/* Нижняя строка: статы + действия */}
+      <div className="flex items-center justify-between mt-2 pl-[52px]">
+        <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
           <span>{u.coins || 0} монет</span>
           <span>{u.completedRoutes || 0} маршр.</span>
           {u.lastLoginAt && (
             <span title="Последний вход">{formatDate(u.lastLoginAt)}</span>
           )}
         </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {canManageShop && (
+            <button
+              onClick={onOpenInventory}
+              className="rounded-lg p-1.5 text-purple-500 hover:bg-[var(--bg-elevated)] transition"
+              title="Инвентарь"
+            >
+              <Package className="h-4 w-4" />
+            </button>
+          )}
+          {canManageCoins && (
+            <button
+              onClick={onOpenCoins}
+              className="rounded-lg p-1.5 text-amber-500 hover:bg-[var(--bg-elevated)] transition"
+              title="Монеты"
+            >
+              <Coins className="h-4 w-4" />
+            </button>
+          )}
+          {!isSelf && canViewUsers && (
+            <button
+              onClick={onOpenChat}
+              className="rounded-lg p-1.5 text-blue-500 hover:bg-[var(--bg-elevated)] transition"
+              title="Написать"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </button>
+          )}
+          {!isSelf && canBan && (
+            <>
+              <button
+                onClick={onBanHistory}
+                className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
+                title="История банов"
+              >
+                <History className="h-4 w-4" />
+              </button>
+              <button
+                onClick={onBan}
+                className={`rounded-lg p-1.5 transition ${
+                  u.banned
+                    ? "text-red-500 hover:text-red-600"
+                    : "text-[var(--text-muted)] hover:text-red-500"
+                }`}
+                title={u.banned ? "Разбанить" : "Забанить"}
+              >
+                <Ban className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Действия */}
-      <div className="flex items-center gap-0.5">
-        {canManageShop && (
-          <button
-            onClick={onOpenInventory}
-            className="rounded-lg p-1.5 text-purple-500 hover:bg-[var(--bg-elevated)] transition"
-            title="Инвентарь"
-          >
-            <Package className="h-4 w-4" />
-          </button>
-        )}
-        {canManageCoins && (
-          <button
-            onClick={onOpenCoins}
-            className="rounded-lg p-1.5 text-amber-500 hover:bg-[var(--bg-elevated)] transition"
-            title="Монеты"
-          >
-            <Coins className="h-4 w-4" />
-          </button>
-        )}
-        {!isSelf && canViewUsers && (
-          <button
-            onClick={onOpenChat}
-            className="rounded-lg p-1.5 text-blue-500 hover:bg-[var(--bg-elevated)] transition"
-            title="Написать"
-          >
-            <MessageCircle className="h-4 w-4" />
-          </button>
-        )}
-        {!isSelf && canAssignRoles && (
+      {/* Роль-пикер — отдельной строкой */}
+      {!isSelf && canAssignRoles && (
+        <div className="mt-2 pl-[52px]">
           <RolePicker
             currentRoleIds={u.roleIds || []}
             allRoles={allRoles}
             onChange={onChangeRoles}
           />
-        )}
-        {!isSelf && canBan && (
-          <>
-            <button
-              onClick={onBanHistory}
-              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
-              title="История банов"
-            >
-              <History className="h-4 w-4" />
-            </button>
-            <button
-              onClick={onBan}
-              className={`rounded-lg p-1.5 transition ${
-                u.banned
-                  ? "text-red-500 hover:text-red-600"
-                  : "text-[var(--text-muted)] hover:text-red-500"
-              }`}
-              title={u.banned ? "Разбанить" : "Забанить"}
-            >
-              <Ban className="h-4 w-4" />
-            </button>
-          </>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
