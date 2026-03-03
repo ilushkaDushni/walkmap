@@ -279,6 +279,7 @@ export default function NotificationBell({ inline = false }) {
       setGiftModalData({
         username: n.data?.username,
         avatarUrl: n.data?.avatarUrl,
+        equippedItems: n.data?.equippedItems || null,
         amount: n.data?.amount || 0,
         message: n.data?.message || "",
       });
@@ -456,6 +457,7 @@ export default function NotificationBell({ inline = false }) {
               username={giftModalData.username}
               avatarUrl={giftModalData.avatarUrl}
               size="lg"
+              equippedItems={giftModalData.equippedItems}
             />
           </div>
         )}
@@ -479,7 +481,7 @@ export default function NotificationBell({ inline = false }) {
             </>
           ) : (
             <>
-              <span className="font-semibold text-[var(--text-primary)]">{giftModalData.username}</span>{" "}
+              <span className="font-semibold" style={{ color: giftModalData.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{giftModalData.username}</span>{" "}
               подарил вам{" "}
               <span className="font-bold text-yellow-500">{giftModalData.amount} монет</span>
             </>

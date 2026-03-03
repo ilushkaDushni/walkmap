@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // POST /api/friends/request — отправить заявку в друзья
 export async function POST(request) {
@@ -53,8 +52,7 @@ export async function POST(request) {
           username: auth.user.username,
           avatarUrl: auth.user.avatarUrl || null,
         };
-        await createNotification(existing.requesterId, "friend_accept", acceptData);
-        pushNotification(existing.requesterId, { type: "friend_accept", ...acceptData });
+        await createAndPushNotification(existing.requesterId, "friend_accept", acceptData);
 
         return NextResponse.json({ status: "accepted", message: "Заявка принята — вы теперь друзья!" });
       }
@@ -77,8 +75,7 @@ export async function POST(request) {
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
   };
-  await createNotification(targetUserId, "friend_request", requestData);
-  pushNotification(targetUserId, { type: "friend_request", ...requestData });
+  await createAndPushNotification(targetUserId, "friend_request", requestData);
 
   return NextResponse.json({ status: "pending", message: "Заявка отправлена" }, { status: 201 });
 }

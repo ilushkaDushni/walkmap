@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 import { checkAndGrantAchievements } from "@/lib/achievementEngine";
 import { checkProfanity, checkFlood, notifyModeratorsAboutViolation } from "@/lib/profanity";
 
@@ -59,6 +58,7 @@ export async function GET(request, { params }) {
               _id: 1, text: 1, createdAt: 1, userId: 1, parentId: 1,
               username: "$user.username",
               avatarUrl: { $ifNull: ["$user.avatarUrl", null] },
+              equippedItems: { $ifNull: ["$user.equippedItems", null] },
             },
           },
         ],
@@ -70,6 +70,7 @@ export async function GET(request, { params }) {
         _id: 1, text: 1, createdAt: 1, userId: 1, parentId: 1,
         username: "$user.username",
         avatarUrl: { $ifNull: ["$user.avatarUrl", null] },
+        equippedItems: { $ifNull: ["$user.equippedItems", null] },
         replyCount: { $ifNull: [{ $arrayElemAt: ["$replyCountArr.count", 0] }, 0] },
         replies: 1,
       },
@@ -86,6 +87,7 @@ export async function GET(request, { params }) {
     parentId: null,
     username: c.username,
     avatarUrl: c.avatarUrl,
+    equippedItems: c.equippedItems,
     replyCount: c.replyCount,
     replies: (c.replies || []).map((r) => ({
       id: r._id.toString(),
@@ -95,6 +97,7 @@ export async function GET(request, { params }) {
       parentId: r.parentId,
       username: r.username,
       avatarUrl: r.avatarUrl,
+      equippedItems: r.equippedItems,
     })),
   }));
 
@@ -199,8 +202,7 @@ export async function POST(request, { params }) {
         username: auth.user.username,
         text: trimmed.slice(0, 100),
       };
-      await createNotification(parentComment.userId, "comment_reply", replyData);
-      pushNotification(parentComment.userId, { type: "comment_reply", ...replyData });
+      await createAndPushNotification(parentComment.userId, "comment_reply", replyData);
     }
   }
 

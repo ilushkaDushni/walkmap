@@ -17,6 +17,10 @@ export default function useNotificationSSE(onEvent) {
     const connect = () => {
       es = new EventSource("/api/notifications/stream");
 
+      es.onopen = () => {
+        window.dispatchEvent(new Event("sse-connected"));
+      };
+
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -27,6 +31,7 @@ export default function useNotificationSSE(onEvent) {
       };
 
       es.onerror = () => {
+        window.dispatchEvent(new Event("sse-disconnected"));
         es.close();
         // Переподключаемся через 5с
         reconnectTimer = setTimeout(connect, 5000);

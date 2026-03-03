@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Users, UserPlus, Search, MessageCircle, Check, X, Clock, Eye, Shield } from "lucide-react";
 import { useUser } from "@/components/UserProvider";
 import UserAvatar from "@/components/UserAvatar";
+import UserName from "@/components/UserName";
 import ChatView from "@/components/ChatView";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 
@@ -284,7 +284,7 @@ export default function FriendsPage() {
     >
       <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" online={isOnline(f.lastActivityAt)} equippedItems={f.equippedItems} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold" style={{ color: f.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{f.username}</p>
+        <UserName username={f.username} equippedItems={f.equippedItems} showTitle={false} />
         <p className={`text-xs truncate ${isOnline(f.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
           {formatLastSeen(f.lastActivityAt)}
         </p>
@@ -357,11 +357,9 @@ export default function FriendsPage() {
           ) : (
             requests.map((r) => (
               <div key={r.id} className="flex items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
-                <UserAvatar username={r.username} avatarUrl={r.avatarUrl} size="md" linkToProfile />
+                <UserAvatar username={r.username} avatarUrl={r.avatarUrl} size="md" linkToProfile equippedItems={r.equippedItems} />
                 <div className="flex-1 min-w-0">
-                  <Link href={`/users/${r.username}`} className="text-sm font-semibold text-[var(--text-primary)] hover:underline">
-                    {r.username}
-                  </Link>
+                  <UserName username={r.username} equippedItems={r.equippedItems} linkToProfile />
                   {r.bio && (
                     <p className="text-xs text-[var(--text-muted)] truncate">{r.bio}</p>
                   )}
@@ -415,11 +413,9 @@ export default function FriendsPage() {
             <div className="space-y-2">
               {searchResults.map((u) => (
                 <div key={u.id} className="flex items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3">
-                  <UserAvatar username={u.username} avatarUrl={u.avatarUrl} size="md" linkToProfile />
+                  <UserAvatar username={u.username} avatarUrl={u.avatarUrl} size="md" linkToProfile equippedItems={u.equippedItems} />
                   <div className="flex-1 min-w-0">
-                    <Link href={`/users/${u.username}`} className="text-sm font-semibold text-[var(--text-primary)] hover:underline">
-                      {u.username}
-                    </Link>
+                    <UserName username={u.username} equippedItems={u.equippedItems} linkToProfile />
                     {u.bio && (
                       <p className="text-xs text-[var(--text-muted)] truncate">{u.bio}</p>
                     )}

@@ -28,7 +28,7 @@ export async function GET(request) {
   const { ObjectId } = await import("mongodb");
   const friends = await db.collection("users")
     .find({ _id: { $in: friendIds.map((id) => new ObjectId(id)) } })
-    .project({ username: 1, avatarUrl: 1, bio: 1, coins: 1, lastActivityAt: 1 })
+    .project({ username: 1, avatarUrl: 1, bio: 1, coins: 1, lastActivityAt: 1, equippedItems: 1 })
     .toArray();
 
   const serialized = friends.map((f) => ({
@@ -37,6 +37,7 @@ export async function GET(request) {
     avatarUrl: f.avatarUrl || null,
     bio: f.bio || "",
     lastActivityAt: f.lastActivityAt || null,
+    equippedItems: f.equippedItems || null,
   }));
 
   return NextResponse.json({ friends: serialized });

@@ -7,6 +7,32 @@ import UserAvatar from "./UserAvatar";
 import { useRouter } from "next/navigation";
 import useNotificationSSE from "@/hooks/useNotificationSSE";
 
+// ─── Персистентность показанных ID (sessionStorage) ─────────────
+const STORAGE_KEY = "shown-toast-ids";
+const MAX_STORED_IDS = 50;
+
+function loadShownIds() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function saveShownId(set, id) {
+  set.add(id);
+  // Обрезаем до последних MAX_STORED_IDS
+  const arr = [...set];
+  if (arr.length > MAX_STORED_IDS) {
+    const trimmed = arr.slice(arr.length - MAX_STORED_IDS);
+    set.clear();
+    for (const v of trimmed) set.add(v);
+  }
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+  } catch { /* ignore */ }
+}
+
 export default function MessageToast() {
   const { user, authFetch } = useUser();
   const router = useRouter();
@@ -14,6 +40,15 @@ export default function MessageToast() {
   const activeChatsRef = useRef(new Set());
   const shownIdsRef = useRef(new Set());
   const timerRef = useRef(null);
+  const sseConnectedRef = useRef(false);
+  const sseLastEventRef = useRef(Date.now());
+  const authFetchRef = useRef(authFetch);
+  authFetchRef.current = authFetch;
+
+  // Загружаем показанные ID из sessionStorage при маунте
+  useEffect(() => {
+    shownIdsRef.current = loadShownIds();
+  }, []);
 
   // Слушаем события chat-active / chat-closed
   useEffect(() => {
@@ -31,8 +66,45 @@ export default function MessageToast() {
     };
   }, []);
 
+  // Слушаем SSE статус
+  useEffect(() => {
+    const onConnected = () => {
+      sseConnectedRef.current = true;
+      sseLastEventRef.current = Date.now();
+    };
+    const onDisconnected = () => {
+      sseConnectedRef.current = false;
+    };
+    window.addEventListener("sse-connected", onConnected);
+    window.addEventListener("sse-disconnected", onDisconnected);
+    return () => {
+      window.removeEventListener("sse-connected", onConnected);
+      window.removeEventListener("sse-disconnected", onDisconnected);
+    };
+  }, []);
+
+  // Хелпер: показать тост + пометить прочитанным
+  const showToast = useCallback((toastData, notificationId) => {
+    if (notificationId) {
+      if (shownIdsRef.current.has(notificationId)) return;
+      saveShownId(shownIdsRef.current, notificationId);
+    }
+    setToast(toastData);
+
+    // Fire-and-forget: помечаем уведомление прочитанным
+    if (notificationId && authFetchRef.current) {
+      authFetchRef.current("/api/notifications/read", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [notificationId] }),
+      }).catch(() => { /* ignore */ });
+    }
+  }, []);
+
   // SSE — мгновенный тост
   useNotificationSSE(useCallback((data) => {
+    sseLastEventRef.current = Date.now();
+
     if (data.type === "typing") {
       window.dispatchEvent(new CustomEvent("chat-typing", {
         detail: { conversationKey: data.conversationKey, userId: data.userId },
@@ -45,132 +117,142 @@ export default function MessageToast() {
       }));
       return;
     }
+
+    const nid = data.notificationId || null;
+
     if (data.type === "new_message") {
       const ck = data.conversationKey;
       if (ck) {
         window.dispatchEvent(new CustomEvent("new-chat-message", { detail: { conversationKey: ck } }));
       }
       if (ck && activeChatsRef.current.has(ck)) return;
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "message",
         username: data.username || "Кто-то",
         avatarUrl: data.avatarUrl || null,
         text: data.text || "",
         friendId: data.userId,
-      });
+      }, nid);
     } else if (data.type === "coin_gift") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "coin_gift",
         username: data.username || "Кто-то",
         avatarUrl: data.avatarUrl || null,
         text: `подарил вам ${data.amount || 0} монет`,
         amount: data.amount || 0,
         message: data.message || "",
-      });
+      }, nid);
     } else if (data.type === "coin_admin") {
       const amt = data.amount || 0;
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "coin_admin",
         username: "Администратор",
         text: amt > 0 ? `Начислено ${amt} монет` : `Списано ${Math.abs(amt)} монет`,
         amount: amt,
         message: data.message || "",
-      });
+      }, nid);
     } else if (data.type === "admin_message") {
       const ck = data.conversationKey;
       if (ck) {
         window.dispatchEvent(new CustomEvent("new-chat-message", { detail: { conversationKey: ck } }));
       }
       if (ck && activeChatsRef.current.has(ck)) return;
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "admin_message",
         username: data.adminUsername || "Администрация",
         text: data.text || "",
-      });
+      }, nid);
     } else if (data.type === "ticket_reply") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "ticket_reply",
         username: data.adminUsername || "Поддержка",
         text: "ответила на ваше обращение",
         ticketId: data.ticketId,
-      });
+      }, nid);
     } else if (data.type === "friend_request") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "friend_request",
         username: data.username || "Кто-то",
         avatarUrl: data.avatarUrl || null,
         text: "хочет добавить вас в друзья",
-      });
+      }, nid);
     } else if (data.type === "friend_accept") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "friend_accept",
         username: data.username || "Кто-то",
         avatarUrl: data.avatarUrl || null,
         text: "принял вашу заявку в друзья",
-      });
+      }, nid);
     } else if (data.type === "comment_reply") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "comment_reply",
         username: data.username || "Кто-то",
         text: "ответил на ваш комментарий",
         routeId: data.routeId,
-      });
+      }, nid);
     } else if (data.type === "lobby_invite") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "lobby_invite",
         username: data.username || "Кто-то",
         avatarUrl: data.avatarUrl || null,
         text: `приглашает в лобби: ${data.routeTitle || "маршрут"}`,
         joinCode: data.joinCode,
-      });
+      }, nid);
     } else if (data.type === "item_gift") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "item_gift",
         username: data.adminUsername || "Администратор",
         text: `Вам подарен предмет: ${data.itemName || ""}`,
         message: data.message || "",
-      });
+      }, nid);
     } else if (data.type === "item_revoke") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "item_revoke",
         username: data.adminUsername || "Администратор",
         text: `Предмет изъят: ${data.itemName || ""}`,
         message: data.reason || "",
-      });
+      }, nid);
     } else if (data.type === "account_banned") {
-      setToast({
-        id: Date.now().toString(),
+      showToast({
+        id: nid || Date.now().toString(),
         toastType: "account_banned",
         username: data.adminUsername || "Администратор",
         text: data.duration ? `Вы забанены на ${data.duration} дн.` : "Вы забанены",
         message: data.reason || "",
-      });
+      }, nid);
     } else {
       return;
     }
 
     // Триггерим обновление бейджа непрочитанных
     window.dispatchEvent(new Event("refresh-unread"));
-  }, []));
+  }, [showToast]));
 
-  // Fallback полинг (60с)
+  // Fallback полинг — только когда SSE отключён или молчит >90с
   useEffect(() => {
-    if (!user || !authFetch) return;
+    if (!user) return;
 
     const poll = async () => {
+      // Пропускаем если SSE активен и был event недавно
+      if (sseConnectedRef.current && Date.now() - sseLastEventRef.current < 90_000) {
+        return;
+      }
+
       try {
-        const res = await authFetch("/api/notifications?limit=5");
+        const af = authFetchRef.current;
+        if (!af) return;
+        const res = await af("/api/notifications?limit=5");
         if (!res.ok) return;
         const data = await res.json();
         const notifications = data.notifications || [];
@@ -178,104 +260,93 @@ export default function MessageToast() {
         const TOAST_TYPES = ["new_message", "coin_gift", "coin_admin", "admin_message", "ticket_reply", "friend_request", "friend_accept", "comment_reply", "lobby_invite", "item_gift", "item_revoke", "account_banned"];
         for (const n of notifications) {
           if (!TOAST_TYPES.includes(n.type) || n.read) continue;
-          if (shownIdsRef.current.has(n.id)) continue;
+          const nid = n.id;
+          if (shownIdsRef.current.has(nid)) continue;
 
           if (n.type === "admin_message") {
             const ck = n.data?.conversationKey;
             if (ck && activeChatsRef.current.has(ck)) continue;
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "admin_message",
+            showToast({
+              id: nid, toastType: "admin_message",
               username: n.data?.adminUsername || "Администрация",
               text: n.data?.text || "",
-            });
+            }, nid);
           } else if (n.type === "new_message") {
             const ck = n.data?.conversationKey;
             if (ck && activeChatsRef.current.has(ck)) continue;
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "message",
+            showToast({
+              id: nid, toastType: "message",
               username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
               text: n.data?.text || "", friendId: n.data?.userId,
-            });
+            }, nid);
           } else if (n.type === "coin_gift") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "coin_gift",
+            showToast({
+              id: nid, toastType: "coin_gift",
               username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
               text: `подарил вам ${n.data?.amount || 0} монет`,
               amount: n.data?.amount || 0, message: n.data?.message || "",
-            });
+            }, nid);
           } else if (n.type === "coin_admin") {
             const amt = n.data?.amount || 0;
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "coin_admin", username: "Администратор",
+            showToast({
+              id: nid, toastType: "coin_admin", username: "Администратор",
               text: amt > 0 ? `Начислено ${amt} монет` : `Списано ${Math.abs(amt)} монет`,
               amount: amt, message: n.data?.message || "",
-            });
+            }, nid);
           } else if (n.type === "ticket_reply") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "ticket_reply",
+            showToast({
+              id: nid, toastType: "ticket_reply",
               username: n.data?.adminUsername || "Поддержка",
               text: "ответила на ваше обращение",
               ticketId: n.data?.ticketId,
-            });
+            }, nid);
           } else if (n.type === "friend_request") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "friend_request",
+            showToast({
+              id: nid, toastType: "friend_request",
               username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
               text: "хочет добавить вас в друзья",
-            });
+            }, nid);
           } else if (n.type === "friend_accept") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "friend_accept",
+            showToast({
+              id: nid, toastType: "friend_accept",
               username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
               text: "принял вашу заявку в друзья",
-            });
+            }, nid);
           } else if (n.type === "comment_reply") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "comment_reply",
+            showToast({
+              id: nid, toastType: "comment_reply",
               username: n.data?.username || "Кто-то",
               text: "ответил на ваш комментарий",
               routeId: n.data?.routeId,
-            });
+            }, nid);
           } else if (n.type === "lobby_invite") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "lobby_invite",
+            showToast({
+              id: nid, toastType: "lobby_invite",
               username: n.data?.username || "Кто-то", avatarUrl: n.data?.avatarUrl || null,
               text: `приглашает в лобби: ${n.data?.routeTitle || "маршрут"}`,
               joinCode: n.data?.joinCode,
-            });
+            }, nid);
           } else if (n.type === "item_gift") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "item_gift",
+            showToast({
+              id: nid, toastType: "item_gift",
               username: n.data?.adminUsername || "Администратор",
               text: `Вам подарен предмет: ${n.data?.itemName || ""}`,
               message: n.data?.message || "",
-            });
+            }, nid);
           } else if (n.type === "item_revoke") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "item_revoke",
+            showToast({
+              id: nid, toastType: "item_revoke",
               username: n.data?.adminUsername || "Администратор",
               text: `Предмет изъят: ${n.data?.itemName || ""}`,
               message: n.data?.reason || "",
-            });
+            }, nid);
           } else if (n.type === "account_banned") {
-            shownIdsRef.current.add(n.id);
-            setToast({
-              id: n.id, toastType: "account_banned",
+            showToast({
+              id: nid, toastType: "account_banned",
               username: n.data?.adminUsername || "Администратор",
               text: n.data?.duration ? `Вы забанены на ${n.data.duration} дн.` : "Вы забанены",
               message: n.data?.reason || "",
-            });
+            }, nid);
           }
           break;
         }
@@ -284,22 +355,28 @@ export default function MessageToast() {
       }
     };
 
-    poll();
+    // Отложенный первый poll — даём SSE 10с на подключение
+    const initialTimer = setTimeout(poll, 10_000);
     const interval = setInterval(poll, 60_000);
 
-    // При возврате на вкладку — poll сразу
+    // При возврате на вкладку — poll если SSE не работает
     const onVisibility = () => {
-      if (document.visibilityState === "visible") poll();
+      if (document.visibilityState === "visible") {
+        if (!sseConnectedRef.current || Date.now() - sseLastEventRef.current > 90_000) {
+          poll();
+        }
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      clearTimeout(initialTimer);
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [user, authFetch]);
+  }, [user, showToast]);
 
-  // Авто-скрытие через 5с
+  // Авто-скрытие через 8с
   useEffect(() => {
     if (!toast) return;
     timerRef.current = setTimeout(() => setToast(null), 8000);

@@ -1,7 +1,6 @@
 import { getDb } from "./mongodb";
 import { getAllRoles, isSuperadmin } from "./permissions";
-import { createNotification } from "./notifications";
-import { pushNotification } from "./sse";
+import { createAndPushNotification } from "./notifications";
 
 // ─── Словарь основ (stems) ─────────────────────────────────────
 const RU_STEMS = [
@@ -176,8 +175,7 @@ export async function sendAutoWarning(userId, reason, details = "") {
       conversationKey,
       userId,
     };
-    await createNotification(userId, "admin_message", notifData);
-    pushNotification(userId, notifData);
+    await createAndPushNotification(userId, "admin_message", notifData);
   } catch (err) {
     console.error("[profanity] Failed to send auto warning:", err);
   }
@@ -230,8 +228,7 @@ export async function notifyModeratorsAboutViolation({ userId, username, text, r
       // Не уведомляем самого нарушителя (если вдруг он модератор)
       if (modId === userId) continue;
 
-      await createNotification(modId, "profanity_alert", notifData);
-      pushNotification(modId, { type: "profanity_alert", data: notifData });
+      await createAndPushNotification(modId, "profanity_alert", notifData);
     }
   } catch (err) {
     console.error("[profanity] Failed to notify moderators:", err);

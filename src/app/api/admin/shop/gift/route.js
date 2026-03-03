@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // POST /api/admin/shop/gift — подарить предмет юзеру
 export async function POST(request) {
@@ -71,8 +70,7 @@ export async function POST(request) {
     adminUsername,
     message: trimmedMessage,
   };
-  await createNotification(userId, "item_gift", notifData);
-  pushNotification(userId, { type: "item_gift", ...notifData });
+  await createAndPushNotification(userId, "item_gift", notifData);
 
   return NextResponse.json({ ok: true });
 }

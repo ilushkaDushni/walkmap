@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // POST /api/lobbies/[id]/invite — пригласить друга
 export async function POST(request, { params }) {
@@ -52,8 +51,7 @@ export async function POST(request, { params }) {
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
   };
-  await createNotification(friendId, "lobby_invite", notifData);
-  pushNotification(friendId, { type: "lobby_invite", ...notifData });
+  await createAndPushNotification(friendId, "lobby_invite", notifData);
 
   return NextResponse.json({ ok: true });
 }

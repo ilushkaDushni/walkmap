@@ -203,6 +203,7 @@ export default function TutorialOverlay() {
 
   /* ── End ── */
   const endTutorial = useCallback(() => {
+    const reward = rewardState === "claimed" ? rewardAmount : 0;
     setPhase("leaving");
     setTimeout(() => {
       setActive(false);
@@ -212,8 +213,11 @@ export default function TutorialOverlay() {
       document.body.style.overflow = "";
       localStorage.setItem(STORAGE_KEY, "true");
       if (window.location.pathname !== "/") router.push("/");
+      if (reward > 0) {
+        setTimeout(() => window.dispatchEvent(new CustomEvent("tutorial-reward", { detail: { amount: reward } })), 400);
+      }
     }, 300);
-  }, [router]);
+  }, [router, rewardState, rewardAmount]);
 
   /* ── Events ── */
   useEffect(() => {
@@ -305,10 +309,11 @@ export default function TutorialOverlay() {
   /* ── Tooltip position ── */
   const getTooltipStyle = () => {
     if (hasTarget) {
-      const tw = 320;
+      const vw = window.innerWidth;
+      const tw = Math.min(320, vw - 32);
       const pad = 16;
       const above = targetRect.cy > window.innerHeight * 0.5;
-      const left = Math.max(pad, Math.min(targetRect.cx - tw / 2, window.innerWidth - tw - pad));
+      const left = Math.max(pad, Math.min(targetRect.cx - tw / 2, vw - tw - pad));
       if (above) return { position: "fixed", bottom: `${window.innerHeight - targetRect.y + 16}px`, left: `${left}px`, width: `${tw}px` };
       return { position: "fixed", top: `${targetRect.y + targetRect.h + 16}px`, left: `${left}px`, width: `${tw}px` };
     }
@@ -390,7 +395,7 @@ export default function TutorialOverlay() {
         @keyframes tut-pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,.5),0 0 20px 0 rgba(74,222,128,.15)} 50%{box-shadow:0 0 0 6px rgba(74,222,128,0),0 0 30px 5px rgba(74,222,128,.2)} }
         @keyframes tut-hand { 0%,100%{transform:translate(0,0)} 50%{transform:translate(0,6px)} }
         @keyframes tut-card-in { 0%{transform:translateY(20px) scale(.96);opacity:0} 100%{transform:translateY(0) scale(1);opacity:1} }
-        @keyframes tut-card-in-center { 0%{transform:translate(-50%,-50%) scale(.9);opacity:0} 100%{transform:translate(-50%,-50%) scale(1);opacity:1} }
+        @keyframes tut-card-in-center { 0%{transform:scale(.9);opacity:0} 100%{transform:scale(1);opacity:1} }
       `}</style>
 
       <FloatingParticles />

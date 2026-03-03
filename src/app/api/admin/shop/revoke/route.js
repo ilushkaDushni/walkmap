@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // POST /api/admin/shop/revoke — изъять предмет у юзера
 export async function POST(request) {
@@ -100,8 +99,7 @@ export async function POST(request) {
     refundRoutiks,
     adminUsername,
   };
-  await createNotification(userId, "item_revoke", notifData);
-  pushNotification(userId, { type: "item_revoke", ...notifData });
+  await createAndPushNotification(userId, "item_revoke", notifData);
 
   return NextResponse.json({ ok: true, refundRoutiks });
 }

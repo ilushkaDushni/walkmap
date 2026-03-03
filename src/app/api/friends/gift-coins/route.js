@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 import { logCoinTransaction } from "@/lib/coinTransactions";
 
 // POST /api/friends/gift-coins — перевод монет другу
@@ -83,11 +82,11 @@ export async function POST(request) {
     userId,
     username: auth.user.username,
     avatarUrl: auth.user.avatarUrl || null,
+    equippedItems: auth.user.equippedItems || null,
     amount: parsedAmount,
     ...(trimmedMessage && { message: trimmedMessage }),
   };
-  await createNotification(friendId, "coin_gift", notifData);
-  pushNotification(friendId, { type: "coin_gift", ...notifData });
+  await createAndPushNotification(friendId, "coin_gift", notifData);
 
   return NextResponse.json({
     ok: true,

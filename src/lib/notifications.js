@@ -1,23 +1,37 @@
 import { getDb } from "./mongodb";
 import { ObjectId } from "mongodb";
+import { pushNotification } from "./sse";
 
 /**
  * Создаёт уведомление для пользователя.
  * @param {string|ObjectId} userId — получатель
- * @param {string} type — тип: "achievement" | "admin_broadcast" | "comment_reply" | "friend_request" | "friend_accept" | "lobby_invite" | "coin_gift" | "coin_admin" | "ticket_reply"
+ * @param {string} type — тип
  * @param {object} data — данные, зависящие от типа
+ * @returns {string} — _id созданного уведомления
  */
 export async function createNotification(userId, type, data = {}) {
   const db = await getDb();
   const uid = typeof userId === "string" ? userId : userId.toString();
 
-  await db.collection("notifications").insertOne({
+  const result = await db.collection("notifications").insertOne({
     userId: uid,
     type,
     data,
     read: false,
     createdAt: new Date(),
   });
+
+  return result.insertedId.toString();
+}
+
+/**
+ * Создаёт уведомление + пушит через SSE с notificationId для дедупликации.
+ * Заменяет паттерн createNotification() + pushNotification().
+ */
+export async function createAndPushNotification(userId, type, data = {}) {
+  const notificationId = await createNotification(userId, type, data);
+  pushNotification(userId, { type, notificationId, ...data });
+  return notificationId;
 }
 
 /**

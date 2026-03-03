@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { createNotification } from "@/lib/notifications";
 import { pushNotification } from "@/lib/sse";
+
 import { resolveUserPermissions } from "@/lib/permissions";
 import { isAdminConversationKey, getTargetUserIdFromAdminKey } from "@/lib/conversationAccess";
 import { checkProfanity, checkFlood, sendAutoWarning, notifyModeratorsAboutViolation } from "@/lib/profanity";
@@ -301,12 +302,15 @@ export async function POST(request, { params }) {
       "data.conversationKey": conversationKey,
       read: false,
     });
+    let notificationId;
     if (!existing) {
-      await createNotification(recipientId, notifType, ssePayload);
+      notificationId = await createNotification(recipientId, notifType, ssePayload);
+    } else {
+      notificationId = existing._id.toString();
     }
 
-    // SSE — всегда пушим для мгновенного тоста
-    pushNotification(recipientId, ssePayload);
+    // SSE — всегда пушим для мгновенного тоста (с notificationId для дедупликации)
+    pushNotification(recipientId, { ...ssePayload, notificationId });
   }
 
   // Подгружаем replyTo если есть

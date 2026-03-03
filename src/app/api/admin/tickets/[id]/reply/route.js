@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { requirePermission } from "@/lib/adminAuth";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // POST /api/admin/tickets/[id]/reply — ответ админа
 export async function POST(request, { params }) {
@@ -54,8 +53,7 @@ export async function POST(request, { params }) {
     subject: ticket.subject,
     adminUsername: user.username,
   };
-  await createNotification(ticket.userId, "ticket_reply", notifData);
-  pushNotification(ticket.userId, { type: "ticket_reply", ...notifData });
+  await createAndPushNotification(ticket.userId, "ticket_reply", notifData);
 
   return NextResponse.json({ ok: true });
 }

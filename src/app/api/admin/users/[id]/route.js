@@ -4,8 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { resolveUserPermissions, isSuperadmin, getTopPosition, getAllRoles } from "@/lib/permissions";
 import { logCoinTransaction } from "@/lib/coinTransactions";
-import { createNotification } from "@/lib/notifications";
-import { pushNotification } from "@/lib/sse";
+import { createAndPushNotification } from "@/lib/notifications";
 
 // PUT /api/admin/users/[id] — обновить пользователя (split permissions)
 export async function PUT(request, { params }) {
@@ -124,8 +123,7 @@ export async function PUT(request, { params }) {
         duration: banDuration > 0 ? banDuration : null,
         adminUsername: caller.username,
       };
-      await createNotification(id, "account_banned", banData);
-      pushNotification(id, { type: "account_banned", ...banData });
+      await createAndPushNotification(id, "account_banned", banData);
     } else {
       // Разбан
       update.banReason = null;
@@ -188,8 +186,7 @@ export async function PUT(request, { params }) {
         adminUsername: caller.username,
         ...(coinMsg && { message: coinMsg }),
       };
-      await createNotification(id, "coin_admin", coinData);
-      pushNotification(id, { type: "coin_admin", ...coinData });
+      await createAndPushNotification(id, "coin_admin", coinData);
     }
   }
 

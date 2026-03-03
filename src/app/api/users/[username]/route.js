@@ -55,5 +55,6 @@ export async function GET(request, { params }) {
     roles,
     stats: { completedRoutes, totalDistanceM, coins: user.coins || 0 },
     achievements,
+    equippedItems: user.equippedItems || null,
   });
 }

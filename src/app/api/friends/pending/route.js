@@ -24,7 +24,7 @@ export async function GET(request) {
   const requesterIds = pending.map((p) => new ObjectId(p.requesterId));
   const users = await db.collection("users")
     .find({ _id: { $in: requesterIds } })
-    .project({ username: 1, avatarUrl: 1, bio: 1 })
+    .project({ username: 1, avatarUrl: 1, bio: 1, equippedItems: 1 })
     .toArray();
 
   const userMap = {};
@@ -39,6 +39,7 @@ export async function GET(request) {
       username: u.username || "???",
       avatarUrl: u.avatarUrl || null,
       bio: u.bio || "",
+      equippedItems: u.equippedItems || null,
       createdAt: p.createdAt,
     };
   });

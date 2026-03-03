@@ -47,6 +47,7 @@ export async function POST(request) {
           userId,
           username: auth.user.username,
           avatarUrl: auth.user.avatarUrl || null,
+          equippedItems: auth.user.equippedItems || null,
           joinedAt: new Date(),
         },
       },

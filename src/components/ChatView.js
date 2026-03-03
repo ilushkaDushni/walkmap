@@ -279,7 +279,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
       {/* Аватар (только для не-сгруппированных чужих) */}
       {!isMe && !grouped && (
         <div className="shrink-0 mr-2 self-end">
-          <UserAvatar username={friend?.username || "?"} avatarUrl={friend?.avatarUrl} size="sm" />
+          <UserAvatar username={friend?.username || "?"} avatarUrl={friend?.avatarUrl} size="sm" equippedItems={friend?.equippedItems} />
         </div>
       )}
       {!isMe && grouped && <div className="w-8 mr-2 shrink-0" />}
@@ -766,10 +766,13 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
               avatarUrl={friend?.avatarUrl}
               size="sm"
               online={friendOnline}
+              equippedItems={friend?.equippedItems}
             />
           )}
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--text-primary)] truncate leading-tight">
+            <p className="text-sm font-semibold truncate leading-tight"
+              style={{ color: (!isAdminChatAsUser && friend?.equippedItems?.usernameColor?.cssData?.color) || "var(--text-primary)" }}
+            >
               {isAdminChatAsUser ? "Администрация" : (friend?.username || "Чат")}
             </p>
             {isTyping ? (

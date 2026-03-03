@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Send, Trash2, MessageCircle, Reply, ChevronDown } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
-import Link from "next/link";
+import UserName from "./UserName";
 
 function timeAgo(date) {
   const now = Date.now();
@@ -137,12 +137,11 @@ function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete })
           avatarUrl={comment.avatarUrl}
           size="sm"
           linkToProfile
+          equippedItems={comment.equippedItems}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <Link href={`/users/${comment.username}`} className="text-sm font-semibold text-[var(--text-primary)] hover:underline">
-              {comment.username}
-            </Link>
+            <UserName username={comment.username} equippedItems={comment.equippedItems} showTitle={false} linkToProfile size="sm" />
             <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(comment.createdAt)}</span>
             {(user && (user.id === comment.userId || canManage)) && (
               <button
@@ -186,12 +185,11 @@ function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete })
                 avatarUrl={r.avatarUrl}
                 size="sm"
                 linkToProfile
+                equippedItems={r.equippedItems}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Link href={`/users/${r.username}`} className="text-sm font-semibold text-[var(--text-primary)] hover:underline">
-                    {r.username}
-                  </Link>
+                  <UserName username={r.username} equippedItems={r.equippedItems} showTitle={false} linkToProfile size="sm" />
                   <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
                   {(user && (user.id === r.userId || canManage)) && (
                     <button

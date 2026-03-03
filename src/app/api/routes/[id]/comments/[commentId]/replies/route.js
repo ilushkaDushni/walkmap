@@ -29,6 +29,7 @@ export async function GET(request, { params }) {
         _id: 1, text: 1, createdAt: 1, userId: 1, parentId: 1,
         username: "$user.username",
         avatarUrl: { $ifNull: ["$user.avatarUrl", null] },
+        equippedItems: { $ifNull: ["$user.equippedItems", null] },
       },
     },
   ]).toArray();
@@ -43,6 +44,7 @@ export async function GET(request, { params }) {
     parentId: r.parentId,
     username: r.username,
     avatarUrl: r.avatarUrl,
+    equippedItems: r.equippedItems,
   }));
 
   return NextResponse.json({ replies: serialized, total });

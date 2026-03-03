@@ -294,8 +294,8 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
           </p>
           {lobbyState.participants.map((p) => (
             <div key={p.userId} className="flex items-center gap-2 rounded-xl bg-[var(--bg-elevated)] px-3 py-2">
-              <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" />
-              <span className="text-sm text-[var(--text-primary)]">{p.username}</span>
+              <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />
+              <span className="text-sm" style={{ color: p.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{p.username}</span>
               {p.userId === lobbyState.hostId && (
                 <span className="text-[10px] text-amber-500 font-medium ml-auto">Хост</span>
               )}
@@ -313,7 +313,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
                 const invited = invitedIds.has(f.id);
                 return (
                   <div key={f.id} className="flex items-center gap-2 rounded-xl bg-[var(--bg-elevated)] px-3 py-2">
-                    <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="sm" />
+                    <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="sm" equippedItems={f.equippedItems} />
                     <span className="text-sm text-[var(--text-secondary)] flex-1">{f.username}</span>
                     {alreadyIn ? (
                       <span className="text-[10px] text-green-500">В лобби</span>
@@ -391,8 +391,8 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
         <div className="space-y-2 mb-4">
           {lobbyState.participants.map((p) => (
             <div key={p.userId} className="flex items-center gap-2 rounded-xl bg-[var(--bg-elevated)] px-3 py-2">
-              <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" />
-              <span className="text-sm text-[var(--text-primary)]">{p.username}</span>
+              <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />
+              <span className="text-sm" style={{ color: p.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{p.username}</span>
               {p.userId === lobbyState.hostId && (
                 <span className="text-[10px] text-amber-500 font-medium ml-auto">Хост</span>
               )}

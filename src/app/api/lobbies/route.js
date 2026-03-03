@@ -56,6 +56,7 @@ export async function POST(request) {
       userId: auth.user._id.toString(),
       username: auth.user.username,
       avatarUrl: auth.user.avatarUrl || null,
+      equippedItems: auth.user.equippedItems || null,
       joinedAt: now,
     }],
     maxParticipants: 5,

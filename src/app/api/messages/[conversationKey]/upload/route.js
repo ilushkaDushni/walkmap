@@ -123,10 +123,13 @@ export async function POST(request, { params }) {
       "data.conversationKey": conversationKey,
       read: false,
     });
+    let notificationId;
     if (!existing) {
-      await createNotification(recipientId, notifType, ssePayload);
+      notificationId = await createNotification(recipientId, notifType, ssePayload);
+    } else {
+      notificationId = existing._id.toString();
     }
-    pushNotification(recipientId, ssePayload);
+    pushNotification(recipientId, { ...ssePayload, notificationId });
   }
 
   return NextResponse.json({
