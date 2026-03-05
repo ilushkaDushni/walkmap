@@ -708,6 +708,42 @@ export default function RouteMapLeaflet({ route }) {
               />
             </div>
           </div>
+          {gps.nextEvent && (
+            <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+              gps.distanceToNext < 20
+                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+            }`}>
+              {gps.distanceToNext < 20 ? (
+                <span className="font-medium">
+                  Вы у точки «{gps.nextEvent.data?.title || "Чекпоинт"}»
+                </span>
+              ) : (
+                <>
+                  <span className="text-lg">
+                    {gps.turnDirection ? ({
+                      "straight": "↑",
+                      "slight-right": "↗",
+                      "right": "→",
+                      "sharp-right": "↘",
+                      "slight-left": "↖",
+                      "left": "←",
+                      "sharp-left": "↙",
+                      "u-turn": "↩",
+                    }[gps.turnDirection.key] || "↑") : "↑"}
+                  </span>
+                  <span>
+                    Через <b>{gps.distanceToNext > 1000
+                      ? `${(gps.distanceToNext / 1000).toFixed(1)} км`
+                      : `${Math.round(gps.distanceToNext)} м`
+                    }</b>{" "}
+                    {gps.turnDirection?.label || "прямо"}
+                    {gps.nextEvent.type === "finish" ? " — финиш" : ""}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
           {gps.wakeLockFailed && (
             <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700 text-center">
               Не удалось заблокировать экран — он может погаснуть

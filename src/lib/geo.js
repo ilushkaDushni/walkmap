@@ -338,6 +338,54 @@ export function remapSegmentsForDirectedPath(segments, offset, reversed, dirPath
     .filter(Boolean);
 }
 
+/**
+ * Bearing (азимут) между двумя GPS-точками. Возвращает 0-360 (0 = север, 90 = восток).
+ */
+export function calculateBearing(from, to) {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const toDeg = (r) => (r * 180) / Math.PI;
+  const dLng = toRad(to.lng - from.lng);
+  const y = Math.sin(dLng) * Math.cos(toRad(to.lat));
+  const x = Math.cos(toRad(from.lat)) * Math.sin(toRad(to.lat)) -
+            Math.sin(toRad(from.lat)) * Math.cos(toRad(to.lat)) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+/**
+ * Определяет направление поворота по двум bearings.
+ * Возвращает { key, label, angle } где angle: -180..180 (отрицательный = лево).
+ */
+export function getTurnDirection(bearingBefore, bearingAfter) {
+  let angle = bearingAfter - bearingBefore;
+  if (angle > 180) angle -= 360;
+  if (angle < -180) angle += 360;
+
+  const abs = Math.abs(angle);
+  let key, label;
+  if (abs < 20)       { key = "straight";     label = "прямо"; }
+  else if (abs < 60)  { key = angle > 0 ? "slight-right" : "slight-left";  label = angle > 0 ? "правее" : "левее"; }
+  else if (abs < 120) { key = angle > 0 ? "right" : "left";                label = angle > 0 ? "направо" : "налево"; }
+  else if (abs < 160) { key = angle > 0 ? "sharp-right" : "sharp-left";    label = angle > 0 ? "резко направо" : "резко налево"; }
+  else                { key = "u-turn";        label = "развернитесь"; }
+
+  return { key, label, angle };
+}
+
+/**
+ * Расстояние вдоль пути от одной проекции до другой.
+ * @param {{ pathIndex: number, fraction: number }} fromProjection
+ * @param {{ pathIndex: number, fraction: number }} toProjection
+ * @param {number[]} cumDist — кумулятивные расстояния
+ * @returns {number} метры
+ */
+export function distanceAlongPath(fromProjection, toProjection, cumDist) {
+  const fromDist = cumDist[fromProjection.pathIndex] +
+    fromProjection.fraction * (cumDist[fromProjection.pathIndex + 1] - cumDist[fromProjection.pathIndex]);
+  const toDist = cumDist[toProjection.pathIndex] +
+    toProjection.fraction * (cumDist[toProjection.pathIndex + 1] - cumDist[toProjection.pathIndex]);
+  return Math.max(0, toDist - fromDist);
+}
+
 export function splitPathByCheckpoints(path, checkpoints) {
   if (!path || path.length < 2) return [path];
 

@@ -11,6 +11,10 @@ import {
   splitPathAtProjection,
   getDirectedPath,
   remapSegmentsForDirectedPath,
+  buildRouteEvents,
+  distanceAlongPath,
+  calculateBearing,
+  getTurnDirection,
 } from "@/lib/geo";
 
 const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = без сглаживания
@@ -170,6 +174,70 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
 
   const distanceRemaining = totalDistance > 0 ? totalDistance * (1 - progress) : 0;
 
+  // === Навигационная подсказка: следующее событие + расстояние + поворот ===
+  const dirEvents = useMemo(
+    () => buildRouteEvents(dirPath, checkpoints, dirSegments, finish),
+    [dirPath, checkpoints, dirSegments, finish]
+  );
+
+  const navigationHint = useMemo(() => {
+    if (!projection || dirPath.length < 2 || dirEvents.length === 0) {
+      return { nextEvent: null, distanceToNext: 0, turnDirection: null };
+    }
+
+    const userSortKey = projection.pathIndex + projection.fraction;
+
+    // Находим первое событие checkpoint/finish, которое впереди пользователя
+    let next = null;
+    for (const ev of dirEvents) {
+      if (ev.type !== "checkpoint" && ev.type !== "finish") continue;
+      if (ev.sortKey > userSortKey) {
+        next = ev;
+        break;
+      }
+    }
+
+    if (!next) {
+      return { nextEvent: null, distanceToNext: 0, turnDirection: null };
+    }
+
+    // Проекция следующего события на путь
+    let nextProjection;
+    if (next.type === "finish" && next.data?.position) {
+      nextProjection = projectPointOnPath(next.data.position, dirPath);
+    } else if (next.type === "checkpoint" && next.data?.position) {
+      nextProjection = projectPointOnPath(next.data.position, dirPath);
+    }
+
+    if (!nextProjection) {
+      return { nextEvent: next, distanceToNext: 0, turnDirection: null };
+    }
+
+    const dist = distanceAlongPath(projection, nextProjection, cumDist);
+
+    // Направление поворота: bearing текущего сегмента → bearing к следующей точке
+    let turn = null;
+    const i = projection.pathIndex;
+    if (i < dirPath.length - 1) {
+      const bearingCurrent = calculateBearing(dirPath[i], dirPath[i + 1]);
+      // Для поворота берём bearing от точки перед чекпоинтом к точке после
+      const ni = nextProjection.pathIndex;
+      if (ni < dirPath.length - 1 && ni + 1 < dirPath.length) {
+        // Bearing входящего сегмента и исходящего от чекпоинта
+        const bearingInto = calculateBearing(dirPath[ni], dirPath[ni + 1]);
+        const bearingOut = ni + 1 < dirPath.length - 1
+          ? calculateBearing(dirPath[ni + 1], dirPath[ni + 2])
+          : bearingInto;
+        turn = getTurnDirection(bearingInto, bearingOut);
+      } else {
+        // Последний сегмент — прямо к финишу
+        turn = { key: "straight", label: "прямо", angle: 0 };
+      }
+    }
+
+    return { nextEvent: next, distanceToNext: dist, turnDirection: turn };
+  }, [projection, dirPath, dirEvents, cumDist]);
+
   // GeoJSON для слоёв карты
   const passedGeoJson = useMemo(() => {
     if (passedCoords.length < 2) return null;
@@ -208,6 +276,9 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     startGps,
     stopGps,
     wakeLockFailed: wakeLock.failed,
+    nextEvent: navigationHint.nextEvent,
+    distanceToNext: navigationHint.distanceToNext,
+    turnDirection: navigationHint.turnDirection,
   };
 }
 
