@@ -17,6 +17,7 @@ export default function AudioPlayer({
   autoPlay = false,
   variant = "full",
   onEnded,
+  onStateChange,
   className = "",
 }) {
   const {
@@ -33,7 +34,7 @@ export default function AudioPlayer({
     nextTrack,
     prevTrack,
     setPlaybackRate,
-  } = useAudioPlayer({ urls, autoPlay, onEnded });
+  } = useAudioPlayer({ urls, autoPlay, onEnded, onStateChange });
 
   if (!urls || urls.length === 0) return null;
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
-export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded }) {
+export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded, onStateChange }) {
   const audioRef = useRef(null);
   const [trackIndex, setTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -11,6 +11,9 @@ export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded })
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [durations, setDurations] = useState([]); // длительности всех треков
+
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => { onStateChangeRef.current = onStateChange; });
 
   const trackCount = urls.length;
 
@@ -84,11 +87,22 @@ export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded })
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
 
+    let lastReport = 0;
+    const reportState = () => {
+      const now = Date.now();
+      if (now - lastReport < 1000) return;
+      lastReport = now;
+      onStateChangeRef.current?.({ isPlaying: !audio.paused, trackIndex, currentTime: audio.currentTime });
+    };
+    const onPlayReport = () => { setIsPlaying(true); reportState(); };
+    const onPauseReport = () => { setIsPlaying(false); reportState(); };
+    const onTimeUpdateReport = () => { setCurrentTime(audio.currentTime); reportState(); };
+
     audio.addEventListener("loadedmetadata", onLoadedMeta);
-    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("timeupdate", onTimeUpdateReport);
     audio.addEventListener("ended", onEnding);
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
+    audio.addEventListener("play", onPlayReport);
+    audio.addEventListener("pause", onPauseReport);
 
     // Автоплей при первом треке + autoPlay, или при переключении трека во время воспроизведения
     const shouldPlay = (trackIndex === 0 && autoPlay) || (trackIndex > 0);
@@ -100,10 +114,10 @@ export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded })
 
     return () => {
       audio.removeEventListener("loadedmetadata", onLoadedMeta);
-      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("timeupdate", onTimeUpdateReport);
       audio.removeEventListener("ended", onEnding);
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("play", onPlayReport);
+      audio.removeEventListener("pause", onPauseReport);
       audio.pause();
       audio.src = "";
     };
@@ -145,6 +159,10 @@ export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded })
     setPlaybackRateState(rate);
   }, []);
 
+  const setTrack = useCallback((idx) => {
+    setTrackIndex(idx);
+  }, []);
+
   return {
     isPlaying,
     isLoading,
@@ -160,5 +178,6 @@ export default function useAudioPlayer({ urls = [], autoPlay = false, onEnded })
     nextTrack,
     prevTrack,
     setPlaybackRate,
+    setTrack,
   };
 }

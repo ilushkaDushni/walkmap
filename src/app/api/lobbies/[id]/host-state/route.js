@@ -53,6 +53,9 @@ export async function PATCH(request, { params }) {
       updatedAt: now,
     };
   }
+  if (body.eventIndex !== undefined) {
+    update["hostState.eventIndex"] = Math.max(0, Math.floor(Number(body.eventIndex)));
+  }
 
   await db.collection("lobbies").updateOne(
     { _id: new ObjectId(id) },

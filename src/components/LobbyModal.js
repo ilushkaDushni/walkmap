@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { X, Copy, Play, Users, Trophy, LogOut, UserPlus, Check, Loader } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { X, Copy, Play, Users, Trophy, LogOut, UserPlus, Check, Loader, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
+import AudioPlayer from "./AudioPlayer";
 import useLobbyHost from "@/hooks/useLobbyHost";
 import useLobbyParticipant from "@/hooks/useLobbyParticipant";
+import { buildRouteEvents, getDirectedPath, remapSegmentsForDirectedPath } from "@/lib/geo";
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -41,6 +43,8 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
   const [results, setResults] = useState(null);
   const [friends, setFriends] = useState([]);
   const [invitedIds, setInvitedIds] = useState(new Set());
+  const [routeData, setRouteData] = useState(null);
+  const [hostEventIndex, setHostEventIndex] = useState(0);
 
   const hostHook = useLobbyHost(currentLobbyId, { enabled: isHost && screen === "active" });
   const participantHook = useLobbyParticipant(currentLobbyId, {
@@ -161,6 +165,60 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
       setInvitedIds((prev) => new Set([...prev, friendId]));
     } catch {}
   };
+
+  // Загрузка маршрута при входе на экран "active"
+  useEffect(() => {
+    if (screen !== "active" || !lobbyState?.routeId || !authFetch || routeData) return;
+    authFetch(`/api/routes/${lobbyState.routeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setRouteData(d); })
+      .catch(() => {});
+  }, [screen, lobbyState?.routeId, authFetch, routeData]);
+
+  // Построение directed path и событий
+  const { dirPath, dirSegments } = useMemo(() => {
+    if (!routeData?.path?.length) return { dirPath: [], dirSegments: [] };
+    const result = getDirectedPath(routeData.path, routeData.startPointIndex, routeData.finishPointIndex);
+    const segs = remapSegmentsForDirectedPath(routeData.segments || [], result.offset, result.reversed, result.dirPath.length);
+    return { dirPath: result.dirPath, dirSegments: segs };
+  }, [routeData]);
+
+  const events = useMemo(() => {
+    if (!dirPath?.length || dirPath.length < 2) return [];
+    return buildRouteEvents(dirPath, routeData?.checkpoints || [], dirSegments, routeData?.finish);
+  }, [dirPath, routeData?.checkpoints, dirSegments, routeData?.finish]);
+
+  // eventIndex: хост управляет локально, участник берёт из hostState
+  const eventIndex = isHost ? hostEventIndex : (lobbyState?.hostState?.eventIndex ?? 0);
+  const currentEvent = events[eventIndex] || null;
+  const isLastEvent = eventIndex >= events.length - 1;
+
+  // Аудио urls текущего события
+  const audioUrls = currentEvent?.data?.audio || [];
+
+  // Хост: пуш eventIndex + progress
+  useEffect(() => {
+    if (!isHost || screen !== "active") return;
+    hostHook.updateEventIndex(hostEventIndex);
+    if (events.length > 0) {
+      hostHook.updateProgress(hostEventIndex / events.length);
+    }
+  }, [isHost, hostEventIndex, events.length, screen]);
+
+  // Участник: обновить src аудио при смене события/трека хоста
+  const hostAudioState = lobbyState?.hostState?.audio;
+  useEffect(() => {
+    if (isHost || !participantHook.audioRef.current || !audioUrls.length) return;
+    const idx = hostAudioState?.trackIndex || 0;
+    const url = audioUrls[idx];
+    if (url && participantHook.audioRef.current.src !== url) {
+      participantHook.audioRef.current.src = url;
+    }
+  }, [isHost, hostAudioState?.trackIndex, eventIndex, audioUrls]);
+
+  // Хост: навигация
+  const handleNextEvent = () => { if (!isLastEvent) setHostEventIndex((i) => i + 1); };
+  const handlePrevEvent = () => { if (hostEventIndex > 0) setHostEventIndex((i) => i - 1); };
 
   if (!isOpen || !user) return null;
 
@@ -363,11 +421,144 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
     return modal(
       <>
         <h2 className="text-lg font-bold text-[var(--text-primary)] text-center mb-2">
-          Прохождение
+          «{lobbyState.routeTitle || "Прохождение"}»
         </h2>
 
+        {/* Предупреждение о хосте */}
+        {lobbyState.hostOffline && (
+          <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2 text-xs text-red-400 text-center">
+            Хост не отвечает. Ожидание переподключения...
+          </div>
+        )}
+
+        {/* Карточка события */}
+        {currentEvent && (
+          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-4 mb-3 space-y-3" style={{ animation: "lobby-spring 0.3s ease" }}>
+            {/* === Segment === */}
+            {currentEvent.type === "segment" && (
+              <>
+                {currentEvent.data.title && (
+                  <h3 className="text-base font-bold text-[var(--text-primary)] text-center">
+                    {currentEvent.data.title}
+                  </h3>
+                )}
+                {currentEvent.data.text && (
+                  <div className="max-h-[30vh] overflow-y-auto scrollbar-thin text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                    {currentEvent.data.text}
+                  </div>
+                )}
+                {currentEvent.data.photos?.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto">
+                    {currentEvent.data.photos.map((url, i) => (
+                      <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* === Checkpoint === */}
+            {currentEvent.type === "checkpoint" && (
+              currentEvent.data.isEmpty ? (
+                <p className="text-sm font-medium text-[var(--text-muted)] text-center py-2">
+                  Раздел #{currentEvent.data.order + 1}
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    {currentEvent.data.color !== "transparent" && (
+                      <div
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
+                        style={{ background: currentEvent.data.color || "#f59e0b" }}
+                      >
+                        {currentEvent.data.order + 1}
+                      </div>
+                    )}
+                    <h3 className="text-base font-bold text-[var(--text-primary)]">
+                      {currentEvent.data.title || `Точка #${currentEvent.data.order + 1}`}
+                    </h3>
+                  </div>
+                  {currentEvent.data.description && (
+                    <div className="max-h-[30vh] overflow-y-auto scrollbar-thin text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                      {currentEvent.data.description}
+                    </div>
+                  )}
+                  {currentEvent.data.photos?.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {currentEvent.data.photos.map((url, i) => (
+                        <img key={i} src={url} alt="" className="h-32 rounded-xl object-cover shrink-0" />
+                      ))}
+                    </div>
+                  )}
+                  {currentEvent.data.coinsReward > 0 && (
+                    <p className="text-sm font-medium text-amber-600">+{currentEvent.data.coinsReward} монет</p>
+                  )}
+                </>
+              )
+            )}
+
+            {/* === Finish === */}
+            {currentEvent.type === "finish" && (
+              <div className="text-center py-2 space-y-2">
+                <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
+                {currentEvent.data.coinsReward > 0 && (
+                  <p className="text-sm text-green-600">+{currentEvent.data.coinsReward} монет за финиш</p>
+                )}
+              </div>
+            )}
+
+            {/* === Аудио === */}
+            {isHost && audioUrls.length > 0 && (
+              <AudioPlayer
+                key={`lobby-${eventIndex}`}
+                urls={audioUrls}
+                autoPlay
+                onStateChange={(s) => hostHook.updateAudio(s)}
+              />
+            )}
+            {!isHost && audioUrls.length > 0 && (
+              <>
+                <audio ref={participantHook.audioRef} />
+                <div className="rounded-xl bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-muted)] text-center">
+                  🎧 Аудио воспроизводится...
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Навигация (только хост) */}
+        {isHost && events.length > 1 && (
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={handlePrevEvent}
+              disabled={hostEventIndex === 0}
+              className="flex items-center justify-center h-10 w-10 rounded-full border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-30"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-sm tabular-nums text-[var(--text-muted)]">
+              {eventIndex + 1} / {events.length}
+            </span>
+            <button
+              onClick={handleNextEvent}
+              disabled={isLastEvent}
+              className="flex items-center justify-center h-10 w-10 rounded-full border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition disabled:opacity-30"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        {/* Счётчик событий (участник) */}
+        {!isHost && events.length > 1 && (
+          <div className="text-center text-sm tabular-nums text-[var(--text-muted)] mb-3">
+            {eventIndex + 1} / {events.length}
+          </div>
+        )}
+
         {/* Прогресс */}
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
             <span>Прогресс</span>
             <span>{progress}%</span>
@@ -380,15 +571,11 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
           </div>
         </div>
 
-        {/* Предупреждение о хосте */}
-        {lobbyState.hostOffline && (
-          <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2 text-xs text-red-400 text-center">
-            Хост не отвечает. Ожидание переподключения...
-          </div>
-        )}
-
         {/* Участники */}
-        <div className="space-y-2 mb-4">
+        <div className="space-y-1.5 mb-3">
+          <p className="text-xs font-medium text-[var(--text-muted)]">
+            Участники ({lobbyState.participants.length})
+          </p>
           {lobbyState.participants.map((p) => (
             <div key={p.userId} className="flex items-center gap-2 rounded-xl bg-[var(--bg-elevated)] px-3 py-2">
               <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />

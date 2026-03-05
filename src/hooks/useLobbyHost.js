@@ -13,6 +13,7 @@ export default function useLobbyHost(lobbyId, { enabled = false } = {}) {
   const progressRef = useRef(0);
   const checkpointsRef = useRef([]);
   const totalCoinsRef = useRef(0);
+  const eventIndexRef = useRef(0);
 
   const pushState = useCallback(async () => {
     if (!authFetch || !lobbyId) return;
@@ -26,6 +27,7 @@ export default function useLobbyHost(lobbyId, { enabled = false } = {}) {
           triggeredCheckpointIds: checkpointsRef.current,
           totalCoins: totalCoinsRef.current,
           audio: audioRef.current,
+          eventIndex: eventIndexRef.current,
         }),
       });
     } catch {
@@ -61,6 +63,10 @@ export default function useLobbyHost(lobbyId, { enabled = false } = {}) {
 
   const updateTotalCoins = useCallback((coins) => {
     totalCoinsRef.current = coins;
+  }, []);
+
+  const updateEventIndex = useCallback((idx) => {
+    eventIndexRef.current = idx;
   }, []);
 
   const startLobby = useCallback(async () => {
@@ -100,6 +106,7 @@ export default function useLobbyHost(lobbyId, { enabled = false } = {}) {
     updateProgress,
     updateCheckpoints,
     updateTotalCoins,
+    updateEventIndex,
     startLobby,
     completeLobby,
     leaveLobby,
