@@ -71,8 +71,8 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
   useEffect(() => {
     if (screen !== "create" || !authFetch) return;
     authFetch("/api/routes?status=published&limit=50")
-      .then((r) => r.ok ? r.json() : { routes: [] })
-      .then((d) => setRoutes(d.routes || []))
+      .then((r) => r.ok ? r.json() : [])
+      .then((d) => setRoutes(Array.isArray(d) ? d : d.routes || []))
       .catch(() => {});
   }, [screen, authFetch]);
 
