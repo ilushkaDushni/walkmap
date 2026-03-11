@@ -232,7 +232,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
       <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-[85] mx-auto max-w-md"
         style={{ animation: "lobby-spring 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)" }}
       >
-        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors max-h-[80vh] overflow-y-auto">
+        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-lg)] transition-colors max-h-[80vh] overflow-y-auto">
           <button
             onClick={onClose}
             className="absolute right-6 top-6 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
@@ -355,7 +355,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
               <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />
               <span className="text-sm" style={{ color: p.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{p.username}</span>
               {p.userId === lobbyState.hostId && (
-                <span className="text-[10px] text-amber-500 font-medium ml-auto">Хост</span>
+                <span className="text-xs text-amber-500 font-medium ml-auto">Хост</span>
               )}
             </div>
           ))}
@@ -374,13 +374,13 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
                     <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="sm" equippedItems={f.equippedItems} />
                     <span className="text-sm text-[var(--text-secondary)] flex-1">{f.username}</span>
                     {alreadyIn ? (
-                      <span className="text-[10px] text-green-500">В лобби</span>
+                      <span className="text-xs text-green-500">В лобби</span>
                     ) : invited ? (
-                      <span className="text-[10px] text-[var(--text-muted)]">Приглашён</span>
+                      <span className="text-xs text-[var(--text-muted)]">Приглашён</span>
                     ) : (
                       <button
                         onClick={() => handleInvite(f.id)}
-                        className="flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-500 font-medium hover:bg-purple-500/20 transition"
+                        className="flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs text-purple-500 font-medium hover:bg-purple-500/20 transition"
                       >
                         <UserPlus className="h-3 w-3" />
                         Пригласить
@@ -581,7 +581,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
               <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />
               <span className="text-sm" style={{ color: p.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{p.username}</span>
               {p.userId === lobbyState.hostId && (
-                <span className="text-[10px] text-amber-500 font-medium ml-auto">Хост</span>
+                <span className="text-xs text-amber-500 font-medium ml-auto">Хост</span>
               )}
             </div>
           ))}

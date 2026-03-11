@@ -27,7 +27,7 @@ function ChatThemePreview({ cssData }) {
     >
       {/* Incoming bubble */}
       <div
-        className="absolute top-3 left-3 rounded-lg rounded-bl-sm px-2.5 py-1 text-[10px] font-medium"
+        className="absolute top-3 left-3 rounded-lg rounded-bl-sm px-2.5 py-1 text-xs font-medium"
         style={cssData.dark
           ? { backgroundColor: "rgba(255,255,255,0.12)", color: "#e2e8f0" }
           : { backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)" }
@@ -37,7 +37,7 @@ function ChatThemePreview({ cssData }) {
       </div>
       {/* Outgoing bubble */}
       <div
-        className="absolute bottom-3 right-3 rounded-lg rounded-br-sm px-2.5 py-1 text-[10px] font-medium"
+        className="absolute bottom-3 right-3 rounded-lg rounded-br-sm px-2.5 py-1 text-xs font-medium"
         style={{ backgroundColor: cssData.bubble, color: cssData.bubbleText }}
       >
         Как дела?
@@ -85,7 +85,7 @@ export default function ShopItemCard({ item, owned, equipped, onClick }) {
           <div className="h-10 w-10 rounded-full bg-[var(--bg-surface)] flex items-center justify-center">
             <span className="text-xs font-bold text-[var(--text-muted)]">👤</span>
           </div>
-          <span className="text-[11px] font-bold" style={{ color: item.cssData?.color || "var(--text-primary)" }}>{item.cssData.text}</span>
+          <span className="text-xs font-bold" style={{ color: item.cssData?.color || "var(--text-primary)" }}>{item.cssData.text}</span>
         </div>
       );
     }
@@ -121,10 +121,10 @@ export default function ShopItemCard({ item, owned, equipped, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col rounded-2xl border bg-[var(--bg-surface)] p-2.5 transition hover:bg-[var(--bg-elevated)] text-left w-full ${rarity.border}`}
+      className={`relative flex flex-col glass-card p-2.5 text-left w-full ${rarity.border}`}
     >
       {/* Rarity badge */}
-      <span className={`absolute top-1.5 right-1.5 z-[1] px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white ${rarity.badge}`}>
+      <span className={`absolute top-1.5 right-1.5 z-[1] px-1.5 py-0.5 rounded-full text-xs font-bold text-white backdrop-blur-sm ${rarity.badge}/90`}>
         {rarity.label}
       </span>
 
@@ -135,17 +135,17 @@ export default function ShopItemCard({ item, owned, equipped, onClick }) {
 
       {/* Info */}
       <p className="text-xs font-semibold text-[var(--text-primary)] truncate leading-tight">{item.name}</p>
-      <p className="text-[10px] text-[var(--text-muted)] mb-1.5">{CATEGORY_LABELS[item.category] || item.category}</p>
+      <p className="text-xs text-[var(--text-muted)] mb-1.5">{CATEGORY_LABELS[item.category] || item.category}</p>
 
       {/* Price / Status */}
       {owned ? (
-        <span className={`text-[10px] font-medium ${equipped ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+        <span className={`text-xs font-medium ${equipped ? "text-green-500" : "text-[var(--text-muted)]"}`}>
           {equipped ? "Надето" : "В инвентаре"}
         </span>
       ) : (
         <div className="flex items-center gap-1">
-          <span className="text-[10px]">🔷</span>
-          <span className="text-xs font-bold text-[var(--text-primary)]">{item.price}</span>
+          <span className="text-xs">🔷</span>
+          <span className="text-xs font-bold text-[var(--accent-color)]">{item.price}</span>
         </div>
       )}
     </button>

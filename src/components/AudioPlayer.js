@@ -92,7 +92,7 @@ export default function AudioPlayer({
           />
         </div>
 
-        <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+        <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
           {formatTime(currentTime)}/{formatTime(duration)}
         </span>
       </div>
@@ -121,7 +121,7 @@ export default function AudioPlayer({
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] tabular-nums text-[var(--text-muted)]">
+          <div className="flex justify-between text-xs tabular-nums text-[var(--text-muted)]">
             <span>{formatTime(isFull && showPlaylist ? totalCurrentTime : currentTime)}</span>
             <span>{formatTime(isFull && showPlaylist ? totalDuration : duration)}</span>
           </div>
@@ -135,7 +135,7 @@ export default function AudioPlayer({
             <button
               key={rate}
               onClick={() => setPlaybackRate(rate)}
-              className={`rounded-lg px-2 py-0.5 text-[11px] font-medium transition ${
+              className={`rounded-lg px-2 py-0.5 text-xs font-medium transition ${
                 playbackRate === rate
                   ? "bg-green-600 text-white"
                   : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)]"
@@ -155,7 +155,7 @@ export default function AudioPlayer({
             >
               <SkipBack className="h-4 w-4" />
             </button>
-            <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
+            <span className="text-xs tabular-nums text-[var(--text-muted)]">
               {trackIndex + 1}/{trackCount}
             </span>
             <button

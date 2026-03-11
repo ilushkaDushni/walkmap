@@ -116,7 +116,7 @@ export default function AdminCommentsPage() {
                       {c.user?.username || "Удалён"}
                     </span>
                     {c.parentId && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)]">
                         ответ
                       </span>
                     )}

@@ -12,6 +12,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
   const [hasMore, setHasMore] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [pinnedMessage, setPinnedMessage] = useState(null);
   const intervalRef = useRef(null);
   const lastTimestampRef = useRef(null);
   const initialLoadDone = useRef(false);
@@ -29,6 +30,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
         setMessages(msgs);
         setHasMore(!!data.hasMore);
         setTypingUsers(data.typingUsers || []);
+        if (data.pinnedMessage !== undefined) setPinnedMessage(data.pinnedMessage);
         if (msgs.length > 0) {
           lastTimestampRef.current = msgs[msgs.length - 1].createdAt;
         }
@@ -396,6 +398,78 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     }
   }, [authFetch, conversationKey]);
 
+  // Send voice message
+  const sendVoice = useCallback(async (audioBlob, duration) => {
+    if (!authFetch || !conversationKey) return null;
+
+    const tempId = `_temp_${++tempIdCounter}`;
+    const previewUrl = URL.createObjectURL(audioBlob);
+    const optimisticMsg = {
+      id: tempId,
+      senderId: "__me__",
+      text: null,
+      type: "voice",
+      audioUrl: previewUrl,
+      audioDuration: duration,
+      imageUrl: null,
+      routeId: null,
+      replyToId: null,
+      replyTo: null,
+      reactions: [],
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      readAt: null,
+      _optimistic: true,
+      _status: "sending",
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", audioBlob, "voice.webm");
+      formData.append("duration", String(duration));
+      const res = await authFetch(`/api/messages/${conversationKey}/upload-audio`, {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        lastTimestampRef.current = msg.createdAt;
+        URL.revokeObjectURL(previewUrl);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...msg, _optimistic: false } : m))
+        );
+        return msg;
+      } else {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, _status: "error" } : m))
+        );
+      }
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, _status: "error" } : m))
+      );
+    }
+    return null;
+  }, [authFetch, conversationKey]);
+
+  // Toggle pin
+  const togglePin = useCallback(async (messageId) => {
+    if (!authFetch || !conversationKey) return null;
+    try {
+      const res = await authFetch(`/api/messages/${conversationKey}/${messageId}/pin`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPinnedMessage(data.pinnedMessage);
+        return data;
+      }
+    } catch { /* ignore */ }
+    return null;
+  }, [authFetch, conversationKey]);
+
   const clearMessages = useCallback(() => {
     setMessages([]);
     lastTimestampRef.current = null;
@@ -408,12 +482,15 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     hasMore,
     loadingOlder,
     typingUsers,
+    pinnedMessage,
     sendMessage,
     sendImage,
+    sendVoice,
     retryMessage,
     deleteMessage,
     toggleReaction,
     editMessage,
+    togglePin,
     loadOlder,
     sendTyping,
     clearMessages,

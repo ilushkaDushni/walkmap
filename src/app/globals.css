@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* ===================================================================
+   РОСТОВ GO v3 — ДИЗАЙН-СИСТЕМА
+   iOS 26 Liquid Glass + Spring Animations
+   =================================================================== */
+
+/* === ТЕМЫ === */
+
 :root,
 [data-theme="dark"] {
   --bg-main: #2a2a2a;
@@ -7,22 +14,87 @@
   --bg-elevated: #4a4a4a;
   --bg-subtle: #303030;
   --bg-header: #1e1e1e;
+  --bg-card: #383838;
   --text-primary: #ffffff;
   --text-secondary: #b0b0b0;
   --text-muted: #808080;
   --border-color: #4a4a4a;
+  --accent-color: #10b981;
+  --accent-color-hover: #059669;
+  --accent-light: rgba(16,185,129,0.12);
+  --shadow-color: rgba(0,0,0,0.25);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.3);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(53,53,53,0.35);
+  --glass-border: rgba(255,255,255,0.12);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(53,53,53,0.55);
+  --glass-bg-light: rgba(53,53,53,0.18);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.15);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.05);
+  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
+  --card-bg: rgba(56,56,56,0.3);
+  --card-border: rgba(255,255,255,0.12);
+  --card-hover: rgba(56,56,56,0.45);
+  /* Семантические цвета (общие) */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --gold: #fbbf24;
+  --silver: #94a3b8;
+  --bronze: #d97706;
+  --rarity-common: #94a3b8;
+  --rarity-rare: #3b82f6;
+  --rarity-epic: #8b5cf6;
+  --rarity-legendary: #f59e0b;
 }
 
 [data-theme="light"] {
-  --bg-main: #e8e8e8;
+  --bg-main: #f2f2f7;
   --bg-surface: #ffffff;
   --bg-elevated: #f0f0f0;
   --bg-subtle: #f5f5f5;
   --bg-header: #ffffff;
+  --bg-card: #ffffff;
   --text-primary: #1a1a1a;
   --text-secondary: #666666;
   --text-muted: #999999;
   --border-color: #e0e0e0;
+  --accent-color: #10b981;
+  --accent-color-hover: #059669;
+  --accent-light: rgba(16,185,129,0.08);
+  --shadow-color: rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(255,255,255,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(255,255,255,0.55);
+  --glass-bg-light: rgba(255,255,255,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
+  --card-bg: rgba(255,255,255,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(255,255,255,0.5);
 }
 
 [data-theme="midnight"] {
@@ -31,10 +103,37 @@
   --bg-elevated: #334155;
   --bg-subtle: #162033;
   --bg-header: #0b1120;
+  --bg-card: #1e293b;
   --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
   --border-color: #334155;
+  --accent-color: #10b981;
+  --accent-color-hover: #059669;
+  --accent-light: rgba(16,185,129,0.12);
+  --shadow-color: rgba(0,0,0,0.35);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(30,41,59,0.35);
+  --glass-border: rgba(255,255,255,0.1);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(30,41,59,0.55);
+  --glass-bg-light: rgba(30,41,59,0.18);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.12);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05);
+  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
+  --card-bg: rgba(30,41,59,0.3);
+  --card-border: rgba(255,255,255,0.1);
+  --card-hover: rgba(30,41,59,0.45);
 }
 
 [data-theme="forest"] {
@@ -43,10 +142,37 @@
   --bg-elevated: #2d4a38;
   --bg-subtle: #15281c;
   --bg-header: #0a1810;
+  --bg-card: #1e3328;
   --text-primary: #d1e7dd;
   --text-secondary: #8fb89e;
   --text-muted: #5e8a6e;
   --border-color: #2d4a38;
+  --accent-color: #34d399;
+  --accent-color-hover: #10b981;
+  --accent-light: rgba(52,211,153,0.12);
+  --shadow-color: rgba(0,0,0,0.35);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(26,46,34,0.35);
+  --glass-border: rgba(255,255,255,0.1);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(26,46,34,0.55);
+  --glass-bg-light: rgba(26,46,34,0.18);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.12);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05);
+  --accent-gradient: linear-gradient(135deg, #34d399, #10b981);
+  --card-bg: rgba(30,51,40,0.3);
+  --card-border: rgba(255,255,255,0.1);
+  --card-hover: rgba(30,51,40,0.45);
 }
 
 [data-theme="sunset"] {
@@ -55,10 +181,37 @@
   --bg-elevated: #3d2e25;
   --bg-subtle: #221815;
   --bg-header: #150e0c;
+  --bg-card: #2e231e;
   --text-primary: #f0ddd5;
   --text-secondary: #b89a8a;
   --text-muted: #8a6e5e;
   --border-color: #3d2e25;
+  --accent-color: #f97316;
+  --accent-color-hover: #ea580c;
+  --accent-light: rgba(249,115,22,0.12);
+  --shadow-color: rgba(0,0,0,0.35);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(42,31,26,0.35);
+  --glass-border: rgba(255,255,255,0.1);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(42,31,26,0.55);
+  --glass-bg-light: rgba(42,31,26,0.18);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.12);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.1), inset 0 0 0 1px rgba(255,255,255,0.05);
+  --accent-gradient: linear-gradient(135deg, #f97316, #ea580c);
+  --card-bg: rgba(46,35,30,0.3);
+  --card-border: rgba(255,255,255,0.1);
+  --card-hover: rgba(46,35,30,0.45);
 }
 
 [data-theme="lavender"] {
@@ -67,10 +220,37 @@
   --bg-elevated: #ede5f5;
   --bg-subtle: #f5eeff;
   --bg-header: #faf5ff;
+  --bg-card: #faf5ff;
   --text-primary: #2d1b4e;
   --text-secondary: #6b5b7b;
   --text-muted: #9b8aab;
   --border-color: #d8cce8;
+  --accent-color: #8b5cf6;
+  --accent-color-hover: #7c3aed;
+  --accent-light: rgba(139,92,246,0.1);
+  --shadow-color: rgba(100,50,150,0.08);
+  --shadow-sm: 0 1px 3px rgba(100,50,150,0.06);
+  --shadow-md: 0 4px 12px rgba(100,50,150,0.08);
+  --shadow-lg: 0 8px 24px rgba(100,50,150,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(250,245,255,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(250,245,255,0.55);
+  --glass-bg-light: rgba(250,245,255,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  --card-bg: rgba(250,245,255,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(250,245,255,0.5);
 }
 
 [data-theme="rose"] {
@@ -79,10 +259,37 @@
   --bg-elevated: #f8d2dc;
   --bg-subtle: #fdeef2;
   --bg-header: #fff0f4;
+  --bg-card: #fff0f4;
   --text-primary: #5c1a2a;
   --text-secondary: #8b4a5e;
   --text-muted: #b88a98;
   --border-color: #f0c0cc;
+  --accent-color: #f43f5e;
+  --accent-color-hover: #e11d48;
+  --accent-light: rgba(244,63,94,0.1);
+  --shadow-color: rgba(150,50,80,0.08);
+  --shadow-sm: 0 1px 3px rgba(150,50,80,0.06);
+  --shadow-md: 0 4px 12px rgba(150,50,80,0.08);
+  --shadow-lg: 0 8px 24px rgba(150,50,80,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(255,240,244,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(255,240,244,0.55);
+  --glass-bg-light: rgba(255,240,244,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #f43f5e, #e11d48);
+  --card-bg: rgba(255,240,244,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(255,240,244,0.5);
 }
 
 [data-theme="peach"] {
@@ -91,10 +298,37 @@
   --bg-elevated: #f5e6d8;
   --bg-subtle: #fff8f2;
   --bg-header: #fffaf7;
+  --bg-card: #fffaf7;
   --text-primary: #4a2c1a;
   --text-secondary: #7b5b4b;
   --text-muted: #ab8a7a;
   --border-color: #e8d5c5;
+  --accent-color: #f97316;
+  --accent-color-hover: #ea580c;
+  --accent-light: rgba(249,115,22,0.1);
+  --shadow-color: rgba(120,80,40,0.08);
+  --shadow-sm: 0 1px 3px rgba(120,80,40,0.06);
+  --shadow-md: 0 4px 12px rgba(120,80,40,0.08);
+  --shadow-lg: 0 8px 24px rgba(120,80,40,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(255,250,247,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(255,250,247,0.55);
+  --glass-bg-light: rgba(255,250,247,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #f97316, #ea580c);
+  --card-bg: rgba(255,250,247,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(255,250,247,0.5);
 }
 
 [data-theme="ocean"] {
@@ -103,10 +337,37 @@
   --bg-elevated: #d5e8ef;
   --bg-subtle: #edf6fa;
   --bg-header: #f5fbff;
+  --bg-card: #f5fbff;
   --text-primary: #1a3545;
   --text-secondary: #4b6b7b;
   --text-muted: #7a99a8;
   --border-color: #c5d8e5;
+  --accent-color: #0ea5e9;
+  --accent-color-hover: #0284c7;
+  --accent-light: rgba(14,165,233,0.1);
+  --shadow-color: rgba(20,80,120,0.08);
+  --shadow-sm: 0 1px 3px rgba(20,80,120,0.06);
+  --shadow-md: 0 4px 12px rgba(20,80,120,0.08);
+  --shadow-lg: 0 8px 24px rgba(20,80,120,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(245,251,255,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(245,251,255,0.55);
+  --glass-bg-light: rgba(245,251,255,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #0ea5e9, #0284c7);
+  --card-bg: rgba(245,251,255,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(245,251,255,0.5);
 }
 
 [data-theme="mint"] {
@@ -115,10 +376,37 @@
   --bg-elevated: #d5ebe2;
   --bg-subtle: #edf8f3;
   --bg-header: #f5fffa;
+  --bg-card: #f5fffa;
   --text-primary: #1a3a2a;
   --text-secondary: #4b7b5b;
   --text-muted: #7aab8a;
   --border-color: #c5e5d5;
+  --accent-color: #10b981;
+  --accent-color-hover: #059669;
+  --accent-light: rgba(16,185,129,0.1);
+  --shadow-color: rgba(20,100,60,0.08);
+  --shadow-sm: 0 1px 3px rgba(20,100,60,0.06);
+  --shadow-md: 0 4px 12px rgba(20,100,60,0.08);
+  --shadow-lg: 0 8px 24px rgba(20,100,60,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(245,255,250,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(245,255,250,0.55);
+  --glass-bg-light: rgba(245,255,250,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #10b981, #059669);
+  --card-bg: rgba(245,255,250,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(245,255,250,0.5);
 }
 
 [data-theme="sand"] {
@@ -127,10 +415,37 @@
   --bg-elevated: #ebe2d5;
   --bg-subtle: #f8f3eb;
   --bg-header: #fffcf5;
+  --bg-card: #fffcf5;
   --text-primary: #3a2e1a;
   --text-secondary: #7b6b4b;
   --text-muted: #ab9a7a;
   --border-color: #e5d8c5;
+  --accent-color: #d97706;
+  --accent-color-hover: #b45309;
+  --accent-light: rgba(217,119,6,0.1);
+  --shadow-color: rgba(100,80,40,0.08);
+  --shadow-sm: 0 1px 3px rgba(100,80,40,0.06);
+  --shadow-md: 0 4px 12px rgba(100,80,40,0.08);
+  --shadow-lg: 0 8px 24px rgba(100,80,40,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(255,252,245,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(255,252,245,0.55);
+  --glass-bg-light: rgba(255,252,245,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #d97706, #b45309);
+  --card-bg: rgba(255,252,245,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(255,252,245,0.5);
 }
 
 [data-theme="sky"] {
@@ -139,17 +454,48 @@
   --bg-elevated: #dbe6f5;
   --bg-subtle: #eff5ff;
   --bg-header: #f5f9ff;
+  --bg-card: #f5f9ff;
   --text-primary: #1a2540;
   --text-secondary: #4b5b80;
   --text-muted: #7a8ab0;
   --border-color: #c8d5e8;
+  --accent-color: #3b82f6;
+  --accent-color-hover: #2563eb;
+  --accent-light: rgba(59,130,246,0.1);
+  --shadow-color: rgba(30,60,120,0.08);
+  --shadow-sm: 0 1px 3px rgba(30,60,120,0.06);
+  --shadow-md: 0 4px 12px rgba(30,60,120,0.08);
+  --shadow-lg: 0 8px 24px rgba(30,60,120,0.12);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+  --glass-bg: rgba(245,249,255,0.35);
+  --glass-border: rgba(255,255,255,0.5);
+  /* v3 Liquid Glass (iOS 26) */
+  --glass-bg-strong: rgba(245,249,255,0.55);
+  --glass-bg-light: rgba(245,249,255,0.2);
+  --glass-blur: 40px;
+  --glass-blur-strong: 60px;
+  --glass-highlight: rgba(255,255,255,0.6);
+  --glass-inner-shadow: inset 0 1px 0 0 rgba(255,255,255,0.5), inset 0 0 0 1px rgba(255,255,255,0.15);
+  --accent-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+  --card-bg: rgba(245,249,255,0.3);
+  --card-border: rgba(255,255,255,0.5);
+  --card-hover: rgba(245,249,255,0.5);
 }
+
+/* === TAILWIND THEME === */
 
 @theme inline {
   --color-background: var(--bg-main);
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
 }
+
+/* === БАЗОВЫЕ СТИЛИ === */
 
 body {
   background: var(--bg-main);
@@ -158,7 +504,11 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Скрыть BottomNav на десктопе когда открыта страница друзей */
+::selection {
+  background: var(--accent-light);
+  color: var(--text-primary);
+}
+
 @media (min-width: 768px) {
   body:has([data-friends-desktop]) [data-bottom-nav] {
     display: none !important;
@@ -174,110 +524,8 @@ button:focus, a:focus {
   outline: none;
 }
 
-/* Анимация пульсации для активной остановки */
-@keyframes ping-slow {
-  0% {
-    transform-origin: center;
-    r: 28;
-    opacity: 0.6;
-  }
-  100% {
-    r: 40;
-    opacity: 0;
-  }
-}
+/* === СКРОЛЛБАРЫ === */
 
-.animate-ping-slow {
-  animation: ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-/* Анимация пунктирной линии маршрута */
-@keyframes dash-move {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -40;
-  }
-}
-
-.animate-dash {
-  animation: dash-move 1s linear infinite;
-}
-
-/* Выезд модала снизу */
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.25s ease-out;
-}
-
-@keyframes slide-out-down {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-}
-
-.animate-slide-out-down {
-  animation: slide-out-down 0.2s ease-in forwards;
-}
-
-/* Rules page staggered entrance */
-@keyframes rules-enter {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.97);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-.rules-animate {
-  opacity: 0;
-  animation: rules-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--i, 0) * 0.07s);
-}
-
-@keyframes slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-down {
-  animation: slide-down 0.25s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* Полупрозрачный скроллбар для текстовых блоков */
-/* Скрытый скроллбар (скролл колёсиком работает) */
 .scrollbar-none,
 textarea.scrollbar-none {
   scrollbar-width: none;
@@ -308,90 +556,224 @@ textarea::-webkit-scrollbar {
   background: rgba(150, 150, 150, 0.6);
 }
 
-/* Дашборд — fade-in-up */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ===================================================================
+   GLASS УТИЛИТЫ (v3)
+   =================================================================== */
+
+/* --- Liquid Glass базовый --- */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-shadow);
 }
 
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out both;
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-shadow);
 }
 
-/* Дашборд — scale-in */
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.glass-light {
+  background: var(--glass-bg-light);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
 }
 
-.animate-scale-in {
-  animation: scale-in 0.4s ease-out both;
+/* --- Liquid Glass Card (iOS 26 виджет) --- */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--glass-inner-shadow), var(--shadow-sm);
+  transition: background 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-/* GPS-точка пользователя — синяя пульсация */
-@keyframes gps-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(2.5);
-    opacity: 0;
-  }
+.glass-card:hover {
+  background: var(--card-hover);
+  box-shadow: var(--glass-inner-shadow), var(--shadow-md);
 }
 
-.gps-dot {
+.glass-card:active {
+  transform: scale(0.97);
+}
+
+/* --- Liquid Glass Pill (iOS 26 Control Center) --- */
+.glass-pill {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--glass-inner-shadow);
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.glass-pill:hover {
+  background: var(--glass-bg-strong);
+}
+
+.glass-pill:active {
+  transform: scale(0.95);
+}
+
+/* --- Стеклянный навбар (floating card) --- */
+.glass-nav {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    var(--glass-inner-shadow),
+    0 -2px 20px rgba(0,0,0,0.06),
+    0 8px 32px rgba(0,0,0,0.12);
+}
+
+/* --- Стеклянный хедер --- */
+.glass-header {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inner-shadow);
+}
+
+/* --- Кнопка с акцент-градиентом (pill shape) --- */
+.btn-accent {
+  background: var(--accent-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 12px 24px;
+  font-weight: 600;
+  box-shadow: 0 2px 12px var(--accent-light), inset 0 1px 0 0 rgba(255,255,255,0.2);
+  transition: transform 0.15s ease, box-shadow 0.25s ease, filter 0.2s ease;
+}
+
+.btn-accent:hover {
+  box-shadow: 0 4px 24px var(--accent-light), inset 0 1px 0 0 rgba(255,255,255,0.2);
+  filter: brightness(1.08);
+}
+
+.btn-accent:active {
+  transform: scale(0.95);
+}
+
+/* --- Стеклянная кнопка (pill shape) --- */
+.btn-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  padding: 12px 24px;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow: var(--glass-inner-shadow);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.btn-glass:hover {
+  background: var(--glass-bg-strong);
+}
+
+.btn-glass:active {
+  transform: scale(0.95);
+}
+
+/* --- Liquid Glass Widget (большой, как на home screen iOS 26) --- */
+.glass-widget {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--glass-inner-shadow), var(--shadow-md);
+  overflow: hidden;
   position: relative;
-  width: 14px;
-  height: 14px;
 }
 
-.gps-dot-core {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #4285f4;
-  border: 2px solid white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  position: relative;
-  z-index: 2;
-}
-
-.gps-dot-pulse {
+/* Блик сверху виджета */
+.glass-widget::before {
+  content: '';
   position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: #4285f4;
-  animation: gps-pulse 2s ease-out infinite;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-highlight), transparent);
+  pointer-events: none;
   z-index: 1;
 }
 
-/* Чат: появление нового сообщения */
-@keyframes message-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* --- Liquid Glass Input --- */
+.glass-input {
+  background: var(--glass-bg-light);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  padding: 10px 18px;
+  color: var(--text-primary);
+  box-shadow: var(--glass-inner-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.animate-message-in {
-  animation: message-in 0.2s ease-out;
+.glass-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: var(--glass-inner-shadow), 0 0 0 3px var(--accent-light);
+}
+
+.glass-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ===================================================================
+   АНИМАЦИИ — СУЩЕСТВУЮЩИЕ
+   =================================================================== */
+
+/* Пульсация для активной остановки */
+@keyframes ping-slow {
+  0% { transform-origin: center; r: 28; opacity: 0.6; }
+  100% { r: 40; opacity: 0; }
+}
+.animate-ping-slow {
+  animation: ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Пунктирная линия маршрута */
+@keyframes dash-move {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -40; }
+}
+.animate-dash {
+  animation: dash-move 1s linear infinite;
+}
+
+/* GPS-точка — синяя пульсация */
+@keyframes gps-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.gps-dot { position: relative; width: 14px; height: 14px; }
+.gps-dot-core {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #4285f4; border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  position: relative; z-index: 2;
+}
+.gps-dot-pulse {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: #4285f4;
+  animation: gps-pulse 2s ease-out infinite;
+  z-index: 1;
 }
 
 /* Чат: пульсация точек "печатает..." */
@@ -399,131 +781,397 @@ textarea::-webkit-scrollbar {
   0%, 60%, 100% { opacity: 0.3; }
   30% { opacity: 1; }
 }
-
 .animate-typing-dot-1 { animation: typing-dot 1.4s infinite 0s; }
 .animate-typing-dot-2 { animation: typing-dot 1.4s infinite 0.2s; }
 .animate-typing-dot-3 { animation: typing-dot 1.4s infinite 0.4s; }
 
-/* Рамки аватаров — вращение */
+/* Рамки аватаров */
 @keyframes frame-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-.animate-frame-spin {
-  animation: frame-spin 3s linear infinite;
-}
+.animate-frame-spin { animation: frame-spin 3s linear infinite; }
 
-/* Рамки — пульсация свечения */
 @keyframes frame-pulse {
   0%, 100% { filter: brightness(1) drop-shadow(0 0 2px currentColor); }
   50% { filter: brightness(1.3) drop-shadow(0 0 8px currentColor); }
 }
-.animate-frame-pulse {
-  animation: frame-pulse 2s ease-in-out infinite;
-}
+.animate-frame-pulse { animation: frame-pulse 2s ease-in-out infinite; }
 
-/* Рамки — радуга (сдвиг hue) */
 @keyframes frame-rainbow {
   0% { filter: hue-rotate(0deg); }
   100% { filter: hue-rotate(360deg); }
 }
-.animate-frame-rainbow {
-  animation: frame-rainbow 4s linear infinite;
-}
+.animate-frame-rainbow { animation: frame-rainbow 4s linear infinite; }
 
-/* Дашборд: анимированный градиентный фон */
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 8s ease infinite;
-}
-
-/* Дашборд: плавающие декоративные элементы */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* Дашборд: блик (shine) на кнопке */
-@keyframes shine {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
-}
-.btn-shine {
-  position: relative;
-  overflow: hidden;
-}
-.btn-shine::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  animation: shine 4s ease-in-out infinite;
-}
-
-/* Дашборд: мягкое свечение */
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); }
-  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
-}
-.animate-glow {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-
-/* Счётчик "Сейчас гуляют" — пульсирующая зелёная точка */
+/* Онлайн пульс */
 @keyframes online-pulse {
-  0%, 100% {
-    transform: scale(1);
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.4; }
+}
+.animate-online-dot { animation: online-pulse 2s ease-in-out infinite; }
+
+/* Shimmer-скелетон */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-subtle) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Единый active:scale */
+.tap-scale { transition: transform 0.15s ease; }
+.tap-scale:active { transform: scale(0.97); }
+
+/* ===================================================================
+   АНИМАЦИИ v3 — iOS 18 SPRING
+   =================================================================== */
+
+/* Модалка — spring снизу */
+@keyframes modal-spring {
+  0% {
+    opacity: 0;
+    transform: translateY(100%) scale(0.95);
+  }
+  60% {
     opacity: 1;
+    transform: translateY(-3%) scale(1.01);
+  }
+  80% {
+    transform: translateY(1%) scale(0.998);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal-spring {
+  animation: modal-spring 0.5s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Модалка — закрытие */
+@keyframes modal-spring-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(40%) scale(0.95);
+  }
+}
+
+.animate-modal-spring-out {
+  animation: modal-spring-out 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Модалка — по центру (для alerts, confirmations) */
+@keyframes modal-center {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-modal-center {
+  animation: modal-center 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Backdrop */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-backdrop {
+  animation: backdrop-in 0.3s ease-out forwards;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Выезд снизу (обновлённый) */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes slide-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+.animate-slide-out-down {
+  animation: slide-out-down 0.2s ease-in forwards;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Карточка — staggered появление */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.animate-card-enter {
+  opacity: 0;
+  animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 0.06s);
+}
+
+/* Rules page staggered (совместимость) */
+.rules-animate {
+  opacity: 0;
+  animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 0.07s);
+}
+
+/* Сообщение в чате */
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-message-in {
+  animation: message-in 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Подсветка при скролле к закреплённому сообщению */
+@keyframes highlight-msg {
+  0% { background-color: var(--accent-color); opacity: 0.15; }
+  100% { background-color: transparent; opacity: 1; }
+}
+
+.animate-highlight {
+  animation: highlight-msg 1.5s ease-out;
+  border-radius: 1rem;
+}
+
+/* Прогресс-бар заполнение */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to { width: var(--progress, 0%); }
+}
+
+.animate-progress {
+  animation: progress-fill 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.3s;
+  width: 0%;
+}
+
+/* Streak огонёк */
+@keyframes flame-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(251,191,36,0.4));
+    transform: scale(1);
   }
   50% {
-    transform: scale(1.6);
-    opacity: 0.4;
+    filter: drop-shadow(0 0 14px rgba(251,191,36,0.7));
+    transform: scale(1.12);
   }
 }
-.animate-online-dot {
-  animation: online-pulse 2s ease-in-out infinite;
+
+.animate-flame {
+  animation: flame-glow 2s ease-in-out infinite;
 }
 
-/* Dust particles — 4 варианта дрейфа */
-@keyframes dust-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
-  10% { opacity: var(--dust-o, 0.3); }
-  90% { opacity: var(--dust-o, 0.3); }
-  25% { transform: translate(30px, -25px) scale(1.2); }
-  50% { transform: translate(-20px, -45px) scale(0.8); }
-  75% { transform: translate(25px, -15px) scale(1.1); }
+/* Достижение получено */
+@keyframes achievement-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-10deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(2deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
 }
-@keyframes dust-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
-  10% { opacity: var(--dust-o, 0.3); }
-  90% { opacity: var(--dust-o, 0.3); }
-  25% { transform: translate(-30px, -18px) scale(0.9); }
-  50% { transform: translate(25px, -40px) scale(1.3); }
-  75% { transform: translate(-20px, -28px) scale(1); }
+
+.animate-achievement-pop {
+  animation: achievement-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
-@keyframes dust-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
-  10% { opacity: var(--dust-o, 0.3); }
-  90% { opacity: var(--dust-o, 0.3); }
-  25% { transform: translate(18px, 12px) scale(1.1); }
-  50% { transform: translate(-28px, -22px) scale(0.9); }
-  75% { transform: translate(12px, -35px) scale(1.2); }
+
+/* Подиум */
+@keyframes podium-rise {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-@keyframes dust-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0; }
-  10% { opacity: var(--dust-o, 0.3); }
-  90% { opacity: var(--dust-o, 0.3); }
-  25% { transform: translate(-18px, -35px) scale(1.3); }
-  50% { transform: translate(35px, -12px) scale(0.8); }
-  75% { transform: translate(-12px, 18px) scale(1.1); }
+
+.animate-podium {
+  opacity: 0;
+  animation: podium-rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 0.15s);
+}
+
+/* Число — пульс при обновлении */
+@keyframes count-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-count-pulse {
+  animation: count-pulse 0.3s ease-out;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scale-in */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Fade slide (для табов) */
+@keyframes fade-slide-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-slide {
+  animation: fade-slide-in 0.25s ease-out;
+}
+
+/* Переливающийся градиент (для premium карточек) */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease-in-out infinite;
+}
+
+/* Свечение — акцентная подсветка */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--accent-light); }
+  50% { box-shadow: 0 0 24px var(--accent-light), 0 0 48px var(--accent-light); }
+}
+
+.animate-glow {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
+/* Раскачивание (для уведомлений) */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+/* Confetti burst (для побед) */
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(720deg) scale(0.3);
+  }
+}
+
+.animate-confetti {
+  animation: confetti-fall 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation-delay: calc(var(--i, 0) * 0.05s);
+}
+
+/* ===================================================================
+   BOTTOM NAV
+   =================================================================== */
+
+.nav-tab-btn {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s ease;
+}
+
+.nav-tab-btn:active {
+  transform: scale(0.92);
+}
+
+/* Скользящий индикатор */
+.nav-tab-slider {
+  transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Иконка */
+.nav-tab-icon {
+  transition: color 0.2s ease, stroke-width 0.15s ease;
+}
+
+/* Лейбл */
+.nav-tab-label {
+  transition: color 0.2s ease;
 }

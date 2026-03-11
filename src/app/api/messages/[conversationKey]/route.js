@@ -125,6 +125,8 @@ export async function GET(request, { params }) {
     text: m.text,
     type: m.type || "text",
     imageUrl: m.imageUrl || null,
+    audioUrl: m.audioUrl || null,
+    audioDuration: m.audioDuration || 0,
     routeId: m.routeId || null,
     createdAt: m.createdAt,
     editedAt: m.editedAt || null,
@@ -135,7 +137,38 @@ export async function GET(request, { params }) {
     ...(isAdminConv && m.type === "admin" ? { senderUsername: m.senderUsername || senderUsernameMap[m.senderId] || "Админ" } : {}),
   }));
 
-  return NextResponse.json({ messages: serialized, hasMore, typingUsers });
+  // Закреплённое сообщение (только при начальной загрузке, без before/after)
+  let pinnedMessage = null;
+  if (!before && !after) {
+    const pinned = await db.collection("messages").findOne(
+      { conversationKey, pinnedAt: { $exists: true }, deletedFor: { $ne: userId } },
+      { sort: { pinnedAt: -1 } }
+    );
+    if (pinned) {
+      let senderName = "Пользователь";
+      try {
+        const sender = await db.collection("users").findOne(
+          { _id: new ObjectId(pinned.senderId) },
+          { projection: { username: 1 } }
+        );
+        if (sender) senderName = sender.username;
+      } catch { /* ignore */ }
+      pinnedMessage = {
+        id: pinned._id.toString(),
+        senderId: pinned.senderId,
+        senderName,
+        text: pinned.text || null,
+        type: pinned.type || "text",
+        imageUrl: pinned.imageUrl || null,
+        audioUrl: pinned.audioUrl || null,
+        createdAt: pinned.createdAt,
+        pinnedAt: pinned.pinnedAt,
+        pinnedBy: pinned.pinnedBy,
+      };
+    }
+  }
+
+  return NextResponse.json({ messages: serialized, hasMore, typingUsers, pinnedMessage });
 }
 
 // POST /api/messages/[conversationKey] — отправить сообщение

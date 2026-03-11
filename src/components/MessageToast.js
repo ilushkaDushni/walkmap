@@ -441,7 +441,7 @@ export default function MessageToast() {
       onClick={handleClick}
       className="fixed top-16 left-4 right-4 z-[90] mx-auto max-w-sm cursor-pointer animate-slide-down"
     >
-      <div className="flex items-center gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl px-4 py-3">
+      <div className="flex items-center gap-3 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] px-4 py-3">
         {toast.avatarUrl ? (
           <UserAvatar username={toast.username} avatarUrl={toast.avatarUrl} size="sm" />
         ) : toast.toastType === "coin_admin" ? (
@@ -473,7 +473,7 @@ export default function MessageToast() {
             <p className="text-xs text-[var(--text-muted)] truncate">{toast.text}</p>
           )}
           {toast.message && (
-            <p className="text-[10px] text-[var(--text-muted)] italic truncate">&laquo;{toast.message}&raquo;</p>
+            <p className="text-xs text-[var(--text-muted)] italic truncate">&laquo;{toast.message}&raquo;</p>
           )}
         </div>
         {toastIcon}

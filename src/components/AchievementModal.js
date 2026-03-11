@@ -39,7 +39,7 @@ export default function AchievementModal({ slug, date, onClose }) {
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl overflow-hidden animate-scale-in"
+        className="relative w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close */}
@@ -79,7 +79,7 @@ export default function AchievementModal({ slug, date, onClose }) {
           )}
 
           {date && (
-            <p className="mt-3 text-[11px] text-[var(--text-muted)]">
+            <p className="mt-3 text-xs text-[var(--text-muted)]">
               Получено: {formatDate(date)}
             </p>
           )}

@@ -341,10 +341,10 @@ export default function TutorialOverlay() {
 
   /* ── Reward content ── */
   const renderReward = () => (
-    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl text-center overflow-hidden relative">
+    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-6 shadow-[var(--shadow-lg)] text-center overflow-hidden relative">
       <div className="relative w-28 h-28 mx-auto mb-5">
         <div className="absolute inset-0 rounded-full" style={{ background: "radial-gradient(circle, rgba(234,179,8,0.25) 0%, transparent 70%)", animation: "tut-glow 2s ease-in-out infinite" }} />
-        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30" style={{ animation: "tut-pop 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-[var(--shadow-sm)] shadow-amber-500/30" style={{ animation: "tut-pop 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}>
           <Trophy size={40} className="text-white drop-shadow-lg" />
         </div>
         {showCoins && Array.from({ length: 14 }).map((_, i) => <CoinParticle key={i} index={i} total={14} />)}
@@ -371,7 +371,7 @@ export default function TutorialOverlay() {
           <div className="h-6 w-6 rounded-full border-2 border-yellow-500 border-t-transparent animate-spin" />
         </div>
       )}
-      <button onClick={endTutorial} className="mt-5 w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all" style={{ animation: "tut-rise 0.4s ease-out 0.9s both" }}>
+      <button onClick={endTutorial} className="mt-5 w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold shadow-[var(--shadow-sm)] shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all" style={{ animation: "tut-rise 0.4s ease-out 0.9s both" }}>
         <Sparkles size={18} />
         Начать!
       </button>
@@ -506,12 +506,12 @@ export default function TutorialOverlay() {
           }}
         >
           {isFinish ? renderReward() : (
-            <div className="relative bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-2xl shadow-black/20">
+            <div className="relative bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-5 shadow-[var(--shadow-lg)] shadow-black/20">
               {renderArrow()}
 
               {/* Icon + Title */}
               <div className="flex items-center gap-3 mb-3">
-                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${cur.iconGradient} flex items-center justify-center flex-shrink-0 shadow-lg`}>
+                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${cur.iconGradient} flex items-center justify-center flex-shrink-0 shadow-[var(--shadow-sm)]`}>
                   <Icon size={20} className="text-white" />
                 </div>
                 <div>
@@ -519,7 +519,7 @@ export default function TutorialOverlay() {
                     {cur.title}
                   </h3>
                   {cur.hint && (
-                    <span className="text-[11px] text-[var(--text-muted)]">{cur.hint}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{cur.hint}</span>
                   )}
                 </div>
               </div>
@@ -559,7 +559,7 @@ export default function TutorialOverlay() {
                   )}
                   <button
                     onClick={goNext}
-                    className="flex items-center gap-1 px-5 h-10 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-semibold shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="flex items-center gap-1 px-5 h-10 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm font-semibold shadow-[var(--shadow-sm)] shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     Далее
                     <ChevronRight size={16} />

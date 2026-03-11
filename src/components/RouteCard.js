@@ -7,7 +7,7 @@ export default function RouteCard({ route, isAdmin, onToggleHidden }) {
   return (
     <Link
       href={`/routes/${route._id}`}
-      className="group block overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-sm transition hover:shadow-md"
+      className="group block overflow-hidden glass-card"
     >
       {/* Обложка */}
       <div className="relative h-48 overflow-hidden bg-[var(--bg-elevated)] transition group-hover:scale-[1.02]">
@@ -34,7 +34,7 @@ export default function RouteCard({ route, isAdmin, onToggleHidden }) {
             />
           );
         })()}
-        <span className="absolute right-3 top-3 rounded-full bg-[var(--bg-surface)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] shadow-sm">
+        <span className="absolute right-3 top-3 rounded-full bg-[var(--bg-surface)]/80 backdrop-blur-md px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] shadow-[var(--shadow-sm)]">
           {route.checkpoints?.length || 0} точек
         </span>
         {isAdmin && (

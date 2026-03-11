@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Users, UserPlus, Search, MessageCircle, Check, X, Clock, Eye, Shield } from "lucide-react";
+import { Users, UserPlus, Search, MessageCircle, Check, X, Clock, Eye, Shield, Plus } from "lucide-react";
 import { useUser } from "@/components/UserProvider";
 import UserAvatar from "@/components/UserAvatar";
 import UserName from "@/components/UserName";
 import ChatView from "@/components/ChatView";
+import GroupChatView from "@/components/GroupChatView";
+import CreateGroupModal from "@/components/CreateGroupModal";
 import { useRouter } from "next/navigation";
 import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 
 const TABS = [
   { key: "friends", label: "Друзья", icon: Users },
+  { key: "groups", label: "Группы", icon: MessageCircle },
   { key: "requests", label: "Заявки", icon: UserPlus },
   { key: "search", label: "Поиск", icon: Search },
 ];
@@ -29,6 +32,9 @@ export default function FriendsPage() {
   const [adminConversation, setAdminConversation] = useState(null); // { unread }
   const [unreadMap, setUnreadMap] = useState({}); // { friendId: count }
   const [contextMenu, setContextMenu] = useState(null); // { x, y, friend }
+  const [groups, setGroups] = useState([]);
+  const [activeGroup, setActiveGroup] = useState(null); // group object
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const contextRef = useRef(null);
   const chatFriendIdRef = useRef(null);
 
@@ -83,12 +89,24 @@ export default function FriendsPage() {
     } catch { /* ignore */ }
   }, [authFetch, adminChatOpen]);
 
+  const loadGroups = useCallback(async () => {
+    if (!authFetch) return;
+    try {
+      const res = await authFetch("/api/groups");
+      if (res.ok) {
+        const data = await res.json();
+        setGroups(data.groups || []);
+      }
+    } catch { /* ignore */ }
+  }, [authFetch]);
+
   useEffect(() => {
     if (!user) return;
     loadFriends();
     loadRequests();
     loadUnread();
-  }, [user, loadFriends, loadRequests, loadUnread]);
+    loadGroups();
+  }, [user, loadFriends, loadRequests, loadUnread, loadGroups]);
 
   // Обработка события open-chat (из NotificationBell)
   useEffect(() => {
@@ -214,6 +232,7 @@ export default function FriendsPage() {
   const handleCloseChat = useCallback(() => {
     setChatFriendId(null);
     setAdminChatOpen(false);
+    setActiveGroup(null);
     loadUnread();
   }, [loadUnread]);
 
@@ -245,23 +264,24 @@ export default function FriendsPage() {
     ? { username: "Администрация" }
     : friends.find((f) => f.id === chatFriendId);
   const activeChatId = adminChatOpen ? user.id : chatFriendId;
+  const hasActiveChat = activeChatId || activeGroup;
 
   const renderTabs = () => (
-    <div className="flex gap-1 mb-4 rounded-2xl bg-[var(--bg-elevated)] p-1">
+    <div className="flex gap-0.5 mb-4 rounded-xl bg-[var(--bg-elevated)] p-0.5">
       {TABS.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           onClick={() => setTab(key)}
-          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-medium transition ${
+          className={`flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold transition ${
             tab === key
               ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
               : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           }`}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-3.5 w-3.5" />
           {label}
           {key === "requests" && requests.length > 0 && (
-            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
               {requests.length}
             </span>
           )}
@@ -278,7 +298,7 @@ export default function FriendsPage() {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, friend: f });
       }}
-      className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 ${
+      className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 shadow-[var(--shadow-sm)] ${
         chatFriendId === f.id ? "ring-2 ring-green-500" : ""
       }`}
     >
@@ -292,7 +312,7 @@ export default function FriendsPage() {
       <div className="relative shrink-0">
         <MessageCircle className="h-4 w-4 text-[var(--text-muted)]" />
         {unreadMap[f.id] > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
             {unreadMap[f.id] > 99 ? "99+" : unreadMap[f.id]}
           </span>
         )}
@@ -308,7 +328,7 @@ export default function FriendsPage() {
           {adminConversation && (
             <button
               onClick={() => { setChatFriendId(null); setAdminChatOpen(true); }}
-              className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 ${
+              className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 shadow-[var(--shadow-sm)] ${
                 adminChatOpen ? "ring-2 ring-red-500" : ""
               }`}
             >
@@ -322,7 +342,7 @@ export default function FriendsPage() {
               <div className="relative shrink-0">
                 <MessageCircle className="h-4 w-4 text-[var(--text-muted)]" />
                 {adminConversation.unread > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
                     {adminConversation.unread > 99 ? "99+" : adminConversation.unread}
                   </span>
                 )}
@@ -343,6 +363,47 @@ export default function FriendsPage() {
             </div>
           ) : (
             friends.map((f) => renderFriendItem(f))
+          )}
+        </div>
+      )}
+
+      {tab === "groups" && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowCreateGroup(true)}
+            className="flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 shadow-[var(--shadow-sm)]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-color)]/15 shrink-0">
+              <Plus className="h-5 w-5 text-[var(--accent-color)]" />
+            </div>
+            <span className="text-sm font-semibold text-[var(--accent-color)]">Новая группа</span>
+          </button>
+
+          {groups.length === 0 ? (
+            <div className="py-12 text-center">
+              <Users className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-3 opacity-40" />
+              <p className="text-sm text-[var(--text-muted)]">Нет групп</p>
+            </div>
+          ) : (
+            groups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => { setChatFriendId(null); setAdminChatOpen(false); setActiveGroup(g); }}
+                className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 shadow-[var(--shadow-sm)] ${
+                  activeGroup?.id === g.id ? "ring-2 ring-[var(--accent-color)]" : ""
+                }`}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-color)]/15 shrink-0">
+                  <Users className="h-5 w-5 text-[var(--accent-color)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{g.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] truncate">
+                    {g.lastMessage ? g.lastMessage.senderUsername + ": " + g.lastMessage.text : `${g.memberCount} участников`}
+                  </p>
+                </div>
+              </button>
+            ))
           )}
         </div>
       )}
@@ -461,7 +522,7 @@ export default function FriendsPage() {
       <div className="fixed inset-0 z-[80]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
       <div
         ref={contextRef}
-        className="fixed z-[81] w-48 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl overflow-hidden py-1 animate-slide-down"
+        className="fixed z-[81] w-48 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] overflow-hidden py-1 animate-slide-down"
         style={{
           left: Math.min(contextMenu.x, window.innerWidth - 200),
           top: Math.min(contextMenu.y, window.innerHeight - 60),
@@ -484,7 +545,7 @@ export default function FriendsPage() {
   return (
     <>
       {/* Mobile: overlay чат */}
-      {activeChatId && (
+      {activeChatId && !activeGroup && (
         <div className="md:hidden">
           <ChatView
             friendId={activeChatId}
@@ -492,6 +553,11 @@ export default function FriendsPage() {
             onBack={handleCloseChat}
             adminMode={adminChatOpen}
           />
+        </div>
+      )}
+      {activeGroup && !activeChatId && (
+        <div className="md:hidden fixed inset-0 z-[56] bg-[var(--bg-surface)]">
+          <GroupChatView group={activeGroup} onBack={handleCloseChat} />
         </div>
       )}
 
@@ -506,7 +572,9 @@ export default function FriendsPage() {
 
         {/* Чат или пустое состояние */}
         <div className="flex-1 min-w-0">
-          {activeChatId ? (
+          {activeGroup ? (
+            <GroupChatView group={activeGroup} onBack={handleCloseChat} />
+          ) : activeChatId ? (
             <ChatView
               friendId={activeChatId}
               friend={chatFriend}
@@ -517,14 +585,14 @@ export default function FriendsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
               <MessageCircle className="h-16 w-16 mb-4 opacity-20" />
-              <p className="text-sm">Выберите друга для чата</p>
+              <p className="text-sm">Выберите друга или группу для чата</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Mobile: обычный layout */}
-      <div className={`md:hidden ${activeChatId ? "hidden" : ""}`}>
+      <div className={`md:hidden ${hasActiveChat ? "hidden" : ""}`}>
         <div className="px-4 py-4 max-w-lg mx-auto">
           <h1 className="text-xl font-bold text-[var(--text-primary)] mb-4">Друзья</h1>
           {renderTabs()}
@@ -533,6 +601,12 @@ export default function FriendsPage() {
       </div>
 
       {contextMenuEl}
+      {showCreateGroup && (
+        <CreateGroupModal
+          onClose={() => setShowCreateGroup(false)}
+          onCreated={(group) => { loadGroups(); setActiveGroup(group); }}
+        />
+      )}
     </>
   );
 }

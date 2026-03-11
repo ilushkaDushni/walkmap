@@ -109,7 +109,7 @@ export default function UserAvatar({ username, avatarUrl, roleColor, size = "md"
     <div className="relative inline-flex shrink-0">
       {framedEl}
       {online && (
-        <span className={`absolute bottom-0 right-0 block rounded-full bg-green-500 ring-[var(--bg-surface)] ${dotSize}`} />
+        <span className={`absolute bottom-0 right-0 block rounded-full bg-green-500 ring-[var(--bg-surface)] shadow-[0_0_6px_rgba(34,197,94,0.6)] ${dotSize}`} />
       )}
     </div>
   ) : framedEl;

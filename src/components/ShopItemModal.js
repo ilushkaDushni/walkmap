@@ -83,7 +83,7 @@ function TitlePreview({ item, user }) {
         />
         <p className="text-base font-bold text-[var(--text-primary)]">{user?.username || "Пользователь"}</p>
         <span
-          className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+          className="px-2.5 py-0.5 rounded-full text-xs font-bold"
           style={{ color, backgroundColor: color + "18", border: `1px solid ${color}40` }}
         >
           {title}
@@ -116,7 +116,7 @@ function ChatThemePreview({ item }) {
           >
             Привет! Как прогулка? 🚶
           </div>
-          <p className="text-[9px] mt-0.5 ml-1" style={{ color: css.dark ? "rgba(226,232,240,0.4)" : "var(--text-muted)" }}>
+          <p className="text-xs mt-0.5 ml-1" style={{ color: css.dark ? "rgba(226,232,240,0.4)" : "var(--text-muted)" }}>
             12:30
           </p>
         </div>
@@ -128,7 +128,7 @@ function ChatThemePreview({ item }) {
           >
             Отлично, прошёл 5 км! 💪
           </div>
-          <p className="text-[9px] mt-0.5 mr-1 text-right" style={{ color: css.dark ? "rgba(226,232,240,0.4)" : "var(--text-muted)" }}>
+          <p className="text-xs mt-0.5 mr-1 text-right" style={{ color: css.dark ? "rgba(226,232,240,0.4)" : "var(--text-muted)" }}>
             12:31 ✓
           </p>
         </div>
@@ -247,7 +247,7 @@ export default function ShopItemModal({ item, owned, equipped, routiks, user, on
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-full max-w-md mx-4 rounded-t-3xl sm:rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl overflow-hidden animate-slide-up max-h-[85vh] overflow-y-auto"
+        className="w-full max-w-md mx-4 rounded-t-3xl sm:rounded-3xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] overflow-hidden animate-slide-up max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -255,7 +255,7 @@ export default function ShopItemModal({ item, owned, equipped, routiks, user, on
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-bold text-[var(--text-primary)]">{item.name}</h3>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${rarity.bg} ${rarity.text}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${rarity.bg} ${rarity.text}`}>
                 {rarity.label}
               </span>
               <span className="text-xs text-[var(--text-muted)]">{CATEGORY_LABELS[item.category] || item.category}</span>
@@ -326,7 +326,7 @@ export default function ShopItemModal({ item, owned, equipped, routiks, user, on
             </button>
           )}
           {!canBuy && !owned && (
-            <p className="text-[10px] text-center mt-1.5 text-[var(--text-muted)]">Недостаточно маршрутиков</p>
+            <p className="text-xs text-center mt-1.5 text-[var(--text-muted)]">Недостаточно маршрутиков</p>
           )}
         </div>
       </div>
@@ -345,12 +345,12 @@ function renderCardPreview(item) {
         background: css.bg || "var(--bg-surface)",
         backgroundSize: css.bgSize || "auto",
       }}>
-        <div className="absolute top-3 left-4 rounded-lg rounded-bl-sm px-2.5 py-1 text-[10px]"
+        <div className="absolute top-3 left-4 rounded-lg rounded-bl-sm px-2.5 py-1 text-xs"
           style={css.dark
             ? { backgroundColor: "rgba(255,255,255,0.12)", color: "#e2e8f0" }
             : { backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)" }
           }>Привет!</div>
-        <div className="absolute bottom-3 right-4 rounded-lg rounded-br-sm px-2.5 py-1 text-[10px]"
+        <div className="absolute bottom-3 right-4 rounded-lg rounded-br-sm px-2.5 py-1 text-xs"
           style={{ backgroundColor: css.bubble, color: css.bubbleText }}>Как дела?</div>
       </div>
     );

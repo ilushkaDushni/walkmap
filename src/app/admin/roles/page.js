@@ -171,14 +171,14 @@ export default function AdminRolesPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-[var(--text-primary)]">{role.name}</p>
-                  <span className="text-[10px] text-[var(--text-muted)] font-mono">{role.slug}</span>
+                  <span className="text-xs text-[var(--text-muted)] font-mono">{role.slug}</span>
                   {role.isDefault && (
-                    <span className="text-[10px] font-semibold bg-green-500/20 text-green-600 rounded px-1.5 py-0.5">
+                    <span className="text-xs font-semibold bg-green-500/20 text-green-600 rounded px-1.5 py-0.5">
                       default
                     </span>
                   )}
                   {role.isSystem && (
-                    <span className="text-[10px] font-semibold bg-blue-500/20 text-blue-500 rounded px-1.5 py-0.5">
+                    <span className="text-xs font-semibold bg-blue-500/20 text-blue-500 rounded px-1.5 py-0.5">
                       system
                     </span>
                   )}
@@ -283,7 +283,7 @@ function RoleEditor({ role, saving, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 py-8 overflow-y-auto" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl my-auto"
+        className="w-full max-w-md rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)] my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Заголовок */}
@@ -412,7 +412,7 @@ function RoleEditor({ role, saving, onSave, onClose }) {
                           className="h-3.5 w-3.5 rounded accent-blue-600"
                         />
                         <span className="text-xs text-[var(--text-primary)]">{label}</span>
-                        <span className="text-[10px] text-[var(--text-muted)] font-mono ml-auto">{key}</span>
+                        <span className="text-xs text-[var(--text-muted)] font-mono ml-auto">{key}</span>
                       </label>
                     ))}
                   </div>

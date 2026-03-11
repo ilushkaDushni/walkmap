@@ -200,7 +200,7 @@ export default function AdminTicketsPage() {
   if (loading || !hasPermission("feedback.manage")) return null;
 
   const statusBadge = (status) => (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === "open" ? "bg-green-500/15 text-green-500" : "bg-[var(--text-muted)]/15 text-[var(--text-muted)]"}`}>
+    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${status === "open" ? "bg-green-500/15 text-green-500" : "bg-[var(--text-muted)]/15 text-[var(--text-muted)]"}`}>
       {status === "open" ? "Открыт" : "Закрыт"}
     </span>
   );
@@ -260,7 +260,7 @@ export default function AdminTicketsPage() {
                       {detail.ticketNumber && <span className="text-teal-500">#{detail.ticketNumber} </span>}
                       {detail.subject}
                     </p>
-                    <p className="text-[10px] text-[var(--text-muted)]">{detail.user?.username} · {detail.user?.email}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{detail.user?.username} · {detail.user?.email}</p>
                   </div>
                   {statusBadge(detail.status)}
                 </>
@@ -270,7 +270,7 @@ export default function AdminTicketsPage() {
               {detail && (
                 <button
                   onClick={handleToggleStatus}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition ${
                     detail.status === "open"
                       ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
                       : "bg-green-500/10 text-green-500 hover:bg-green-500/20"
@@ -297,14 +297,14 @@ export default function AdminTicketsPage() {
                   return (
                     <div key={m.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${isAdmin ? "bg-teal-500/15 text-[var(--text-primary)]" : "bg-[var(--bg-elevated)] text-[var(--text-primary)]"}`}>
-                        <p className="text-[10px] font-bold mb-0.5" style={{ color: isAdmin ? "#14b8a6" : "var(--text-muted)" }}>
+                        <p className="text-xs font-bold mb-0.5" style={{ color: isAdmin ? "#14b8a6" : "var(--text-muted)" }}>
                           {m.sender?.username || "Удалён"} {isAdmin && "· Поддержка"}
                         </p>
                         {m.imageUrl && (
                           <img src={m.imageUrl} alt="" className="rounded-xl max-w-full mb-1 cursor-pointer" onClick={() => window.open(m.imageUrl, "_blank")} />
                         )}
                         {m.text && <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>}
-                        <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
                       </div>
                     </div>
                   );
@@ -395,14 +395,14 @@ export default function AdminTicketsPage() {
               <UserAvatar username={t.user?.username || "?"} avatarUrl={t.user?.avatarUrl} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  {t.ticketNumber && <span className="text-[10px] font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
+                  {t.ticketNumber && <span className="text-xs font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
                   <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
                   {statusBadge(t.status)}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-[var(--text-muted)]">{t.user?.username || "Удалён"}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
+                  <span className="text-xs text-[var(--text-muted)]">{t.user?.username || "Удалён"}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
                 </div>
               </div>
             </button>

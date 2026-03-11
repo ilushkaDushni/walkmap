@@ -275,7 +275,7 @@ function RolePicker({ currentRoleIds, allRoles, onChange }) {
           currentRoles.map((r) => (
             <span
               key={r._id}
-              className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+              className="rounded px-1.5 py-0.5 text-xs font-semibold"
               style={{ backgroundColor: `${r.color}20`, color: r.color }}
             >
               {r.name}
@@ -285,7 +285,7 @@ function RolePicker({ currentRoleIds, allRoles, onChange }) {
         <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-[var(--text-muted)]" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-lg py-1">
+        <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)] py-1">
           {allRoles.map((r) => (
             <label
               key={r._id}
@@ -298,7 +298,7 @@ function RolePicker({ currentRoleIds, allRoles, onChange }) {
                 className="h-3.5 w-3.5 rounded accent-blue-600"
               />
               <span
-                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                className="rounded px-1.5 py-0.5 text-xs font-semibold"
                 style={{ backgroundColor: `${r.color}20`, color: r.color }}
               >
                 {r.name}
@@ -343,7 +343,7 @@ function UserRow({ u, isSelf, allRoles, canAssignRoles, canBan, canManageCoins, 
             {(u.roles || []).map((role) => (
               <span
                 key={role.id}
-                className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                className="rounded px-1.5 py-0.5 text-xs font-semibold"
                 style={{ backgroundColor: `${role.color}20`, color: role.color }}
               >
                 {role.name}
@@ -470,7 +470,7 @@ function InventoryModal({ u, authFetch, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl flex flex-col"
+        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-md)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
@@ -500,19 +500,19 @@ function InventoryModal({ u, authFetch, onClose }) {
                         {item.name}
                       </span>
                       {item.equipped && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-500 font-medium">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/15 text-green-500 font-medium">
                           Надето
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-[var(--text-muted)]">
+                      <span className="text-xs text-[var(--text-muted)]">
                         {CATEGORY_LABELS[item.category] || item.category}
                       </span>
-                      <span className={`text-[11px] font-medium ${RARITY_COLORS[item.rarity] || "text-gray-500"}`}>
+                      <span className={`text-xs font-medium ${RARITY_COLORS[item.rarity] || "text-gray-500"}`}>
                         {item.rarity}
                       </span>
-                      <span className="text-[11px] text-[var(--text-muted)]">
+                      <span className="text-xs text-[var(--text-muted)]">
                         {item.price} &#x20BD;
                       </span>
                     </div>
@@ -596,7 +596,7 @@ function RevokeModal({ item, userId, authFetch, onDone, onClose }) {
   return (
     <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl"
+        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h4 className="text-sm font-bold text-[var(--text-primary)] mb-3">
@@ -699,7 +699,7 @@ function GiftItemModal({ userId, username, ownedItemIds, authFetch, onDone, onCl
   return (
     <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl flex flex-col"
+        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-md)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
@@ -715,7 +715,7 @@ function GiftItemModal({ userId, username, ownedItemIds, authFetch, onDone, onCl
         <div className="flex gap-1.5 px-4 pt-3 flex-wrap">
           <button
             onClick={() => setFilter("")}
-            className={`rounded-lg px-2 py-1 text-[11px] font-medium transition ${
+            className={`rounded-lg px-2 py-1 text-xs font-medium transition ${
               !filter ? "bg-blue-600 text-white" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
             }`}
           >
@@ -725,7 +725,7 @@ function GiftItemModal({ userId, username, ownedItemIds, authFetch, onDone, onCl
             <button
               key={cat}
               onClick={() => setFilter(cat)}
-              className={`rounded-lg px-2 py-1 text-[11px] font-medium transition ${
+              className={`rounded-lg px-2 py-1 text-xs font-medium transition ${
                 filter === cat ? "bg-blue-600 text-white" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
               }`}
             >
@@ -761,11 +761,11 @@ function GiftItemModal({ userId, username, ownedItemIds, authFetch, onDone, onCl
                     <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-[var(--text-primary)]">{item.name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-[var(--text-muted)]">
+                        <span className="text-xs text-[var(--text-muted)]">
                           {CATEGORY_LABELS[item.category] || item.category}
                         </span>
                         {owned && (
-                          <span className="text-[10px] text-amber-500 font-medium">Уже есть</span>
+                          <span className="text-xs text-amber-500 font-medium">Уже есть</span>
                         )}
                       </div>
                     </div>
@@ -807,7 +807,7 @@ function CoinsModal({ u, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl"
+        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -879,7 +879,7 @@ function BanUserModal({ u, onBan, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl"
+        className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -900,7 +900,7 @@ function BanUserModal({ u, onBan, onClose }) {
           onChange={(e) => setReason(e.target.value)}
           autoFocus
         />
-        <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2 mb-3">{reason.length}/500</div>
+        <div className="text-right text-xs text-[var(--text-muted)] -mt-2 mb-3">{reason.length}/500</div>
 
         <p className="text-xs text-[var(--text-muted)] mb-2">Длительность:</p>
         <div className="flex flex-wrap gap-1.5 mb-4">
@@ -957,7 +957,7 @@ function BanHistoryModal({ u, authFetch, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl flex flex-col"
+        className="w-full max-w-sm max-h-[80vh] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-md)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
@@ -995,19 +995,19 @@ function BanHistoryModal({ u, authFetch, onClose }) {
                       {h.action === "ban" ? "Бан" : "Разбан"}
                     </span>
                     {h.duration && (
-                      <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                      <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                         <Clock className="h-3 w-3" />
                         {h.duration} дн.
                       </span>
                     )}
                     {h.action === "ban" && !h.duration && (
-                      <span className="text-[10px] font-semibold text-red-400">навсегда</span>
+                      <span className="text-xs font-semibold text-red-400">навсегда</span>
                     )}
                   </div>
                   {h.reason && (
                     <p className="text-xs text-[var(--text-secondary)] mb-1">{h.reason}</p>
                   )}
-                  <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <span>{h.bannedByUsername || "Система"}</span>
                     <span>{formatDate(h.createdAt)}</span>
                   </div>

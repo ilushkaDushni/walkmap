@@ -150,7 +150,7 @@ export default function AdminModal({ isOpen, onClose }) {
 
       {/* Модальное окно */}
       <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-md animate-slide-up">
-        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors max-h-[70dvh] overflow-y-auto">
+        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-lg)] transition-colors max-h-[70dvh] overflow-y-auto">
           {/* Закрыть */}
           <button
             onClick={onClose}
@@ -179,7 +179,7 @@ export default function AdminModal({ isOpen, onClose }) {
                 <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface)]">
                   <Icon className="h-5 w-5 text-[var(--text-secondary)]" />
                   {badge != null && (
-                    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
                       {badge}
                     </span>
                   )}

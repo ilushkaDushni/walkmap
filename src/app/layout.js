@@ -56,10 +56,12 @@ export default function RootLayout({ children }) {
             <MessageToast />
             <PreviewBanner />
             {/* Шапка */}
-            <header className="sticky top-0 z-50 bg-[var(--bg-header)] border-b border-[var(--border-color)] transition-colors">
-              <div className="flex items-center justify-between px-4 py-3">
-                <a href="/" className="flex items-center gap-2 text-lg font-bold text-[var(--text-primary)]">
-                  <Map className="h-6 w-6" />
+            <header className="sticky top-0 z-50 glass-header transition-colors">
+              <div className="flex h-11 items-center justify-between px-4">
+                <a href="/" className="flex items-center gap-1.5 text-sm font-bold text-[var(--text-primary)]">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--accent-color)]">
+                    <Map className="h-3.5 w-3.5 text-white" />
+                  </div>
                   Ростов GO
                 </a>
                 {/* Десктоп: иконки в шапке */}

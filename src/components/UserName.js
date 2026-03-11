@@ -7,7 +7,7 @@ export default function UserName({ username, equippedItems, showTitle = true, li
   const title = equippedItems?.title?.cssData;
 
   const nameSize = size === "sm" ? "text-xs" : "text-sm";
-  const titleSize = size === "sm" ? "text-[9px]" : "text-[10px]";
+  const titleSize = size === "sm" ? "text-xs" : "text-xs";
 
   const nameEl = (
     <span

@@ -137,7 +137,7 @@ export default function AdminTransactionsPage() {
                     <span className="text-sm font-semibold text-[var(--text-primary)] truncate">
                       {t.user?.username || "Удалён"}
                     </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeDef.color}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${typeDef.color}`}>
                       {typeDef.label}
                     </span>
                   </div>

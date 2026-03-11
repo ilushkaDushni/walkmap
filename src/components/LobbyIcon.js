@@ -13,7 +13,7 @@ export default function LobbyIcon({ lobbyId, participantCount, isActive, onClick
       className={`flex items-center justify-center transition-all ${
         inline
           ? `relative h-10 w-10 rounded-xl hover:bg-[var(--bg-elevated)] ${isActive ? "" : ""}`
-          : `fixed bottom-40 right-4 z-[55] h-12 w-12 rounded-full shadow-lg hover:scale-105 active:scale-95 ${
+          : `fixed bottom-40 right-4 z-[55] h-12 w-12 rounded-full shadow-[var(--shadow-sm)] hover:scale-105 active:scale-95 ${
               isActive
                 ? "bg-green-500 border-green-400"
                 : "bg-[var(--bg-surface)] border border-[var(--border-color)]"
@@ -31,8 +31,8 @@ export default function LobbyIcon({ lobbyId, participantCount, isActive, onClick
       </svg>
 
       {participantCount > 0 && (
-        <span className={`absolute flex items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white ${
-          inline ? "-top-0.5 -right-0.5 h-4 min-w-4 px-0.5 text-[9px]" : "-top-1 -right-1 h-5 min-w-5 px-1"
+        <span className={`absolute flex items-center justify-center rounded-full bg-purple-500 text-xs font-bold text-white ${
+          inline ? "-top-0.5 -right-0.5 h-4 min-w-4 px-0.5 text-xs" : "-top-1 -right-1 h-5 min-w-5 px-1"
         }`}>
           {participantCount}
         </span>

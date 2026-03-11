@@ -323,7 +323,7 @@ export default function NotificationBell({ inline = false }) {
   if (!user) return null;
 
   const panelContent = (
-    <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-2xl overflow-hidden max-h-[60vh] flex flex-col">
+    <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] overflow-hidden max-h-[60vh] flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">Уведомления</h3>
         <div className="flex items-center gap-2">
@@ -358,7 +358,7 @@ export default function NotificationBell({ inline = false }) {
                   key={n.id}
                   onClick={() => handleClickNotification(n)}
                   className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)] ${
-                    !n.read ? "bg-[var(--bg-elevated)]/50" : ""
+                    !n.read ? "bg-[var(--bg-elevated)]/50 border-l-2 border-l-[var(--accent-color)]" : ""
                   } ${hasLink ? "cursor-pointer" : "cursor-default"}`}
                 >
                   <div className={`mt-0.5 shrink-0 ${colorCls}`}>
@@ -380,7 +380,7 @@ export default function NotificationBell({ inline = false }) {
                     {n.type === "profanity_alert" && n.data?.text && (
                       <p className="text-xs text-[var(--text-muted)] italic mt-0.5 truncate">&laquo;{n.data.text}&raquo;</p>
                     )}
-                    <span className="text-[10px] text-[var(--text-muted)] mt-0.5">{timeAgo(n.createdAt)}</span>
+                    <span className="text-xs text-[var(--text-muted)] mt-0.5 block text-right">{timeAgo(n.createdAt)}</span>
                     {n.type === "friend_request" && !n.read && (
                       <div className="flex items-center gap-2 mt-2">
                         <button
@@ -450,7 +450,7 @@ export default function NotificationBell({ inline = false }) {
   const giftModal = giftModalData ? (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={() => setGiftModalData(null)} />
-      <div className="relative bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-color)] shadow-2xl p-6 w-full max-w-xs text-center animate-scale-in">
+      <div className="relative bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-color)] shadow-[var(--shadow-lg)] p-6 w-full max-w-xs text-center animate-scale-in">
         {!giftModalData.isAdmin && (
           <div className="flex justify-center mb-4">
             <UserAvatar
@@ -514,7 +514,7 @@ export default function NotificationBell({ inline = false }) {
         >
           <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
           {count > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
               {count > 99 ? "99+" : count}
             </span>
           )}
@@ -539,11 +539,11 @@ export default function NotificationBell({ inline = false }) {
       <button
         data-tutorial="notifications"
         onClick={() => { setFromTop(false); setOpen(!open); }}
-        className="fixed bottom-24 right-4 z-[55] flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-lg transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-24 right-4 z-[55] flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-sm)] transition-all hover:scale-105 active:scale-95"
       >
         <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
         {count > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
             {count > 99 ? "99+" : count}
           </span>
         )}

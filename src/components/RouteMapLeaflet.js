@@ -613,7 +613,7 @@ export default function RouteMapLeaflet({ route }) {
         {isGpsOverlay && !autoFollow && (
           <button
             onClick={handleRecenter}
-            className="absolute bottom-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
+            className="absolute bottom-3 right-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[var(--shadow-sm)] border border-gray-200 text-blue-600 hover:bg-gray-50 transition"
           >
             <Locate className="h-5 w-5" />
           </button>
@@ -755,7 +755,7 @@ export default function RouteMapLeaflet({ route }) {
             </div>
           )}
           {gps.accuracy > 100 && (
-            <p className="text-[10px] text-[var(--text-muted)] text-center">
+            <p className="text-xs text-[var(--text-muted)] text-center">
               Низкая точность GPS ({Math.round(gps.accuracy)}м)
             </p>
           )}

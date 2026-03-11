@@ -77,12 +77,12 @@ export default function AchievementToast() {
         visible ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0 pointer-events-none"
       }`}
     >
-      <div className={`flex items-center gap-3 rounded-2xl ${colors.bg} border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 shadow-lg`}>
+      <div className={`flex items-center gap-3 rounded-2xl ${colors.bg} border border-[var(--border-color)] bg-[var(--bg-surface)] px-4 py-3 shadow-[var(--shadow-sm)]`}>
         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colors.bg} shrink-0`}>
           <Icon className={`h-5 w-5 ${colors.text}`} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Достижение!</div>
+          <div className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Достижение!</div>
           <div className={`text-sm font-bold ${colors.text} truncate`}>{current.title}</div>
         </div>
         {current.rewardCoins > 0 && (

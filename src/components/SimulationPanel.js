@@ -174,7 +174,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
               onChange={handleProgressChange}
               className="w-full h-1.5 rounded-full appearance-none bg-[var(--bg-elevated)] accent-blue-600 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+            <div className="flex justify-between text-xs text-[var(--text-muted)]">
               <span>{Math.round(progress * 100)}%</span>
               {events.length > 0 && (
                 <span>Событие {currentEventIndex + 1} / {events.length}</span>
@@ -297,7 +297,7 @@ export default function SimulationPanel({ route, simulatedPosition, onPositionCh
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-[10px] text-[var(--text-muted)]">
+            <span className="text-xs text-[var(--text-muted)]">
               {currentEventIndex >= 0 ? currentEventIndex + 1 : 0} / {events.length}
             </span>
             <button

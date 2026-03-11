@@ -142,7 +142,7 @@ function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete })
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <UserName username={comment.username} equippedItems={comment.equippedItems} showTitle={false} linkToProfile size="sm" />
-            <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(comment.createdAt)}</span>
+            <span className="text-xs text-[var(--text-muted)]">{timeAgo(comment.createdAt)}</span>
             {(user && (user.id === comment.userId || canManage)) && (
               <button
                 onClick={() => onDelete(comment.id)}
@@ -190,7 +190,7 @@ function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete })
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <UserName username={r.username} equippedItems={r.equippedItems} showTitle={false} linkToProfile size="sm" />
-                  <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
                   {(user && (user.id === r.userId || canManage)) && (
                     <button
                       onClick={() => handleDeleteReply(r.id)}
@@ -343,7 +343,7 @@ export default function RouteComments({ routeId }) {
           </div>
           <div className="flex items-center justify-between mt-1 ml-10">
             {error && <span className="text-xs text-red-400">{error}</span>}
-            <span className="text-[10px] text-[var(--text-muted)] ml-auto">{text.length}/500</span>
+            <span className="text-xs text-[var(--text-muted)] ml-auto">{text.length}/500</span>
           </div>
         </div>
       ) : (

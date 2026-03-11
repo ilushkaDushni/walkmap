@@ -142,11 +142,11 @@ export default function ThemePicker({ currentTheme, onSelect }) {
                 </div>
               )}
             </div>
-            <span className="text-[10px] text-[var(--text-muted)] leading-tight text-center">
+            <span className="text-xs text-[var(--text-muted)] leading-tight text-center">
               {t.name}
             </span>
             {t.isPremium && (
-              <span className={`text-[8px] font-bold leading-none ${locked ? "text-[var(--text-muted)]" : "text-purple-400"}`}>
+              <span className={`text-xs font-bold leading-none ${locked ? "text-[var(--text-muted)]" : "text-purple-400"}`}>
                 {locked ? `🔷 ${t.price}` : "PRO"}
               </span>
             )}

@@ -373,14 +373,14 @@ export default function AdminShopPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{item.name}</p>
-                  <p className="text-[10px] text-[var(--text-muted)]">
+                  <p className="text-xs text-[var(--text-muted)]">
                     {CATEGORY_LABELS[item.category]} · {RARITY_LABELS[item.rarity]} · 🔷 {item.price}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleToggleActive(item)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-medium ${item.isActive ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-400"}`}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium ${item.isActive ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-400"}`}
                   >
                     {item.isActive ? "Активен" : "Скрыт"}
                   </button>

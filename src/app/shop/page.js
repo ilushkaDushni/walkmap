@@ -175,41 +175,39 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-main)] pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[var(--bg-main)] border-b border-[var(--border-color)]">
+      <div className="sticky top-0 z-10 bg-[var(--bg-main)] shadow-[var(--shadow-sm)]">
         <div className="px-4 py-3 max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-1 bg-[var(--bg-surface)] rounded-xl p-0.5 border border-[var(--border-color)]">
+          <div className="flex items-center gap-1 bg-[var(--bg-elevated)] rounded-xl p-0.5">
             <button
               onClick={() => setTab("shop")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 tab === "shop"
-                  ? "bg-[var(--text-primary)] text-[var(--bg-main)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              🛒 Магазин
+              Магазин
             </button>
             <button
               onClick={() => setTab("inventory")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 tab === "inventory"
-                  ? "bg-[var(--text-primary)] text-[var(--bg-main)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              📦 Инвентарь
+              Инвентарь
             </button>
           </div>
           {user && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowConverter((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-color)] text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
-              >
-                🪙 {user.coins || 0}
-                <span className="w-3" />
-                🔷 {user.routiks || 0}
-              </button>
-            </div>
+            <button
+              onClick={() => setShowConverter((v) => !v)}
+              className="flex items-center gap-2.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] px-3 py-2 hover:bg-[var(--bg-elevated)] transition"
+            >
+              <span className="flex items-center gap-1 text-xs font-bold text-yellow-500">🪙 {user.coins || 0}</span>
+              <span className="w-px h-3 bg-[var(--border-color)]" />
+              <span className="flex items-center gap-1 text-xs font-bold text-blue-500">🔷 {user.routiks || 0}</span>
+            </button>
           )}
         </div>
       </div>

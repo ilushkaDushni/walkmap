@@ -335,7 +335,7 @@ function UnsavedChangesModal({ onSave, onDiscard, onCancel }) {
       onClick={() => close(onCancel)}
     >
       <div
-        className={`w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl transition-all duration-200 ${
+        className={`w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)] transition-all duration-200 ${
           visible ? "scale-100 opacity-100" : "scale-75 opacity-0"
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -388,7 +388,7 @@ function FolderSettingsModal({ folder, routes, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-xl"
+        className="w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-md)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -604,7 +604,7 @@ function FolderPicker({ route, folders, onFieldChange }) {
         <ChevronDown className="h-3 w-3 ml-auto shrink-0 text-[var(--text-muted)]" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-lg py-1">
+        <div className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)] py-1">
           {folders.map((f) => (
             <label
               key={f._id}

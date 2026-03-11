@@ -1,11 +1,17 @@
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MapPin, Clock, Flag, Footprints } from "lucide-react";
 import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import RouteMap from "@/components/RouteMap";
 import RouteComments from "@/components/RouteComments";
 
 export const dynamic = "force-dynamic";
+
+const DIFFICULTY_MAP = {
+  easy: { label: "Лёгкий", color: "bg-green-500/10 text-green-600" },
+  medium: { label: "Средний", color: "bg-yellow-500/10 text-yellow-600" },
+  hard: { label: "Сложный", color: "bg-red-500/10 text-red-600" },
+};
 
 export default async function RouteDetailPage({ params }) {
   const { routeId } = await params;
@@ -17,7 +23,7 @@ export default async function RouteDetailPage({ params }) {
         <p className="mb-6 text-[var(--text-muted)]">Такого маршрута не существует</p>
         <Link
           href="/routes"
-          className="rounded-lg bg-green-600 px-6 py-3 text-white transition hover:bg-green-700"
+          className="rounded-xl bg-[var(--accent-color)] px-6 py-3 text-sm font-bold text-white transition hover:brightness-110"
         >
           Вернуться к списку
         </Link>
@@ -35,7 +41,7 @@ export default async function RouteDetailPage({ params }) {
         <p className="mb-6 text-[var(--text-muted)]">Такого маршрута не существует</p>
         <Link
           href="/routes"
-          className="rounded-lg bg-green-600 px-6 py-3 text-white transition hover:bg-green-700"
+          className="rounded-xl bg-[var(--accent-color)] px-6 py-3 text-sm font-bold text-white transition hover:brightness-110"
         >
           Вернуться к списку
         </Link>
@@ -43,42 +49,69 @@ export default async function RouteDetailPage({ params }) {
     );
   }
 
-  // Сериализация для клиента
   const serialized = {
     ...route,
     _id: route._id.toString(),
     createdBy: route.createdBy?.toString?.() || null,
   };
 
-  return (
-    <div className="mx-auto max-w-xl px-4 pt-4 pb-24">
-      <Link
-        href="/routes"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-secondary)]"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Все маршруты
-      </Link>
+  const diff = DIFFICULTY_MAP[serialized.difficulty] || DIFFICULTY_MAP.easy;
 
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{serialized.title}</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">{serialized.description}</p>
-        <div className="mt-2 flex gap-4 text-xs text-[var(--text-muted)]">
-          {serialized.distance > 0 && (
-            <span>
-              {serialized.distance >= 1000
-                ? `${(serialized.distance / 1000).toFixed(1)} км`
-                : `${serialized.distance} м`}
-            </span>
-          )}
-          {serialized.duration > 0 && <span>{serialized.duration} мин</span>}
-          <span>{serialized.checkpoints?.length || 0} точек</span>
+  return (
+    <div className="pb-24">
+      {/* Full-width map */}
+      <div className="relative w-full h-[280px] sm:h-[340px]">
+        <div className="absolute inset-0">
+          <RouteMap route={serialized} fullscreen />
         </div>
+        <Link
+          href="/routes"
+          className="absolute top-4 left-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--bg-surface)]/90 backdrop-blur-sm shadow-[var(--shadow-md)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Link>
       </div>
 
-      <RouteMap route={serialized} />
+      {/* Content */}
+      <div className="mx-auto max-w-xl px-4 -mt-6 relative z-10">
+        <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] p-4">
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">{serialized.title}</h1>
+          {serialized.description && (
+            <p className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">{serialized.description}</p>
+          )}
 
-      <RouteComments routeId={serialized._id} />
+          {/* Pill badges */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {serialized.distance > 0 && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium">
+                <Footprints className="h-3 w-3" />
+                {serialized.distance >= 1000
+                  ? `${(serialized.distance / 1000).toFixed(1)} км`
+                  : `${serialized.distance} м`}
+              </span>
+            )}
+            {serialized.duration > 0 && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 text-xs font-medium">
+                <Clock className="h-3 w-3" />
+                {serialized.duration} мин
+              </span>
+            )}
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-medium">
+              <Flag className="h-3 w-3" />
+              {serialized.checkpoints?.length || 0} точек
+            </span>
+            <span className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${diff.color}`}>
+              <MapPin className="h-3 w-3" />
+              {diff.label}
+            </span>
+          </div>
+        </div>
+
+        {/* Comments */}
+        <div className="mt-4">
+          <RouteComments routeId={serialized._id} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon, Shield } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon, Shield, Mic, Square, Pin } from "lucide-react";
+import PinnedMessageBanner from "./chat/PinnedMessageBanner";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useChatPolling from "@/hooks/useChatPolling";
@@ -11,6 +12,8 @@ import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 import { getChatTheme, setChatTheme as saveChatTheme, CHAT_THEMES, addPremiumThemes, getAllChatThemes } from "@/lib/chatThemes";
 import { getChatFontSize } from "@/lib/chatSettings";
 import ChatSettingsModal from "./ChatSettingsModal";
+import VoiceMessage from "./VoiceMessage";
+import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 
 const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
@@ -53,7 +56,7 @@ function RouteCard({ routeId }) {
       <div className="min-w-0">
         <p className="text-xs font-medium text-[var(--text-primary)] truncate">{route.title || "Маршрут"}</p>
         {route.distance && (
-          <p className="text-[10px] text-[var(--text-muted)]">{(route.distance / 1000).toFixed(1)} км</p>
+          <p className="text-xs text-[var(--text-muted)]">{(route.distance / 1000).toFixed(1)} км</p>
         )}
       </div>
     </Link>
@@ -80,7 +83,7 @@ function EmojiPicker({ onSelect, onClose }) {
   }, [onClose]);
 
   return (
-    <div ref={ref} className="absolute bottom-full left-0 mb-2 p-2 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-lg z-10 w-[280px]">
+    <div ref={ref} className="absolute bottom-full left-0 mb-2 p-2 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] z-10 w-[280px]">
       <div className="grid grid-cols-8 gap-1">
         {EMOJI_LIST.map((e) => (
           <button
@@ -99,7 +102,7 @@ function EmojiPicker({ onSelect, onClose }) {
 const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 // --- Context Menu ---
-function ContextMenu({ x, y, msg, isMe, onReply, onReact, onDeleteAll, onDeleteSelf, onEdit, onCopy, onClose }) {
+function ContextMenu({ x, y, msg, isMe, onReply, onReact, onDeleteAll, onDeleteSelf, onEdit, onCopy, onPin, isPinned, onClose }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -122,7 +125,7 @@ function ContextMenu({ x, y, msg, isMe, onReply, onReact, onDeleteAll, onDeleteS
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[180px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-xl overflow-hidden py-1"
+      className="fixed z-50 min-w-[180px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-[var(--shadow-xl)] overflow-hidden py-1"
       style={menuStyle}
     >
       {/* Reaction row */}
@@ -144,6 +147,15 @@ function ContextMenu({ x, y, msg, isMe, onReply, onReact, onDeleteAll, onDeleteS
         <Reply className="h-4 w-4" />
         Ответить
       </button>
+      {!msg._optimistic && (
+        <button
+          onClick={() => { onPin(); onClose(); }}
+          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition"
+        >
+          <Pin className="h-4 w-4" />
+          {isPinned ? "Открепить" : "Закрепить"}
+        </button>
+      )}
       {msg.text && (
         <button
           onClick={() => { onCopy(); onClose(); }}
@@ -202,7 +214,7 @@ function TypingIndicator({ theme }) {
 function DateSeparator({ label, theme }) {
   return (
     <div className="flex items-center justify-center py-2">
-      <span className="px-3 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-elevated)]/60 text-[var(--text-muted)]"
+      <span className="px-3 py-0.5 rounded-full text-xs font-medium bg-[var(--bg-elevated)]/60 text-[var(--text-muted)]"
         style={theme.dark ? { backgroundColor: "rgba(255,255,255,0.1)", color: "rgba(226,232,240,0.5)" } : undefined}
       >
         {label}
@@ -224,7 +236,7 @@ function ImageLightbox({ src, onClose }) {
 }
 
 // --- Message Bubble ---
-function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDelete, onReaction, onEdit, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
+function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDelete, onReaction, onEdit, onPin, isPinned, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
   const [lightbox, setLightbox] = useState(false);
@@ -275,7 +287,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
   const isImageOnly = msg.type === "image" && msg.imageUrl && !msg.text;
 
   return (
-    <div className={`flex ${isMe ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"} ${isNew ? "animate-message-in" : ""}`}>
+    <div data-msg-id={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"} ${grouped ? "mt-0.5" : "mt-2"} ${isNew ? "animate-message-in" : ""}`}>
       {/* Аватар (только для не-сгруппированных чужих) */}
       {!isMe && !grouped && (
         <div className="shrink-0 mr-2 self-end">
@@ -306,12 +318,12 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
             <div className={`mb-1 pl-2 border-l-2 rounded-sm ${isImageOnly ? "px-3 pt-1.5" : ""}`}
               style={isMe ? { borderColor: "rgba(255,255,255,0.5)" } : { borderColor: theme.dark ? "rgba(226,232,240,0.3)" : accentHex + "80" }}
             >
-              <p className="text-[10px] font-semibold"
+              <p className="text-xs font-semibold"
                 style={isMe ? { color: "rgba(255,255,255,0.8)" } : { color: accentHex }}
               >
                 {msg.replyTo.senderId === user?.id ? "Вы" : (msg.replyTo.senderName || friend?.username)}
               </p>
-              <p className={`text-[11px] truncate ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+              <p className={`text-xs truncate ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
                 style={isMe ? { color: "rgba(255,255,255,0.6)" } : theme.dark ? { color: "rgba(226,232,240,0.5)" } : undefined}
               >
                 {msg.replyTo.text}
@@ -328,8 +340,8 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
                   onClick={() => { setImgFailed(false); setImgRetry((r) => r + 1); }}
                 >
                   <ImageIcon className="h-8 w-8 text-[var(--text-muted)] opacity-40" />
-                  <span className="text-[11px] text-[var(--text-muted)]">Не удалось загрузить</span>
-                  <span className="text-[10px] text-green-500 font-medium">Нажмите для повтора</span>
+                  <span className="text-xs text-[var(--text-muted)]">Не удалось загрузить</span>
+                  <span className="text-xs text-green-500 font-medium">Нажмите для повтора</span>
                 </div>
               ) : (
               <img
@@ -351,8 +363,8 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
               {/* Time overlay for image-only messages */}
               {isImageOnly && !imgFailed && (
                 <div className="absolute bottom-1.5 right-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/50 text-white">
-                  {msg.editedAt && <span className="text-[9px]">ред.</span>}
-                  <span className="text-[10px]">{timeShort(msg.createdAt)}</span>
+                  {msg.editedAt && <span className="text-xs">ред.</span>}
+                  <span className="text-xs">{timeShort(msg.createdAt)}</span>
                   {isMe && (
                     isSending ? <Clock className="h-2.5 w-2.5 ml-0.5" /> :
                     isError ? <AlertCircle className="h-2.5 w-2.5 ml-0.5 text-red-400" /> :
@@ -367,10 +379,15 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
           {/* Admin badge */}
           {msg.type === "admin" && (
             <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500">
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500">
                 {msg.senderUsername ? `ОТ АДМИНА ${msg.senderUsername}` : "Администрация"}
               </span>
             </div>
+          )}
+
+          {/* Voice */}
+          {msg.type === "voice" && msg.audioUrl && (
+            <VoiceMessage audioUrl={msg.audioUrl} duration={msg.audioDuration} isMe={isMe} theme={theme} />
           )}
 
           {/* Text */}
@@ -385,11 +402,11 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
               style={isMe ? { color: "rgba(255,255,255,0.6)" } : undefined}
             >
               {msg.editedAt && (
-                <span className={`text-[10px] mr-0.5 ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+                <span className={`text-xs mr-0.5 ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
                   style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
                 >ред.</span>
               )}
-              <span className={`text-[10px] ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
+              <span className={`text-xs ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}
                 style={!isMe && theme.dark ? { color: "rgba(226,232,240,0.4)" } : undefined}
               >{timeShort(msg.createdAt)}</span>
               {isMe && (
@@ -406,7 +423,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
         {isError && (
           <button
             onClick={() => msg._retryFn?.(msg.id)}
-            className="flex items-center gap-1 mt-0.5 text-[10px] text-red-400 hover:text-red-300"
+            className="flex items-center gap-1 mt-0.5 text-xs text-red-400 hover:text-red-300"
           >
             <RefreshCw className="h-3 w-3" /> Повторить
           </button>
@@ -427,7 +444,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
                 style={data.mine ? { backgroundColor: accentHex + "26", borderColor: accentHex + "66", color: accentHex } : undefined}
               >
                 <span>{emoji}</span>
-                {data.count > 1 && <span className="text-[10px]">{data.count}</span>}
+                {data.count > 1 && <span className="text-xs">{data.count}</span>}
               </button>
             ))}
           </div>
@@ -446,6 +463,8 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
             onDeleteSelf={() => onDelete(msg.id, "self")}
             onEdit={() => onEdit(msg)}
             onCopy={handleCopy}
+            onPin={() => onPin(msg.id)}
+            isPinned={isPinned}
             onClose={onCloseContextMenu}
           />
         )}
@@ -479,9 +498,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
     ? `admin_${friendId}`
     : user ? [user.id, friendId].sort().join("_") : null;
   const {
-    messages, loading, hasMore, loadingOlder, typingUsers,
-    sendMessage, sendImage, retryMessage, deleteMessage, toggleReaction,
-    editMessage, loadOlder, sendTyping, clearMessages,
+    messages, loading, hasMore, loadingOlder, typingUsers, pinnedMessage,
+    sendMessage, sendImage, sendVoice, retryMessage, deleteMessage, toggleReaction,
+    editMessage, togglePin, loadOlder, sendTyping, clearMessages,
   } = useChatPolling(conversationKey, {
     interval: 15000,
     enabled: !!conversationKey,
@@ -666,6 +685,19 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
     await toggleReaction(messageId, emoji);
   }, [toggleReaction]);
 
+  const handlePin = useCallback(async (messageId) => {
+    await togglePin(messageId);
+  }, [togglePin]);
+
+  const handleJumpToMessage = useCallback((messageId) => {
+    const el = messagesContainerRef.current?.querySelector(`[data-msg-id="${messageId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("animate-highlight");
+      setTimeout(() => el.classList.remove("animate-highlight"), 1500);
+    }
+  }, []);
+
   const handleMsgContextMenu = useCallback((msgId, pos) => {
     setActiveContextMenu({ msgId, x: pos.x, y: pos.y });
   }, []);
@@ -698,6 +730,17 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Voice recording
+  const { recording, duration: recDuration, audioBlob, error: recError, start: startRec, stop: stopRec, cancel: cancelRec, reset: resetRec } = useVoiceRecorder();
+
+  // Отправка голосового после записи
+  useEffect(() => {
+    if (audioBlob && !recording) {
+      sendVoice(audioBlob, recDuration);
+      resetRec();
+    }
+  }, [audioBlob, recording, recDuration, sendVoice, resetRec]);
 
   // Группировка сообщений
   const processedMessages = useMemo(() => {
@@ -776,9 +819,9 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
               {isAdminChatAsUser ? "Администрация" : (friend?.username || "Чат")}
             </p>
             {isTyping ? (
-              <p className="text-[11px] leading-tight text-[var(--text-muted)]">печатает...</p>
+              <p className="text-xs leading-tight text-[var(--text-muted)]">печатает...</p>
             ) : !isAdminChatAsUser && friend?.lastActivityAt != null ? (
-              <p className={`text-[11px] leading-tight ${friendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+              <p className={`text-xs leading-tight ${friendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
                 {friendStatus}
               </p>
             ) : null}
@@ -799,7 +842,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
             >
               <Bell className="h-5 w-5 text-[var(--text-secondary)]" />
               {count > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-xs font-bold text-white">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -807,6 +850,16 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
           )}
         </div>
       </div>
+
+      {/* Pinned message banner */}
+      {pinnedMessage && (
+        <PinnedMessageBanner
+          message={pinnedMessage}
+          onJump={handleJumpToMessage}
+          onUnpin={() => handlePin(pinnedMessage.id)}
+          canUnpin
+        />
+      )}
 
       {/* Messages */}
       <div
@@ -854,6 +907,8 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
                 onDelete={handleDelete}
                 onReaction={handleReaction}
                 onEdit={handleEdit}
+                onPin={handlePin}
+                isPinned={pinnedMessage?.id === msg.id}
                 theme={chatTheme}
                 fontClass={fontClass}
                 contextMenu={activeContextMenu?.msgId === msg.id ? activeContextMenu : null}
@@ -874,7 +929,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
       {showScrollFab && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-28 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-lg hover:bg-[var(--bg-surface)] transition"
+          className="absolute bottom-28 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] shadow-[var(--shadow-lg)] hover:bg-[var(--bg-surface)] transition"
         >
           <ChevronDown className="h-5 w-5 text-[var(--text-secondary)]" />
         </button>
@@ -929,77 +984,120 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
         </div>
       )}
 
-      {/* Input */}
-      <div className={`px-4 py-3 shrink-0 ${inline ? "" : "pb-[env(safe-area-inset-bottom,12px)]"}`}>
-        <div className="flex items-end gap-2 max-w-2xl mx-auto">
-          {/* Emoji button */}
-          <div className="relative shrink-0">
+      {/* Recording overlay */}
+      {recording && (
+        <div className="px-4 py-3 shrink-0 bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-3 max-w-2xl mx-auto">
             <button
-              onClick={() => setShowEmoji((v) => !v)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
+              onClick={cancelRec}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-500 transition hover:bg-red-500/20 shrink-0"
             >
-              <Smile className="h-5 w-5" />
+              <X className="h-5 w-5" />
             </button>
-            {showEmoji && (
-              <EmojiPicker
-                onSelect={handleEmojiSelect}
-                onClose={() => setShowEmoji(false)}
-              />
-            )}
+            <div className="flex-1 flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium text-[var(--text-primary)]">
+                {Math.floor(recDuration / 60)}:{(recDuration % 60).toString().padStart(2, "0")}
+              </span>
+              <div className="flex-1 h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${Math.min(100, (recDuration / 120) * 100)}%` }} />
+              </div>
+            </div>
+            <button
+              onClick={stopRec}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-white shrink-0"
+              style={{ backgroundColor: chatTheme.accent }}
+            >
+              <Square className="h-4 w-4" fill="currentColor" />
+            </button>
           </div>
+        </div>
+      )}
 
-          {/* Attach image button */}
-          {!editingMsg && (
-            <div className="shrink-0">
+      {/* Input */}
+      {!recording && (
+        <div className={`px-4 py-3 shrink-0 ${inline ? "" : "pb-[env(safe-area-inset-bottom,12px)]"}`}>
+          <div className="flex items-end gap-2 max-w-2xl mx-auto">
+            {/* Emoji button */}
+            <div className="relative shrink-0">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setShowEmoji((v) => !v)}
                 className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
               >
-                <Paperclip className="h-5 w-5" />
+                <Smile className="h-5 w-5" />
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
+              {showEmoji && (
+                <EmojiPicker
+                  onSelect={handleEmojiSelect}
+                  onClose={() => setShowEmoji(false)}
+                />
+              )}
             </div>
-          )}
 
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value.slice(0, 1000));
-              sendTyping();
-              const ta = textareaRef.current;
-              if (ta) {
-                ta.style.height = "auto";
-                ta.style.height = Math.min(ta.scrollHeight, 144) + "px";
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder={editingMsg ? "Редактировать сообщение..." : "Сообщение..."}
-            rows={1}
-            className="flex-1 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)] resize-none"
-            style={{ maxHeight: "144px", overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!text.trim() && !imagePreview}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-white transition disabled:opacity-40 shrink-0"
-            style={{ backgroundColor: chatTheme.accent }}
-          >
-            {editingMsg ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-          </button>
+            {/* Attach image button */}
+            {!editingMsg && (
+              <div className="shrink-0">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
+                >
+                  <Paperclip className="h-5 w-5" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </div>
+            )}
+
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value.slice(0, 1000));
+                sendTyping();
+                const ta = textareaRef.current;
+                if (ta) {
+                  ta.style.height = "auto";
+                  ta.style.height = Math.min(ta.scrollHeight, 144) + "px";
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={editingMsg ? "Редактировать сообщение..." : "Сообщение..."}
+              rows={1}
+              className="flex-1 rounded-2xl border border-[var(--border-color)]/50 bg-[var(--bg-elevated)]/80 backdrop-blur-sm px-4 py-2.5 text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)] resize-none"
+              style={{ maxHeight: "144px", overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}
+            />
+
+            {/* Send or Mic button */}
+            {text.trim() || imagePreview || editingMsg ? (
+              <button
+                onClick={handleSend}
+                disabled={!text.trim() && !imagePreview}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white transition disabled:opacity-40 shrink-0"
+                style={{ backgroundColor: chatTheme.accent }}
+              >
+                {editingMsg ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              </button>
+            ) : (
+              <button
+                onClick={startRec}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition shrink-0"
+              >
+                <Mic className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Settings Modal */}
       {showSettings && conversationKey && (

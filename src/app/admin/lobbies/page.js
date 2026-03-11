@@ -107,7 +107,7 @@ export default function AdminLobbiesPage() {
                         {lobby.participants.map((p) => (
                           <span
                             key={p.userId}
-                            className="text-[10px] rounded px-1.5 py-0.5 bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                            className="text-xs rounded px-1.5 py-0.5 bg-[var(--bg-elevated)] text-[var(--text-muted)]"
                           >
                             {p.username}
                           </span>

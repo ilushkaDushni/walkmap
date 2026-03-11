@@ -446,7 +446,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
 
   const backdrop = (
     <div
-      className={`fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${closing ? "opacity-0" : "opacity-100"}`}
+      className={`fixed inset-0 z-[60] bg-black/30 backdrop-blur-xl transition-opacity duration-200 ${closing ? "opacity-0" : "opacity-100"}`}
       onClick={() => animateClose()}
     />
   );
@@ -455,7 +455,11 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
     <>
       {backdrop}
       <div className={`fixed inset-x-4 bottom-36 z-[70] mx-auto max-w-md ${closing ? "animate-slide-out-down" : "animate-slide-up"}`}>
-        <div className="rounded-3xl bg-[var(--bg-surface)] p-6 shadow-2xl transition-colors max-h-[75dvh] overflow-y-auto">
+        <div className="glass-strong rounded-3xl p-6 shadow-lg transition-colors max-h-[75dvh] overflow-y-auto">
+          {/* Drag handle */}
+          <div className="flex justify-center mb-3 -mt-1">
+            <div className="h-1 w-10 rounded-full bg-[var(--text-muted)]/30" />
+          </div>
           {children}
         </div>
       </div>
@@ -484,9 +488,9 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
     <p className="text-center text-xs text-red-400 mt-2">{error}</p>
   );
 
-  const inputCls = "w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--text-secondary)]";
-  const btnPrimary = "flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--text-primary)] px-4 py-3 text-sm font-semibold text-[var(--bg-surface)] transition hover:opacity-90 disabled:opacity-50";
-  const btnOutline = "flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--border-color)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--bg-elevated)]";
+  const inputCls = "w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--accent-color)] shadow-[var(--shadow-sm)]";
+  const btnPrimary = "flex w-full items-center justify-center gap-2 btn-accent rounded-2xl px-4 py-3 text-sm font-semibold transition hover:opacity-90 disabled:opacity-50";
+  const btnOutline = "flex w-full items-center justify-center gap-2 glass-pill rounded-2xl px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition";
 
   const primaryRoleColor = user?.roles?.[0]?.color || null;
 
@@ -587,7 +591,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                 )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600"
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-[var(--shadow-sm)] transition hover:bg-green-600"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -603,7 +607,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                   rows={3}
                   className={`${inputCls} resize-none`}
                 />
-                <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+                <div className="text-right text-xs text-[var(--text-muted)] mt-1">
                   {editBio.length}/200
                 </div>
               </div>
@@ -659,7 +663,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-lg transition hover:bg-green-600 disabled:opacity-50"
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shadow-[var(--shadow-sm)] transition hover:bg-green-600 disabled:opacity-50"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -689,10 +693,10 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                   className={inputCls}
                 />
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] text-[var(--text-muted)]">
+                  <span className="text-xs text-[var(--text-muted)]">
                     {isFirstUsernameChange ? "Первая смена — бесплатно" : "Смена ника — 50 монет"}
                   </span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{editUsername.trim().length}/20</span>
+                  <span className="text-xs text-[var(--text-muted)]">{editUsername.trim().length}/20</span>
                 </div>
                 {usernameMsg.text && (
                   <p className={`text-xs mt-1 ${usernameMsg.ok ? "text-green-500" : "text-red-400"}`}>
@@ -720,7 +724,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
                   rows={3}
                   className={`${inputCls} resize-none`}
                 />
-                <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+                <div className="text-right text-xs text-[var(--text-muted)] mt-1">
                   {editBio.length}/200
                 </div>
               </div>
@@ -873,7 +877,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
           <p className="text-xs text-[var(--text-muted)] mt-1">{user.email}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1">
             {user.isSuperadmin && (
-              <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-500/20 text-amber-500">
+              <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-amber-500/20 text-amber-500">
                 <Shield className="h-3 w-3" />
                 Суперадмин
               </span>
@@ -881,7 +885,7 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
             {(user.roles || []).map((role) => (
               <span
                 key={role.id || role.slug}
-                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
                 style={{ backgroundColor: `${role.color}20`, color: role.color }}
               >
                 <Shield className="h-3 w-3" />
@@ -1254,7 +1258,7 @@ function ReviewsScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, us
               className={`${inputCls} resize-none`}
             />
             <div className="flex items-center justify-between mt-1 mb-2">
-              <span className="text-[10px] text-[var(--text-muted)]">{text.length}/500</span>
+              <span className="text-xs text-[var(--text-muted)]">{text.length}/500</span>
             </div>
             {error && <p className="text-xs text-red-400 mb-2">{error}</p>}
             {success && <p className="text-xs text-green-500 mb-2">{success}</p>}
@@ -1285,7 +1289,7 @@ function ReviewsScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, us
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-[var(--text-primary)] truncate">{r.username}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{timeAgo(r.createdAt)}</span>
                     </div>
                     <div className="flex gap-0.5">
                       {Array.from({ length: 5 }, (_, j) => (
@@ -1380,7 +1384,7 @@ function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user
       </p>
 
       <div className="text-center mb-4">
-        <span className="text-[10px] text-[var(--text-muted)]">Версия {APP_VERSION}</span>
+        <span className="text-xs text-[var(--text-muted)]">Версия {APP_VERSION}</span>
       </div>
 
       {/* Правила сообщества */}
@@ -1431,7 +1435,7 @@ function AboutScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrimary, user
                 rows={4}
                 className={`${inputCls} resize-none`}
               />
-              <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">
+              <div className="text-right text-xs text-[var(--text-muted)] mt-1">
                 {message.length}/1000
               </div>
             </div>
@@ -1527,7 +1531,7 @@ function EmailFeedbackScreen({ modalShell, backBtn, closeBtn, inputCls, btnPrima
               rows={5}
               className={`${inputCls} resize-none`}
             />
-            <div className="text-right text-[10px] text-[var(--text-muted)] mt-1">{message.length}/1000</div>
+            <div className="text-right text-xs text-[var(--text-muted)] mt-1">{message.length}/1000</div>
           </div>
           {result && !result.ok && (
             <p className="text-center text-xs text-red-400">{result.text}</p>
@@ -1684,7 +1688,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
   };
 
   const statusBadge = (status) => (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === "open" ? "bg-green-500/15 text-green-500" : "bg-[var(--text-muted)]/15 text-[var(--text-muted)]"}`}>
+    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${status === "open" ? "bg-green-500/15 text-green-500" : "bg-[var(--text-muted)]/15 text-[var(--text-muted)]"}`}>
       {status === "open" ? "Открыт" : "Закрыт"}
     </span>
   );
@@ -1732,13 +1736,13 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        {t.ticketNumber && <span className="text-[10px] font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
+                        {t.ticketNumber && <span className="text-xs font-bold text-teal-500 shrink-0">#{t.ticketNumber}</span>}
                         <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{t.subject}</p>
                         {statusBadge(t.status)}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
-                        <span className="text-[10px] text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
+                        <span className="text-xs text-[var(--text-muted)]">{timeAgo(t.updatedAt)}</span>
+                        <span className="text-xs text-[var(--text-muted)]">{t.messageCount} сообщ.</span>
                       </div>
                     </div>
                   </button>
@@ -1758,7 +1762,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Написать на почту</p>
-                <p className="text-[11px] text-[var(--text-muted)]">Ответ на email в течение дня</p>
+                <p className="text-xs text-[var(--text-muted)]">Ответ на email в течение дня</p>
               </div>
             </button>
           </div>
@@ -1787,7 +1791,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
               placeholder="Тема обращения"
               className={inputCls}
             />
-            <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newSubject.length}/100</div>
+            <div className="text-right text-xs text-[var(--text-muted)] -mt-2">{newSubject.length}/100</div>
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value.slice(0, 1000))}
@@ -1795,7 +1799,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
               rows={4}
               className={`${inputCls} resize-none`}
             />
-            <div className="text-right text-[10px] text-[var(--text-muted)] -mt-2">{newMessage.length}/1000</div>
+            <div className="text-right text-xs text-[var(--text-muted)] -mt-2">{newMessage.length}/1000</div>
             {/* Фото */}
             {pendingImageUrl && (
               <div className="relative inline-block">
@@ -1869,7 +1873,7 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
               <h2 className="text-base font-bold text-[var(--text-primary)] truncate flex-1">{ticketData.subject}</h2>
               {statusBadge(ticketData.status)}
             </div>
-            <span className="text-[10px] text-[var(--text-muted)]">Создано {timeAgo(ticketData.createdAt)}</span>
+            <span className="text-xs text-[var(--text-muted)]">Создано {timeAgo(ticketData.createdAt)}</span>
           </div>
 
           {/* Лента сообщений */}
@@ -1885,13 +1889,13 @@ function SupportScreens({ screen, setScreen, ticketId, setTicketId, onClose, mod
                   )}
                   <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${isUser ? "bg-[var(--bg-elevated)] text-[var(--text-primary)]" : "bg-teal-500/15 text-[var(--text-primary)]"}`}>
                     {!isUser && (
-                      <p className="text-[10px] font-bold text-teal-500 mb-0.5">{m.sender?.username || "Поддержка"}</p>
+                      <p className="text-xs font-bold text-teal-500 mb-0.5">{m.sender?.username || "Поддержка"}</p>
                     )}
                     {m.imageUrl && (
                       <img src={m.imageUrl} alt="" className="rounded-xl max-w-full mb-1 cursor-pointer" onClick={() => window.open(m.imageUrl, "_blank")} />
                     )}
                     {m.text && <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>}
-                    <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1 text-right">{timeAgo(m.createdAt)}</p>
                   </div>
                 </div>
               );

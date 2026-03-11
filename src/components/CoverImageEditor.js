@@ -65,7 +65,7 @@ export default function CoverImageEditor({ cover, open, onClose, onSave, onRepla
 
       {/* Модалка */}
       <div
-        className="relative z-10 w-full max-w-lg rounded-2xl bg-[var(--bg-surface)] shadow-xl overflow-hidden"
+        className="relative z-10 w-full max-w-lg rounded-2xl bg-[var(--bg-surface)] shadow-[var(--shadow-md)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -97,7 +97,7 @@ export default function CoverImageEditor({ cover, open, onClose, onSave, onRepla
                 transformOrigin: `${draft.posX}% ${draft.posY}%`,
               }}
             />
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-[10px] text-white pointer-events-none">
+            <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-lg bg-black/50 px-2 py-1 text-xs text-white pointer-events-none">
               <Move className="h-3 w-3" />
               Перетащите для позиции
             </div>

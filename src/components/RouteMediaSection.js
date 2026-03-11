@@ -116,7 +116,7 @@ export default function RouteMediaSection({ route, updateRoute }) {
             <label className="flex h-20 w-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-[var(--border-color)] text-[var(--text-muted)] hover:border-green-500 hover:text-green-500 transition">
               <div className="flex flex-col items-center gap-1">
                 <Image className="h-6 w-6" />
-                <span className="text-[10px]">Обложка</span>
+                <span className="text-xs">Обложка</span>
               </div>
               <input
                 type="file"

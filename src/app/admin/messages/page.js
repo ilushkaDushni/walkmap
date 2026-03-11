@@ -135,7 +135,7 @@ export default function AdminMessagesPage() {
                     {c.username}
                   </p>
                   {c.lastMessage?.type === "admin" && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500 shrink-0">
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-500 shrink-0">
                       АДМИН
                     </span>
                   )}
@@ -146,12 +146,12 @@ export default function AdminMessagesPage() {
                     : ""}
                   {c.lastMessage?.text || "Фото"}
                 </p>
-                <span className="text-[10px] text-[var(--text-muted)]">
+                <span className="text-xs text-[var(--text-muted)]">
                   {timeAgo(c.lastMessage?.createdAt)}
                 </span>
               </div>
               {c.unread > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shrink-0">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white shrink-0">
                   {c.unread > 99 ? "99+" : c.unread}
                 </span>
               )}

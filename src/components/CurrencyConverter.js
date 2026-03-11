@@ -58,7 +58,7 @@ export default function CurrencyConverter({ onConvert }) {
 
       <div className="flex items-center gap-2">
         <div className="flex-1">
-          <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Монеты</label>
+          <label className="text-xs text-[var(--text-muted)] mb-1 block">Монеты</label>
           <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] px-3 py-2">
             <span>🪙</span>
             <input
@@ -71,18 +71,18 @@ export default function CurrencyConverter({ onConvert }) {
               className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none w-full"
             />
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">Баланс: {user?.coins || 0}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Баланс: {user?.coins || 0}</p>
         </div>
 
         <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-2" />
 
         <div className="flex-1">
-          <label className="text-[10px] text-[var(--text-muted)] mb-1 block">Маршрутики</label>
+          <label className="text-xs text-[var(--text-muted)] mb-1 block">Маршрутики</label>
           <div className="flex items-center gap-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] px-3 py-2">
             <span>🔷</span>
             <span className="text-sm font-medium text-[var(--text-primary)]">{routiksResult}</span>
           </div>
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">Баланс: {user?.routiks || 0}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Баланс: {user?.routiks || 0}</p>
         </div>
       </div>
 
