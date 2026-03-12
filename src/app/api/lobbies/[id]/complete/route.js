@@ -46,6 +46,10 @@ export async function POST(request, { params }) {
     });
 
     if (!alreadyCompleted) {
+      // Вычисляем длительность лобби
+      const lobbyDuration = lobby.startedAt ? Math.round((now.getTime() - new Date(lobby.startedAt).getTime()) / 1000) : null;
+      const lobbyPace = lobbyDuration && route?.distance > 0 ? Math.round(lobbyDuration / (route.distance / 1000)) : null;
+
       // Создаём completed_routes
       await db.collection("completed_routes").insertOne({
         userId,
@@ -54,6 +58,9 @@ export async function POST(request, { params }) {
         coinsEarned: coinsToAward,
         gpsVerified: true,
         lobbyId: id,
+        startedAt: lobby.startedAt ? new Date(lobby.startedAt) : null,
+        duration: lobbyDuration,
+        pace: lobbyPace,
       });
 
       // Начисляем монеты

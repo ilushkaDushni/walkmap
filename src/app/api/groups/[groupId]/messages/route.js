@@ -47,6 +47,35 @@ export async function GET(request, { params }) {
       : [];
     const userMap = Object.fromEntries(users.map((u) => [u._id.toString(), u]));
 
+    // Собираем replyToId для подгрузки оригиналов
+    const replyIds = messages
+      .filter((m) => m.replyToId)
+      .map((m) => m.replyToId);
+
+    let replyMap = {};
+    if (replyIds.length > 0) {
+      const originals = await db.collection("group_messages")
+        .find({ _id: { $in: replyIds.map((id) => new ObjectId(id)) } })
+        .project({ _id: 1, senderId: 1, text: 1 })
+        .toArray();
+
+      // Подгружаем username отправителей оригиналов
+      const replySenderIds = [...new Set(originals.map((o) => o.senderId))];
+      const replySenders = await db.collection("users")
+        .find({ _id: { $in: replySenderIds.map((id) => new ObjectId(id)) } })
+        .project({ _id: 1, username: 1 })
+        .toArray();
+      const replySenderMap = Object.fromEntries(replySenders.map((s) => [s._id.toString(), s.username]));
+
+      for (const o of originals) {
+        replyMap[o._id.toString()] = {
+          senderId: o.senderId,
+          senderName: replySenderMap[o.senderId] || "Удалённый",
+          text: o.text?.slice(0, 100) || "",
+        };
+      }
+    }
+
     const serialized = messages.reverse().map((m) => {
       const sender = userMap[m.senderId];
       return {
@@ -60,6 +89,9 @@ export async function GET(request, { params }) {
         imageUrl: m.imageUrl || null,
         audioUrl: m.audioUrl || null,
         audioDuration: m.audioDuration || 0,
+        location: m.location || null,
+        replyToId: m.replyToId || null,
+        replyTo: m.replyToId ? (replyMap[m.replyToId] || null) : null,
         createdAt: m.createdAt,
         reactions: m.reactions || [],
       };
@@ -102,11 +134,72 @@ export async function POST(request, { params }) {
     const db = await getDb();
     const { groupId } = await params;
     const userId = auth.user._id.toString();
-    const { text } = await request.json();
+    const body = await request.json();
+    const { text, replyToId, location } = body;
 
     const group = await db.collection("group_chats").findOne({ _id: new ObjectId(groupId) });
     if (!group || !group.members.some((m) => m.userId === userId)) {
       return NextResponse.json({ error: "Нет доступа" }, { status: 403 });
+    }
+
+    const sender = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { username: 1, avatarUrl: 1, equippedItems: 1 } }
+    );
+
+    // Геолокация
+    if (location && location.lat != null && location.lng != null) {
+      const locMessage = {
+        groupId,
+        senderId: userId,
+        text: null,
+        type: "location",
+        location: { lat: Number(location.lat), lng: Number(location.lng) },
+        replyToId: replyToId || null,
+        reactions: [],
+        createdAt: new Date(),
+      };
+
+      const locResult = await db.collection("group_messages").insertOne(locMessage);
+
+      await db.collection("group_chats").updateOne(
+        { _id: new ObjectId(groupId) },
+        {
+          $set: {
+            lastMessage: { text: "📍 Геолокация", senderId: userId, senderUsername: sender?.username, createdAt: locMessage.createdAt },
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      for (const member of group.members) {
+        if (member.userId === userId) continue;
+        pushNotification(member.userId, {
+          type: "group_message",
+          groupId,
+          groupName: group.name,
+          username: sender?.username || "Кто-то",
+          text: "📍 Геолокация",
+        });
+      }
+
+      return NextResponse.json({
+        id: locResult.insertedId.toString(),
+        senderId: userId,
+        senderUsername: sender?.username || "Вы",
+        senderAvatarUrl: sender?.avatarUrl || null,
+        senderEquippedItems: sender?.equippedItems || {},
+        text: null,
+        type: "location",
+        location: locMessage.location,
+        imageUrl: null,
+        audioUrl: null,
+        audioDuration: 0,
+        replyToId: locMessage.replyToId,
+        replyTo: null,
+        createdAt: locMessage.createdAt,
+        reactions: [],
+      }, { status: 201 });
     }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -121,17 +214,12 @@ export async function POST(request, { params }) {
       senderId: userId,
       text: text.trim(),
       type: "text",
+      replyToId: replyToId || null,
       reactions: [],
       createdAt: new Date(),
     };
 
     const result = await db.collection("group_messages").insertOne(message);
-
-    // Обновляем lastMessage в группе
-    const sender = await db.collection("users").findOne(
-      { _id: new ObjectId(userId) },
-      { projection: { username: 1, avatarUrl: 1, equippedItems: 1 } }
-    );
 
     await db.collection("group_chats").updateOne(
       { _id: new ObjectId(groupId) },
@@ -155,6 +243,48 @@ export async function POST(request, { params }) {
       });
     }
 
+    // Обработка @mentions — отправляем персональные уведомления
+    const mentions = text.match(/@(\w+)/g);
+    if (mentions && mentions.length > 0) {
+      const mentionedUsernames = mentions.map((m) => m.slice(1).toLowerCase());
+      const mentionedUsers = await db.collection("users")
+        .find({ username: { $in: mentionedUsernames.map((u) => new RegExp(`^${u}$`, "i")) } })
+        .project({ _id: 1, username: 1 })
+        .toArray();
+
+      for (const mu of mentionedUsers) {
+        const muId = mu._id.toString();
+        if (muId === userId) continue;
+        if (!group.members.some((gm) => gm.userId === muId)) continue;
+        pushNotification(muId, {
+          type: "group_mention",
+          groupId,
+          groupName: group.name,
+          username: sender?.username || "Кто-то",
+          text: text.trim().slice(0, 100),
+        });
+      }
+    }
+
+    // Подгружаем replyTo если есть
+    let replyTo = null;
+    if (replyToId) {
+      try {
+        const orig = await db.collection("group_messages").findOne({ _id: new ObjectId(replyToId) });
+        if (orig) {
+          const replySender = await db.collection("users").findOne(
+            { _id: new ObjectId(orig.senderId) },
+            { projection: { username: 1 } }
+          );
+          replyTo = {
+            senderId: orig.senderId,
+            senderName: replySender?.username || "Удалённый",
+            text: orig.text?.slice(0, 100) || "",
+          };
+        }
+      } catch { /* ignore invalid id */ }
+    }
+
     return NextResponse.json({
       id: result.insertedId.toString(),
       senderId: userId,
@@ -166,6 +296,8 @@ export async function POST(request, { params }) {
       imageUrl: null,
       audioUrl: null,
       audioDuration: 0,
+      replyToId: message.replyToId,
+      replyTo,
       createdAt: message.createdAt,
       reactions: [],
     }, { status: 201 });

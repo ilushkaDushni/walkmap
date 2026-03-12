@@ -20,8 +20,8 @@ export async function POST(request, { params }) {
     }
 
     const member = group.members.find((m) => m.userId === userId);
-    if (!member || member.role !== "owner") {
-      return NextResponse.json({ error: "Только создатель может добавлять" }, { status: 403 });
+    if (!member || (member.role !== "owner" && member.role !== "admin")) {
+      return NextResponse.json({ error: "Только создатель или админ может добавлять" }, { status: 403 });
     }
 
     if (group.members.some((m) => m.userId === memberId)) {
@@ -86,10 +86,16 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: true });
     }
 
-    // Кик участника — только owner
+    // Кик участника — owner или admin
     const member = group.members.find((m) => m.userId === userId);
-    if (!member || member.role !== "owner") {
-      return NextResponse.json({ error: "Только создатель может удалять" }, { status: 403 });
+    if (!member || (member.role !== "owner" && member.role !== "admin")) {
+      return NextResponse.json({ error: "Только создатель или админ может удалять" }, { status: 403 });
+    }
+
+    // Админ не может кикать owner или другого админа
+    const targetMember = group.members.find((m) => m.userId === memberId);
+    if (member.role === "admin" && targetMember && (targetMember.role === "owner" || targetMember.role === "admin")) {
+      return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
     }
 
     await db.collection("group_chats").updateOne(

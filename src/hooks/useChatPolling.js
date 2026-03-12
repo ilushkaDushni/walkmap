@@ -240,6 +240,57 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     return null;
   }, [authFetch, conversationKey, adminMode]);
 
+  // Send location message
+  const sendLocation = useCallback(async (lat, lng) => {
+    if (!authFetch || !conversationKey) return null;
+
+    const tempId = `_temp_${++tempIdCounter}`;
+    const optimisticMsg = {
+      id: tempId,
+      senderId: "__me__",
+      text: null,
+      type: "location",
+      location: { lat, lng },
+      imageUrl: null,
+      routeId: null,
+      replyToId: null,
+      replyTo: null,
+      reactions: [],
+      createdAt: new Date().toISOString(),
+      editedAt: null,
+      readAt: null,
+      _optimistic: true,
+      _status: "sending",
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const res = await authFetch(`/api/messages/${conversationKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location: { lat, lng } }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        lastTimestampRef.current = msg.createdAt;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...msg, _optimistic: false } : m))
+        );
+        return msg;
+      } else {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, _status: "error" } : m))
+        );
+      }
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, _status: "error" } : m))
+      );
+    }
+    return null;
+  }, [authFetch, conversationKey]);
+
   // Retry failed message
   const retryMessage = useCallback(async (tempId) => {
     const msg = messages.find((m) => m.id === tempId);
@@ -486,6 +537,7 @@ export default function useChatPolling(conversationKey, { interval = 5000, enabl
     sendMessage,
     sendImage,
     sendVoice,
+    sendLocation,
     retryMessage,
     deleteMessage,
     toggleReaction,

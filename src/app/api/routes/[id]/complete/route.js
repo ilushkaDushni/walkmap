@@ -33,19 +33,47 @@ export async function POST(request, { params }) {
     const maxPossibleCoins = checkpointCoins + finishCoins;
     const coins = Math.min(body.coins || 0, maxPossibleCoins);
 
-    // Атомарная вставка — уникальный индекс {userId, routeId} предотвращает дубли
     const gpsVerified = body.gpsVerified === true;
+    const now = new Date();
+
+    // Вычисляем длительность если передан startedAt
+    let duration = null;
+    let pace = null;
+    let startedAt = null;
+    if (body.startedAt) {
+      startedAt = new Date(body.startedAt);
+      duration = Math.round((now.getTime() - startedAt.getTime()) / 1000);
+      // Валидация: от 30 секунд до 24 часов
+      if (duration < 30 || duration > 86400) {
+        duration = null;
+        startedAt = null;
+      } else if (route.distance > 0) {
+        pace = Math.round(duration / (route.distance / 1000)); // сек/км
+      }
+    }
+
+    // Атомарная вставка — уникальный индекс {userId, routeId} предотвращает дубли
     try {
       await db.collection("completed_routes").insertOne({
         userId,
         routeId: id,
-        completedAt: new Date(),
+        completedAt: now,
         coinsEarned: coins,
         gpsVerified,
+        startedAt,
+        duration,
+        pace,
       });
     } catch (e) {
       if (e.code === 11000) {
-        return NextResponse.json({ alreadyCompleted: true });
+        // Уже проходил — обновляем время если новый результат лучше
+        if (duration && gpsVerified) {
+          await db.collection("completed_routes").updateOne(
+            { userId, routeId: id, $or: [{ duration: null }, { duration: { $gt: duration } }] },
+            { $set: { duration, pace, startedAt, completedAt: now, gpsVerified: true } }
+          );
+        }
+        return NextResponse.json({ alreadyCompleted: true, newBestTime: !!duration });
       }
       throw e;
     }

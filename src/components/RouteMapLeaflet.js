@@ -8,8 +8,31 @@ import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
+
+function ElapsedTimer({ startedAt }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!startedAt) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  if (!startedAt) return null;
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  const text = h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+    : `${m}:${String(s).padStart(2, "0")}`;
+  return (
+    <span className="flex items-center gap-1 text-xs font-mono text-[var(--text-secondary)]">
+      <Timer className="h-3 w-3" />{text}
+    </span>
+  );
+}
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const ROSTOV_BOUNDS = [[38.8, 46.9], [40.6, 47.6]];
@@ -77,7 +100,7 @@ function accuracyCircleGeoJson(center, radiusMeters) {
   };
 }
 
-export default function RouteMapLeaflet({ route }) {
+export default function RouteMapLeaflet({ route, preview, autoStart }) {
   const [started, setStarted] = useState(false);
   const [eventIndex, setEventIndex] = useState(0);
   const mapRef = useRef(null);
@@ -234,7 +257,7 @@ export default function RouteMapLeaflet({ route }) {
     authFetch(`/api/routes/${route._id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coins: gps.totalCoins, gpsVerified: true }),
+      body: JSON.stringify({ coins: gps.totalCoins, gpsVerified: true, startedAt: gps.startedAt?.toISOString() || null }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -245,7 +268,7 @@ export default function RouteMapLeaflet({ route }) {
         }
       })
       .catch(() => {});
-  }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins]);
+  }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins, gps.startedAt]);
 
   // Directed path: от старта к финишу
   const { dirPath, reversed, offset } = useMemo(
@@ -434,6 +457,10 @@ export default function RouteMapLeaflet({ route }) {
     requestPermission();
   };
 
+  useEffect(() => {
+    if (autoStart && !started && !gpsMode) handleStart();
+  }, [autoStart]);
+
   const handleStopGps = () => {
     gps.stopGps();
     setGpsMode(null);
@@ -621,7 +648,7 @@ export default function RouteMapLeaflet({ route }) {
       </div>
 
       {/* === PREVIEW (до начала) === */}
-      {!started && !gpsMode && (
+      {!preview && !started && !gpsMode && (
         <>
           {/* Оффлайн */}
           <div className="flex gap-2">
@@ -694,8 +721,9 @@ export default function RouteMapLeaflet({ route }) {
       {gpsMode === "gps_active" && (
         <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-2">
           <div className="space-y-1.5">
-            <div className="flex justify-between text-xs text-[var(--text-muted)]">
+            <div className="flex justify-between items-center text-xs text-[var(--text-muted)]">
               <span>{Math.round(gps.progress * 100)}%</span>
+              <ElapsedTimer startedAt={gps.startedAt} />
               <span>{gps.distanceRemaining > 1000
                 ? `${(gps.distanceRemaining / 1000).toFixed(1)} км`
                 : `${Math.round(gps.distanceRemaining)} м`
@@ -773,6 +801,12 @@ export default function RouteMapLeaflet({ route }) {
       {gpsMode === "gps_finished" && (
         <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-5 text-center space-y-3 animate-slide-up">
           <p className="text-lg font-bold text-green-600">Маршрут пройден!</p>
+          {gps.startedAt && (
+            <div className="flex items-center justify-center gap-1.5 text-sm text-[var(--text-secondary)]">
+              <Timer className="h-4 w-4" />
+              <ElapsedTimer startedAt={gps.startedAt} />
+            </div>
+          )}
           {gps.totalCoins > 0 && (
             <p className="text-sm text-green-600">+{gps.totalCoins} монет</p>
           )}

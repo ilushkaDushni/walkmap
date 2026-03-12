@@ -47,6 +47,9 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setSmoothedPosition({ ...smoothedRef.current });
   }, [active, rawPosition]);
 
+  // Время старта навигации (для рекордов)
+  const [startedAt, setStartedAt] = useState(null);
+
   // Блокировка обратного хода
   const maxProgressRef = useRef(0);
   const [projection, setProjection] = useState(null);
@@ -150,6 +153,7 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setIsOffRoute(false);
     setPassedCoords([]);
     setRemainingCoords([]);
+    setStartedAt(new Date());
     resetTrigger();
     startTracking();
   }, [startTracking, resetTrigger]);
@@ -164,6 +168,7 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setIsOffRoute(false);
     setPassedCoords([]);
     setRemainingCoords([]);
+    setStartedAt(null);
     resetTrigger();
   }, [stopTracking, resetTrigger]);
 
@@ -273,6 +278,7 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     triggeredIds,
     triggeredSegmentIds,
     dismissEvent,
+    startedAt,
     startGps,
     stopGps,
     wakeLockFailed: wakeLock.failed,

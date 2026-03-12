@@ -20,10 +20,10 @@ export default function AuthenticatedView({ user, userStats, publicStats, weathe
   const [selectedLeader, setSelectedLeader] = useState(null);
   const [levelsOpen, setLevelsOpen] = useState(false);
 
-  const dist = formatDist(userStats.totalDistanceM);
-  const level = getUserLevel(userStats.completedRoutes);
-  const progress = getLevelProgress(userStats.completedRoutes);
-  const completedRoutes = userStats.completedRoutes;
+  const dist = formatDist(userStats.totalDistanceM || 0);
+  const level = getUserLevel(userStats.completedRoutes || 0);
+  const progress = getLevelProgress(userStats.completedRoutes || 0);
+  const completedRoutes = userStats.completedRoutes || 0;
   const dbSlugs = new Set(userStats.achievements || []);
   const unlockedSlugs = new Set([
     ...dbSlugs,

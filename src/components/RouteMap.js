@@ -11,6 +11,6 @@ const RouteMapLeaflet = dynamic(() => import("./RouteMapLeaflet"), {
   ),
 });
 
-export default function RouteMap({ route }) {
-  return <RouteMapLeaflet route={route} />;
+export default function RouteMap({ route, preview }) {
+  return <RouteMapLeaflet route={route} preview={preview} />;
 }

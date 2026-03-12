@@ -53,5 +53,28 @@ export async function POST(request, { params }) {
   };
   await createAndPushNotification(friendId, "lobby_invite", notifData);
 
+  // Отправляем карточку-приглашение в личный чат
+  const conversationKey = [userId, friendId].sort().join("_");
+  const lobbyInviteMsg = {
+    conversationKey,
+    senderId: userId,
+    text: null,
+    type: "lobby_invite",
+    lobbyInvite: {
+      lobbyId: id,
+      joinCode: lobby.joinCode,
+      routeTitle: route?.title || "",
+      routeId: lobby.routeId,
+      type: lobby.type || "walk",
+      participantCount: lobby.participants.length,
+      maxParticipants: lobby.maxParticipants,
+    },
+    reactions: [],
+    deletedFor: [],
+    createdAt: new Date(),
+    readAt: null,
+  };
+  await db.collection("messages").insertOne(lobbyInviteMsg);
+
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon, Shield, Mic, Square, Pin } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Bell, X, Reply, Smile, Check, CheckCheck, Trash2, MoreVertical, ChevronDown, Clock, AlertCircle, RefreshCw, Paperclip, Pencil, Copy, Image as ImageIcon, Shield, Mic, Square, Pin, Users } from "lucide-react";
 import PinnedMessageBanner from "./chat/PinnedMessageBanner";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
@@ -14,6 +14,7 @@ import { getChatFontSize } from "@/lib/chatSettings";
 import ChatSettingsModal from "./ChatSettingsModal";
 import VoiceMessage from "./VoiceMessage";
 import useVoiceRecorder from "@/hooks/useVoiceRecorder";
+import LinkPreview, { extractUrls, MessageTextWithLinks } from "./chat/LinkPreview";
 
 const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
@@ -390,11 +391,65 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
             <VoiceMessage audioUrl={msg.audioUrl} duration={msg.audioDuration} isMe={isMe} theme={theme} />
           )}
 
-          {/* Text */}
+          {/* Location */}
+          {msg.type === "location" && msg.location && (
+            <a
+              href={`https://maps.google.com/?q=${msg.location.lat},${msg.location.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  style={{ backgroundColor: isMe ? "rgba(255,255,255,0.2)" : (accentHex + "20") }}
+                >
+                  <MapPin className="h-5 w-5" style={{ color: isMe ? "#fff" : accentHex }} />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-sm font-medium ${isMe ? "" : ""}`}>Геолокация</p>
+                  <p className={`text-xs truncate ${isMe ? "opacity-70" : "text-[var(--text-muted)]"}`}>
+                    {msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)}
+                  </p>
+                </div>
+              </div>
+            </a>
+          )}
+
+          {/* Lobby invite card */}
+          {msg.type === "lobby_invite" && msg.lobbyInvite && (
+            <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-[var(--text-primary)]">
+                  {msg.lobbyInvite.routeTitle}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">
+                {msg.lobbyInvite.type === "race" ? "🏃 Гонка" : msg.lobbyInvite.type === "event" ? "🎉 Ивент" : "🚶 Прогулка"}
+                {" · "}{msg.lobbyInvite.participantCount}/{msg.lobbyInvite.maxParticipants} участников
+              </p>
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("lobby-join-from-chat", {
+                    detail: { joinCode: msg.lobbyInvite.joinCode },
+                  }));
+                }}
+                className="w-full rounded-lg bg-green-600 py-2 text-xs font-semibold text-white hover:bg-green-700 transition"
+              >
+                Присоединиться
+              </button>
+            </div>
+          )}
+
+          {/* Text — ссылки кликабельные */}
           {msg.text && (
-            <p className={`${isImageOnly ? "px-3 pt-1" : ""} ${fontClass} break-words whitespace-pre-wrap leading-snug`}>{msg.text}</p>
+            <MessageTextWithLinks text={msg.text} className={`${isImageOnly ? "px-3 pt-1" : ""} ${fontClass} break-words whitespace-pre-wrap leading-snug`} />
           )}
           {msg.routeId && <RouteCard routeId={msg.routeId} />}
+          {/* Превью ссылок (до 3 штук) */}
+          {msg.text && !msg.routeId && extractUrls(msg.text).length > 0 && (
+            <LinkPreview text={msg.text} />
+          )}
 
           {/* Time + status (скрыто для image-only, время на фото) */}
           {!isImageOnly && (
@@ -499,7 +554,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
     : user ? [user.id, friendId].sort().join("_") : null;
   const {
     messages, loading, hasMore, loadingOlder, typingUsers, pinnedMessage,
-    sendMessage, sendImage, sendVoice, retryMessage, deleteMessage, toggleReaction,
+    sendMessage, sendImage, sendVoice, sendLocation, retryMessage, deleteMessage, toggleReaction,
     editMessage, togglePin, loadOlder, sendTyping, clearMessages,
   } = useChatPolling(conversationKey, {
     interval: 15000,
@@ -784,7 +839,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
   }, [messages, newMessageIds, retryMessage]);
 
   const friendOnline = isOnline(friend?.lastActivityAt);
-  const friendStatus = formatLastSeen(friend?.lastActivityAt);
+  const friendStatus = formatLastSeen(friend?.lastActivityAt, friend?.trackingStatus);
   const isTyping = typingUsers.length > 0;
   const isAdminChatAsUser = adminMode && friendId === user?.id;
 
@@ -1034,14 +1089,28 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
               )}
             </div>
 
-            {/* Attach image button */}
+            {/* Attach image + location buttons */}
             {!editingMsg && (
-              <div className="shrink-0">
+              <div className="flex shrink-0">
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
                 >
                   <Paperclip className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!navigator.geolocation) return;
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => sendLocation(pos.coords.latitude, pos.coords.longitude),
+                      () => {},
+                      { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition"
+                  title="Отправить геолокацию"
+                >
+                  <MapPin className="h-5 w-5" />
                 </button>
                 <input
                   ref={fileInputRef}

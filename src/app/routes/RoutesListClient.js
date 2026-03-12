@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useUser } from "@/components/UserProvider";
 import RouteCard from "@/components/RouteCard";
 import { LogIn, MapPin, ArrowUpDown, SlidersHorizontal } from "lucide-react";
@@ -27,27 +27,16 @@ export default function RoutesListClient({ routes: initialRoutes }) {
   const [sortBy, setSortBy] = useState("default");
   const [difficulty, setDifficulty] = useState(null);
   const [showSort, setShowSort] = useState(false);
+  const [bestTimes, setBestTimes] = useState({});
 
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center py-16 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/10">
-          <MapPin className="h-8 w-8 text-green-500" />
-        </div>
-        <h2 className="text-lg font-bold text-[var(--text-primary)]">Войдите, чтобы увидеть маршруты</h2>
-        <p className="mt-2 text-sm text-[var(--text-muted)] max-w-xs">
-          Зарегистрируйтесь или войдите в аккаунт, чтобы просматривать и проходить маршруты
-        </p>
-        <button
-          onClick={() => window.dispatchEvent(new Event("open-profile-modal"))}
-          className="mt-6 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-[var(--shadow-lg)] transition hover:shadow-[var(--shadow-md)] active:scale-[0.98]"
-        >
-          <LogIn className="h-4 w-4" />
-          Войти / Зарегистрироваться
-        </button>
-      </div>
-    );
-  }
+  // Загружаем лучшие времена юзера для всех маршрутов
+  useEffect(() => {
+    if (!user) return;
+    authFetch("/api/routes/my-records")
+      .then((r) => r.ok ? r.json() : {})
+      .then((data) => setBestTimes(data))
+      .catch(() => {});
+  }, [user, authFetch]);
 
   const visible = isAdmin ? routes : routes.filter((r) => !r._hidden);
 
@@ -74,6 +63,27 @@ export default function RoutesListClient({ routes: initialRoutes }) {
     }
     return result;
   }, [visible, sortBy, difficulty]);
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center py-16 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/10">
+          <MapPin className="h-8 w-8 text-green-500" />
+        </div>
+        <h2 className="text-lg font-bold text-[var(--text-primary)]">Войдите, чтобы увидеть маршруты</h2>
+        <p className="mt-2 text-sm text-[var(--text-muted)] max-w-xs">
+          Зарегистрируйтесь или войдите в аккаунт, чтобы просматривать и проходить маршруты
+        </p>
+        <button
+          onClick={() => window.dispatchEvent(new Event("open-profile-modal"))}
+          className="mt-6 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-[var(--shadow-lg)] transition hover:shadow-[var(--shadow-md)] active:scale-[0.98]"
+        >
+          <LogIn className="h-4 w-4" />
+          Войти / Зарегистрироваться
+        </button>
+      </div>
+    );
+  }
 
   const published = filtered.filter((r) => !r._hidden);
   const hidden = filtered.filter((r) => r._hidden);
@@ -162,6 +172,7 @@ export default function RoutesListClient({ routes: initialRoutes }) {
             route={route}
             isAdmin={isAdmin}
             onToggleHidden={handleToggleHidden}
+            bestTime={bestTimes[route._id]}
           />
         ))}
       </div>
@@ -176,6 +187,7 @@ export default function RoutesListClient({ routes: initialRoutes }) {
                 route={route}
                 isAdmin={isAdmin}
                 onToggleHidden={handleToggleHidden}
+                bestTime={bestTimes[route._id]}
               />
             ))}
           </div>

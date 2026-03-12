@@ -49,7 +49,7 @@ export default function ProfileClient({ profile }) {
   const router = useRouter();
   const primaryRoleColor = roles?.[0]?.color || null;
   const achievementSet = new Set(achievements);
-  const level = getUserLevel(stats.completedRoutes);
+  const level = getUserLevel(stats?.completedRoutes || 0);
 
   const isOwnProfile = user?.id === profileId;
   const [friendStatus, setFriendStatus] = useState(null); // "none" | "friend" | "pending_sent" | "pending_received"

@@ -111,6 +111,12 @@ export default function MessageToast() {
       }));
       return;
     }
+    if (data.type === "group_typing") {
+      window.dispatchEvent(new CustomEvent("chat-typing", {
+        detail: { type: "group_typing", groupId: data.groupId, userId: data.userId, username: data.username },
+      }));
+      return;
+    }
     if (data.type === "message_read") {
       window.dispatchEvent(new CustomEvent("chat-messages-read", {
         detail: { conversationKey: data.conversationKey },

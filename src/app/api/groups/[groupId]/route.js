@@ -47,7 +47,8 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       id: group._id.toString(),
       name: group.name,
-      avatarUrl: group.avatarUrl,
+      description: group.description || null,
+      avatarUrl: group.avatarUrl || null,
       members,
       createdBy: group.createdBy,
       createdAt: group.createdAt,
@@ -66,7 +67,7 @@ export async function PATCH(request, { params }) {
     const db = await getDb();
     const { groupId } = await params;
     const userId = auth.user._id.toString();
-    const { name } = await request.json();
+    const body = await request.json();
 
     const group = await db.collection("group_chats").findOne({ _id: new ObjectId(groupId) });
     if (!group) {
@@ -74,17 +75,31 @@ export async function PATCH(request, { params }) {
     }
 
     const member = group.members.find((m) => m.userId === userId);
-    if (!member || member.role !== "owner") {
-      return NextResponse.json({ error: "Только создатель может редактировать" }, { status: 403 });
+    if (!member || (member.role !== "owner" && member.role !== "admin")) {
+      return NextResponse.json({ error: "Только создатель или админ может редактировать" }, { status: 403 });
     }
 
-    if (!name || name.trim().length < 1 || name.trim().length > 50) {
-      return NextResponse.json({ error: "Название 1-50 символов" }, { status: 400 });
+    const updates = { updatedAt: new Date() };
+
+    if (body.name !== undefined) {
+      const name = body.name;
+      if (!name || name.trim().length < 1 || name.trim().length > 50) {
+        return NextResponse.json({ error: "Название 1-50 символов" }, { status: 400 });
+      }
+      updates.name = name.trim();
+    }
+
+    if (body.description !== undefined) {
+      const desc = (body.description || "").trim();
+      if (desc.length > 200) {
+        return NextResponse.json({ error: "Описание максимум 200 символов" }, { status: 400 });
+      }
+      updates.description = desc || null;
     }
 
     await db.collection("group_chats").updateOne(
       { _id: new ObjectId(groupId) },
-      { $set: { name: name.trim(), updatedAt: new Date() } }
+      { $set: updates }
     );
 
     return NextResponse.json({ success: true });

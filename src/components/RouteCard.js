@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { TrendingUp, Clock, Pencil, Shield } from "lucide-react";
+import { TrendingUp, Clock, Pencil, Shield, Trophy } from "lucide-react";
 import { normalizeCoverImage, coverImageStyle } from "@/lib/coverImage";
 import RouteCardMiniMap from "@/components/RouteCardMiniMap";
 
-export default function RouteCard({ route, isAdmin, onToggleHidden }) {
+function formatBestTime(seconds) {
+  if (!seconds || seconds <= 0) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export default function RouteCard({ route, isAdmin, onToggleHidden, bestTime }) {
   return (
     <Link
       href={`/routes/${route._id}`}
@@ -89,6 +98,12 @@ export default function RouteCard({ route, isAdmin, onToggleHidden }) {
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               {route.duration} мин
+            </span>
+          )}
+          {bestTime > 0 && (
+            <span className="flex items-center gap-1 text-yellow-600">
+              <Trophy className="h-4 w-4" />
+              {formatBestTime(bestTime)}
             </span>
           )}
         </div>

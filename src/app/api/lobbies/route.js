@@ -13,7 +13,8 @@ export async function POST(request) {
   const auth = await requireAuth(request);
   if (auth.error) return auth.error;
 
-  const { routeId } = await request.json();
+  const { routeId, type } = await request.json();
+  const lobbyType = ["walk", "race", "event"].includes(type) ? type : "walk";
 
   if (!routeId || !ObjectId.isValid(routeId)) {
     return NextResponse.json({ error: "Некорректный ID маршрута" }, { status: 400 });
@@ -49,6 +50,7 @@ export async function POST(request) {
 
   const lobby = {
     routeId: routeId,
+    type: lobbyType,
     hostId: auth.user._id.toString(),
     joinCode,
     status: "waiting",
@@ -68,6 +70,7 @@ export async function POST(request) {
       audio: { isPlaying: false, trackIndex: 0, currentTime: 0, updatedAt: now },
       updatedAt: now,
     },
+    participantStates: {},
     createdAt: now,
     expiresAt,
   };
@@ -77,6 +80,7 @@ export async function POST(request) {
   return NextResponse.json({
     id: result.insertedId.toString(),
     joinCode,
+    type: lobbyType,
     status: "waiting",
     routeId,
     routeTitle: route.title || "",

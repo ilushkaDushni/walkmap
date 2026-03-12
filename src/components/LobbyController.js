@@ -42,18 +42,40 @@ export default function LobbyController({ inline = false }) {
       setModalOpen(true);
     };
 
+    // Присоединиться к лобби из карточки в чате
+    const onJoinFromChat = async (e) => {
+      const { joinCode } = e.detail || {};
+      if (!joinCode || !authFetch) return;
+      try {
+        const res = await authFetch("/api/lobbies/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ joinCode }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLobbyId(data.id);
+          setIsHost(false);
+          setModalOpen(true);
+          window.dispatchEvent(new CustomEvent("lobby-joined", { detail: data }));
+        }
+      } catch {}
+    };
+
     window.addEventListener("lobby-created", onCreated);
     window.addEventListener("lobby-joined", onJoined);
     window.addEventListener("lobby-left", onLeft);
     window.addEventListener("open-lobby-modal", onOpenLobby);
+    window.addEventListener("lobby-join-from-chat", onJoinFromChat);
 
     return () => {
       window.removeEventListener("lobby-created", onCreated);
       window.removeEventListener("lobby-joined", onJoined);
       window.removeEventListener("lobby-left", onLeft);
       window.removeEventListener("open-lobby-modal", onOpenLobby);
+      window.removeEventListener("lobby-join-from-chat", onJoinFromChat);
     };
-  }, []);
+  }, [authFetch]);
 
   // Polling для обновления бейджа (если в лобби)
   useEffect(() => {

@@ -103,9 +103,9 @@ export default function LeaderModal({ username, onClose }) {
                   const Icon = ICON_MAP[a.icon] || Trophy;
                   const colors = COLOR_CLASSES[a.color] || COLOR_CLASSES.blue;
                   return (
-                    <div key={a.slug} title={`${a.title}${ok ? " (получено)" : ""}`} className={`flex flex-col items-center rounded-lg py-2 px-1 transition ${ok ? colors.bg : "opacity-40"}`}>
-                      <Icon className={`h-4 w-4 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />
-                      <span className={`text-xs font-medium mt-0.5 text-center leading-tight ${ok ? colors.text : "text-[var(--text-muted)]"}`}>{a.title}</span>
+                    <div key={a.slug} title={`${a.title}${ok ? " (получено)" : ""}`} className={`flex flex-col items-center rounded-lg py-2 px-1 transition overflow-hidden ${ok ? colors.bg : "opacity-40"}`}>
+                      <Icon className={`h-4 w-4 shrink-0 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />
+                      <span className={`text-[10px] font-medium mt-0.5 text-center leading-tight truncate w-full ${ok ? colors.text : "text-[var(--text-muted)]"}`}>{a.title}</span>
                     </div>
                   );
                 })}

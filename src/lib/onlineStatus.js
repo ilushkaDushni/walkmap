@@ -4,7 +4,8 @@ export function isOnline(lastActivityAt) {
   return diff < 5 * 60 * 1000; // 5 минут
 }
 
-export function formatLastSeen(lastActivityAt) {
+export function formatLastSeen(lastActivityAt, trackingStatus) {
+  if (trackingStatus?.active) return "на маршруте 🚶";
   if (!lastActivityAt) return "был(а) давно";
 
   const diff = Date.now() - new Date(lastActivityAt).getTime();

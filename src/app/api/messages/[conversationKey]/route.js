@@ -128,6 +128,8 @@ export async function GET(request, { params }) {
     audioUrl: m.audioUrl || null,
     audioDuration: m.audioDuration || 0,
     routeId: m.routeId || null,
+    location: m.location || null,
+    lobbyInvite: m.lobbyInvite || null,
     createdAt: m.createdAt,
     editedAt: m.editedAt || null,
     readAt: m.readAt || null,
@@ -204,7 +206,95 @@ export async function POST(request, { params }) {
     }
   }
 
-  const { text, routeId, replyToId, adminMode } = await request.json();
+  const body = await request.json();
+  const { text, routeId, replyToId, adminMode, location } = body;
+
+  // Сообщение с геолокацией
+  if (location && location.lat != null && location.lng != null) {
+    const db = await getDb();
+
+    const locMessage = {
+      conversationKey,
+      senderId: userId,
+      text: null,
+      type: "location",
+      location: {
+        lat: Number(location.lat),
+        lng: Number(location.lng),
+      },
+      routeId: null,
+      replyToId: replyToId || null,
+      reactions: [],
+      deletedFor: [],
+      createdAt: new Date(),
+      readAt: null,
+    };
+
+    const locResult = await db.collection("messages").insertOne(locMessage);
+
+    // Убираем typing indicator
+    try {
+      await db.collection("typing_indicators").deleteOne({ conversationKey, userId });
+    } catch { /* ignore */ }
+
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { lastActivityAt: new Date() } }
+    );
+
+    // Уведомление получателю
+    let recipientId;
+    if (isAdminConvPost) {
+      const targetUserId = getTargetUserIdFromAdminKey(conversationKey);
+      recipientId = userId !== targetUserId ? targetUserId : null;
+    } else {
+      const parts = conversationKey.split("_");
+      recipientId = parts.find((p) => p !== userId);
+    }
+
+    if (recipientId) {
+      const sender = await db.collection("users").findOne(
+        { _id: new ObjectId(userId) },
+        { projection: { username: 1, avatarUrl: 1 } }
+      );
+      const ssePayload = {
+        type: "new_message",
+        username: sender?.username || "Кто-то",
+        avatarUrl: sender?.avatarUrl || null,
+        text: "📍 Геолокация",
+        conversationKey,
+        userId,
+      };
+
+      const existing = await db.collection("notifications").findOne({
+        userId: recipientId, type: "new_message",
+        "data.conversationKey": conversationKey, read: false,
+      });
+      let notificationId;
+      if (!existing) {
+        notificationId = await createNotification(recipientId, "new_message", ssePayload);
+      } else {
+        notificationId = existing._id.toString();
+      }
+      pushNotification(recipientId, { ...ssePayload, notificationId });
+    }
+
+    return NextResponse.json({
+      id: locResult.insertedId.toString(),
+      senderId: userId,
+      text: null,
+      type: "location",
+      location: locMessage.location,
+      imageUrl: null,
+      routeId: null,
+      replyToId: locMessage.replyToId,
+      replyTo: null,
+      reactions: [],
+      createdAt: locMessage.createdAt,
+      editedAt: null,
+      readAt: null,
+    }, { status: 201 });
+  }
 
   if (!text || typeof text !== "string" || text.trim().length === 0) {
     return NextResponse.json({ error: "Текст обязателен" }, { status: 400 });

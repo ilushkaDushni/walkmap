@@ -4,6 +4,8 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import RouteMap from "@/components/RouteMap";
 import RouteComments from "@/components/RouteComments";
+import RouteRecords from "@/components/RouteRecords";
+import StartRouteButton from "@/components/StartRouteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -61,8 +63,8 @@ export default async function RouteDetailPage({ params }) {
     <div className="pb-24">
       {/* Full-width map */}
       <div className="relative w-full h-[280px] sm:h-[340px]">
-        <div className="absolute inset-0">
-          <RouteMap route={serialized} fullscreen />
+        <div className="absolute inset-0 overflow-hidden">
+          <RouteMap route={serialized} preview />
         </div>
         <Link
           href="/routes"
@@ -105,6 +107,16 @@ export default async function RouteDetailPage({ params }) {
               {diff.label}
             </span>
           </div>
+        </div>
+
+        {/* Начать маршрут */}
+        <div className="mt-4">
+          <StartRouteButton route={serialized} />
+        </div>
+
+        {/* Рекорды */}
+        <div className="mt-4">
+          <RouteRecords routeId={serialized._id} />
         </div>
 
         {/* Comments */}

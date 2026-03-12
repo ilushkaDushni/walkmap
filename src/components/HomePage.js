@@ -44,7 +44,7 @@ export default function HomePage() {
 
     setDataLoading(true);
     Promise.all([
-      authFetch("/api/stats/user").then((r) => r.json()).catch(() => ({ completedRoutes: 0, totalDistanceM: 0, coins: 0 })),
+      authFetch("/api/stats/user").then((r) => r.ok ? r.json() : Promise.reject()).catch(() => ({ completedRoutes: 0, totalDistanceM: 0, coins: 0, commentsCount: 0, hasNightCompletion: false, achievements: [] })),
       fetch("/api/stats/leaderboard").then((r) => r.json()).catch(() => []),
     ]).then(([stats, lb]) => {
       setUserStats(stats);

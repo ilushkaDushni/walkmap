@@ -236,6 +236,39 @@ export default function FriendsPage() {
     loadUnread();
   }, [loadUnread]);
 
+  const handleGroupUpdated = useCallback((updated) => {
+    setActiveGroup((prev) => prev ? { ...prev, ...updated } : prev);
+    setGroups((prev) => prev.map((g) => g.id === updated.id ? { ...g, ...updated } : g));
+  }, []);
+
+  const handleLeaveGroup = useCallback(async () => {
+    if (!authFetch || !activeGroup) return;
+    if (!confirm("Вы уверены, что хотите покинуть группу?")) return;
+    try {
+      const res = await authFetch(`/api/groups/${activeGroup.id}/members`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: user.id }),
+      });
+      if (res.ok) {
+        setActiveGroup(null);
+        loadGroups();
+      }
+    } catch { /* ignore */ }
+  }, [authFetch, activeGroup, user?.id, loadGroups]);
+
+  const handleDeleteGroup = useCallback(async () => {
+    if (!authFetch || !activeGroup) return;
+    if (!confirm("Удалить группу? Это действие необратимо.")) return;
+    try {
+      const res = await authFetch(`/api/groups/${activeGroup.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setActiveGroup(null);
+        loadGroups();
+      }
+    } catch { /* ignore */ }
+  }, [authFetch, activeGroup, loadGroups]);
+
   // Закрытие контекстного меню при клике вне
   useEffect(() => {
     if (!contextMenu) return;
@@ -305,8 +338,8 @@ export default function FriendsPage() {
       <UserAvatar username={f.username} avatarUrl={f.avatarUrl} size="md" online={isOnline(f.lastActivityAt)} equippedItems={f.equippedItems} />
       <div className="flex-1 min-w-0">
         <UserName username={f.username} equippedItems={f.equippedItems} showTitle={false} />
-        <p className={`text-xs truncate ${isOnline(f.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
-          {formatLastSeen(f.lastActivityAt)}
+        <p className={`text-xs truncate ${f.trackingStatus?.active ? "text-blue-500" : isOnline(f.lastActivityAt) ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+          {formatLastSeen(f.lastActivityAt, f.trackingStatus)}
         </p>
       </div>
       <div className="relative shrink-0">
@@ -393,8 +426,12 @@ export default function FriendsPage() {
                   activeGroup?.id === g.id ? "ring-2 ring-[var(--accent-color)]" : ""
                 }`}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-color)]/15 shrink-0">
-                  <Users className="h-5 w-5 text-[var(--accent-color)]" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-color)]/15 shrink-0 overflow-hidden">
+                  {g.avatarUrl ? (
+                    <img src={g.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Users className="h-5 w-5 text-[var(--accent-color)]" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{g.name}</p>
@@ -557,7 +594,7 @@ export default function FriendsPage() {
       )}
       {activeGroup && !activeChatId && (
         <div className="md:hidden fixed inset-0 z-[56] bg-[var(--bg-surface)]">
-          <GroupChatView group={activeGroup} onBack={handleCloseChat} />
+          <GroupChatView group={activeGroup} onBack={handleCloseChat} onGroupUpdated={handleGroupUpdated} onLeaveGroup={handleLeaveGroup} onDeleteGroup={handleDeleteGroup} />
         </div>
       )}
 
@@ -573,7 +610,7 @@ export default function FriendsPage() {
         {/* Чат или пустое состояние */}
         <div className="flex-1 min-w-0">
           {activeGroup ? (
-            <GroupChatView group={activeGroup} onBack={handleCloseChat} />
+            <GroupChatView group={activeGroup} onBack={handleCloseChat} onGroupUpdated={handleGroupUpdated} onLeaveGroup={handleLeaveGroup} onDeleteGroup={handleDeleteGroup} />
           ) : activeChatId ? (
             <ChatView
               friendId={activeChatId}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, Copy, Play, Users, Trophy, LogOut, UserPlus, Check, Loader, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Copy, Play, Users, Trophy, LogOut, UserPlus, Check, Loader, ChevronLeft, ChevronRight, MessageCircle, Send, RotateCcw, Share2, Eye } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import AudioPlayer from "./AudioPlayer";
@@ -45,6 +45,12 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
   const [invitedIds, setInvitedIds] = useState(new Set());
   const [routeData, setRouteData] = useState(null);
   const [hostEventIndex, setHostEventIndex] = useState(0);
+  const [lobbyType, setLobbyType] = useState("walk");
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatText, setChatText] = useState("");
+  const [showChat, setShowChat] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatTimerRef = { current: null };
 
   const hostHook = useLobbyHost(currentLobbyId, { enabled: isHost && screen === "active" });
   const participantHook = useLobbyParticipant(currentLobbyId, {
@@ -97,7 +103,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
       const res = await authFetch("/api/lobbies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ routeId: selectedRouteId }),
+        body: JSON.stringify({ routeId: selectedRouteId, type: lobbyType }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
@@ -163,6 +169,91 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
         body: JSON.stringify({ friendId }),
       });
       setInvitedIds((prev) => new Set([...prev, friendId]));
+    } catch {}
+  };
+
+  // === Мини-чат лобби ===
+  const fetchChat = useCallback(async () => {
+    if (!authFetch || !currentLobbyId) return;
+    const last = chatMessages[chatMessages.length - 1];
+    const afterParam = last ? `?after=${encodeURIComponent(last.createdAt)}` : "";
+    try {
+      const res = await authFetch(`/api/lobbies/${currentLobbyId}/chat${afterParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.messages?.length > 0) {
+          setChatMessages((prev) => {
+            const ids = new Set(prev.map((m) => m.id));
+            return [...prev, ...data.messages.filter((m) => !ids.has(m.id))];
+          });
+        }
+      }
+    } catch {}
+  }, [authFetch, currentLobbyId, chatMessages]);
+
+  useEffect(() => {
+    if (!showChat || !currentLobbyId) return;
+    fetchChat();
+    const timer = setInterval(fetchChat, 3000);
+    return () => clearInterval(timer);
+  }, [showChat, currentLobbyId, fetchChat]);
+
+  const sendChatMessage = async (text) => {
+    if (!authFetch || !currentLobbyId || !text?.trim()) return;
+    try {
+      const res = await authFetch(`/api/lobbies/${currentLobbyId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      if (res.ok) {
+        const msg = await res.json();
+        setChatMessages((prev) => [...prev, msg]);
+        setChatText("");
+      }
+    } catch {}
+  };
+
+  // === Реванш ===
+  const handleRematch = async () => {
+    if (!results || !lobbyState?.routeId) return;
+    setResults(null);
+    setSelectedRouteId(lobbyState.routeId);
+    setHostEventIndex(0);
+    setRouteData(null);
+    setChatMessages([]);
+    setShowChat(false);
+    setCreating(true);
+    setError("");
+    try {
+      const res = await authFetch("/api/lobbies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ routeId: lobbyState.routeId, type: lobbyState.type || "walk" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setCurrentLobbyId(data.id);
+      setScreen("waiting");
+      window.dispatchEvent(new CustomEvent("lobby-created", { detail: data }));
+    } catch (e) {
+      setError(e.message);
+      setScreen("create");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // === Поделиться результатами в чат ===
+  const handleShareResults = async (friendId, conversationKey) => {
+    if (!authFetch || !results) return;
+    const text = `🏆 Маршрут «${results.routeTitle}» пройден!\n${results.results?.map((r) => `${r.username}: +${r.coins} монет`).join("\n")}`;
+    try {
+      await authFetch(`/api/messages/${conversationKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
     } catch {}
   };
 
@@ -259,6 +350,28 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
       <>
         <h2 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">Создать лобби</h2>
 
+        {/* Тип лобби */}
+        <div className="flex gap-2 mb-4">
+          {[
+            { value: "walk", label: "Прогулка", icon: "🚶" },
+            { value: "race", label: "Гонка", icon: "🏃" },
+            { value: "event", label: "Ивент", icon: "🎉" },
+          ].map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setLobbyType(t.value)}
+              className={`flex-1 rounded-2xl px-3 py-2.5 text-center transition border ${
+                lobbyType === t.value
+                  ? "border-green-500 bg-green-500/10"
+                  : "border-[var(--border-color)] bg-[var(--bg-elevated)] hover:border-[var(--text-muted)]"
+              }`}
+            >
+              <span className="text-lg">{t.icon}</span>
+              <p className="text-xs font-medium text-[var(--text-primary)] mt-0.5">{t.label}</p>
+            </button>
+          ))}
+        </div>
+
         <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
           {routes.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)] text-center py-4">Нет доступных маршрутов</p>
@@ -303,6 +416,29 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
               Войти
             </button>
           </div>
+          {joinCode.length === 6 && (
+            <button
+              onClick={async () => {
+                setError("");
+                try {
+                  const res = await authFetch("/api/lobbies/join", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ joinCode, role: "observer" }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Ошибка");
+                  setCurrentLobbyId(data.id);
+                  setScreen("waiting");
+                  window.dispatchEvent(new CustomEvent("lobby-joined", { detail: data }));
+                } catch (e) { setError(e.message); }
+              }}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-[var(--border-color)] py-2.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Войти как наблюдатель
+            </button>
+          )}
         </div>
 
         {error && <p className="text-center text-xs text-red-400 mt-2">{error}</p>}
@@ -336,6 +472,9 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
         <h2 className="text-lg font-bold text-[var(--text-primary)] text-center mb-1">
           {lobbyState.routeTitle || "Лобби"}
         </h2>
+        <p className="text-xs text-center text-[var(--text-muted)] mb-2">
+          {lobbyState.type === "race" ? "🏃 Гонка" : lobbyState.type === "event" ? "🎉 Ивент" : "🚶 Прогулка"}
+        </p>
 
         {/* Код */}
         <div className="flex items-center justify-center gap-3 mb-4">
@@ -354,9 +493,11 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
             <div key={p.userId} className="flex items-center gap-2 rounded-xl bg-[var(--bg-elevated)] px-3 py-2">
               <UserAvatar username={p.username} avatarUrl={p.avatarUrl} size="sm" equippedItems={p.equippedItems} />
               <span className="text-sm" style={{ color: p.equippedItems?.usernameColor?.cssData?.color || "var(--text-primary)" }}>{p.username}</span>
-              {p.userId === lobbyState.hostId && (
+              {p.userId === lobbyState.hostId ? (
                 <span className="text-xs text-amber-500 font-medium ml-auto">Хост</span>
-              )}
+              ) : p.role === "observer" ? (
+                <span className="text-xs text-blue-400 font-medium ml-auto">Наблюдатель</span>
+              ) : null}
             </div>
           ))}
         </div>
@@ -392,6 +533,60 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
             </div>
           </div>
         )}
+
+        {/* Мини-чат */}
+        <div className="mb-3">
+          <button
+            onClick={() => setShowChat((v) => !v)}
+            className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition mb-2"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {showChat ? "Скрыть чат" : "Чат лобби"}
+          </button>
+          {showChat && (
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] p-3">
+              <div className="max-h-32 overflow-y-auto space-y-1 mb-2">
+                {chatMessages.length === 0 && (
+                  <p className="text-xs text-[var(--text-muted)] text-center py-2">Пока пусто</p>
+                )}
+                {chatMessages.map((m) => (
+                  <div key={m.id} className="text-xs">
+                    <span className="font-medium text-[var(--text-primary)]">{m.senderUsername}: </span>
+                    <span className="text-[var(--text-secondary)]">{m.text}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Быстрые реакции */}
+              <div className="flex gap-1 mb-2 flex-wrap">
+                {["Я на месте!", "Подождите", "Вперёд!", "👍"].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => sendChatMessage(r)}
+                    className="rounded-full border border-[var(--border-color)] px-2 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value.slice(0, 200))}
+                  onKeyDown={(e) => { if (e.key === "Enter") { sendChatMessage(chatText); } }}
+                  placeholder="Сообщение..."
+                  className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs text-[var(--text-primary)] outline-none"
+                />
+                <button
+                  onClick={() => sendChatMessage(chatText)}
+                  disabled={!chatText.trim()}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white disabled:opacity-40"
+                >
+                  <Send className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex gap-2">
           <button
@@ -638,17 +833,29 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
           ))}
         </div>
 
-        <button
-          onClick={() => {
-            setCurrentLobbyId(null);
-            setResults(null);
-            window.dispatchEvent(new Event("lobby-left"));
-            onClose();
-          }}
-          className="flex w-full items-center justify-center rounded-2xl bg-[var(--text-primary)] py-3 text-sm font-semibold text-[var(--bg-surface)] hover:opacity-90 transition"
-        >
-          Отлично!
-        </button>
+        <div className="flex gap-2">
+          {/* Реванш */}
+          {isHost && (
+            <button
+              onClick={handleRematch}
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-green-500/30 py-3 text-sm font-semibold text-green-600 hover:bg-green-500/10 transition"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Реванш
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setCurrentLobbyId(null);
+              setResults(null);
+              window.dispatchEvent(new Event("lobby-left"));
+              onClose();
+            }}
+            className="flex-1 flex items-center justify-center rounded-2xl bg-[var(--text-primary)] py-3 text-sm font-semibold text-[var(--bg-surface)] hover:opacity-90 transition"
+          >
+            Отлично!
+          </button>
+        </div>
       </>
     );
   }
