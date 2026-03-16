@@ -4,6 +4,7 @@ import { getDb } from "@/lib/mongodb";
 import { requireAuth } from "@/lib/adminAuth";
 import { checkAndGrantAchievements } from "@/lib/achievementEngine";
 import { logCoinTransaction } from "@/lib/coinTransactions";
+import { checkAndResolveUserChallenges } from "@/lib/challengeResolver";
 
 export async function POST(request, { params }) {
   const auth = await requireAuth(request);
@@ -92,6 +93,15 @@ export async function POST(request, { params }) {
         balance: updatedUser.coins || 0,
         meta: { routeId: id, routeTitle: route.title },
       });
+    }
+
+    // Проверяем активные челленджи
+    if (duration && gpsVerified) {
+      try {
+        await checkAndResolveUserChallenges(db, userId, id, { duration, pace, gpsVerified });
+      } catch (e) {
+        console.error("Challenge resolve error:", e);
+      }
     }
 
     // Проверяем достижения

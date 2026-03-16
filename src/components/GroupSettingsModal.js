@@ -6,6 +6,7 @@ import {
   Link2, Bell, BellOff, Palette, LogOut, Trash2, Plus,
   Crown, ChevronRight, ArrowLeft, Check, UserMinus,
 } from "lucide-react";
+import AvatarCropper from "./AvatarCropper";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import ChatThemePicker from "./ChatThemePicker";
@@ -309,18 +310,29 @@ function SettingsRow({ icon: Icon, label, detail, onClick, trailing }) {
   );
 }
 
-// --- Avatar Upload ---
+// --- Avatar Upload with Cropper ---
 function AvatarUpload({ avatarUrl, name, groupId, isOwner, authFetch, onUpdated }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
 
-  const handleFile = async (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
-    if (!file || !authFetch) return;
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropped = async (blob) => {
+    setCropSrc(null);
+    if (!authFetch) return;
     setUploading(true);
     try {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", blob, "avatar.webp");
       const res = await authFetch(`/api/groups/${groupId}/avatar`, { method: "POST", body: form });
       if (res.ok) {
         const { avatarUrl: url } = await res.json();
@@ -330,32 +342,66 @@ function AvatarUpload({ avatarUrl, name, groupId, isOwner, authFetch, onUpdated 
     finally { setUploading(false); }
   };
 
+  const handleRemove = async () => {
+    if (!authFetch) return;
+    setUploading(true);
+    try {
+      const res = await authFetch(`/api/groups/${groupId}/avatar`, { method: "DELETE" });
+      if (res.ok) onUpdated(null);
+    } catch { /* ignore */ }
+    finally { setUploading(false); }
+  };
+
   const initial = (name || "?")[0].toUpperCase();
 
+  if (cropSrc) {
+    return (
+      <div className="w-full flex flex-col items-center">
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-3">Обрезка фото</p>
+        <AvatarCropper
+          imageSrc={cropSrc}
+          onCrop={handleCropped}
+          onCancel={() => setCropSrc(null)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="relative">
-      <div className="h-20 w-20 rounded-full overflow-hidden bg-[var(--accent-color)]/15 flex items-center justify-center">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-2xl font-bold text-[var(--accent-color)]">{initial}</span>
-        )}
-        {uploading && (
-          <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
-            <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          </div>
+    <div className="flex flex-col items-center">
+      <div className="relative">
+        <div className="h-20 w-20 rounded-full overflow-hidden bg-[var(--accent-color)]/15 flex items-center justify-center">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-2xl font-bold text-[var(--accent-color)]">{initial}</span>
+          )}
+          {uploading && (
+            <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+        {isOwner && (
+          <>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-[var(--accent-color)] flex items-center justify-center shadow-lg"
+            >
+              <Camera className="h-3.5 w-3.5 text-white" />
+            </button>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelect} />
+          </>
         )}
       </div>
-      {isOwner && (
-        <>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-[var(--accent-color)] flex items-center justify-center shadow-lg"
-          >
-            <Camera className="h-3.5 w-3.5 text-white" />
-          </button>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFile} />
-        </>
+      {isOwner && avatarUrl && !uploading && (
+        <button
+          onClick={handleRemove}
+          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-500 transition mt-2"
+        >
+          <Trash2 className="h-3 w-3" />
+          Удалить фото
+        </button>
       )}
     </div>
   );

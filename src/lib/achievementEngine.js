@@ -27,7 +27,7 @@ export async function checkAndGrantAchievements(userId, { grantReward = true } =
   // Ночные часы: 00:00–05:00 МСК = 21:00–01:59 UTC
   const nightHoursUTC = [21, 22, 23, 0, 1];
 
-  const [completedRoutes, distAgg, commentsCount, nightDoc] = await Promise.all([
+  const [completedRoutes, distAgg, commentsCount, nightDoc, duelsCompleted, duelsWon, racesFinished, racesWon, racesPodium] = await Promise.all([
     db.collection("completed_routes").countDocuments(gpsFilter),
     db.collection("completed_routes").aggregate([
       { $match: gpsFilter },
@@ -41,7 +41,42 @@ export async function checkAndGrantAchievements(userId, { grantReward = true } =
       ...gpsFilter,
       $expr: { $in: [{ $hour: "$completedAt" }, nightHoursUTC] },
     }),
+    // Дуэли: завершённые (участвовал)
+    db.collection("challenges").countDocuments({
+      status: "completed",
+      $or: [{ challengerId: userIdStr }, { challengedId: userIdStr }],
+    }),
+    // Дуэли: победы
+    db.collection("challenges").countDocuments({
+      status: "completed",
+      winnerId: userIdStr,
+    }),
+    // Гонки: финишировал
+    db.collection("race_results").countDocuments({
+      "participants.userId": userIdStr,
+      "participants.dnf": { $ne: true },
+    }),
+    // Гонки: победы (1 место)
+    db.collection("race_results").countDocuments({
+      participants: { $elemMatch: { userId: userIdStr, place: 1 } },
+    }),
+    // Гонки: подиум (топ-3)
+    db.collection("race_results").countDocuments({
+      participants: { $elemMatch: { userId: userIdStr, place: { $lte: 3 } } },
+    }),
   ]);
+
+  // Серия побед в дуэлях (последние N дуэлей)
+  let duelWinStreak = 0;
+  const recentDuels = await db.collection("challenges").find({
+    status: "completed",
+    winnerId: { $ne: null },
+    $or: [{ challengerId: userIdStr }, { challengedId: userIdStr }],
+  }).sort({ resolvedAt: -1 }).limit(50).toArray();
+  for (const d of recentDuels) {
+    if (d.winnerId === userIdStr) duelWinStreak++;
+    else break;
+  }
 
   const stats = {
     completedRoutes,
@@ -49,6 +84,12 @@ export async function checkAndGrantAchievements(userId, { grantReward = true } =
     coins: user.coins || 0,
     commentsCount,
     hasNightCompletion: nightDoc !== null,
+    duelsCompleted,
+    duelsWon,
+    duelWinStreak,
+    racesFinished,
+    racesWon,
+    racesPodium,
   };
 
   // Уже полученные slugs

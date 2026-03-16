@@ -75,6 +75,14 @@ export async function POST(request) {
     expiresAt,
   };
 
+  // Race: инициализируем raceState
+  if (lobbyType === "race") {
+    lobby.raceState = {
+      startedAt: null,
+      finishedParticipants: [],
+    };
+  }
+
   const result = await db.collection("lobbies").insertOne(lobby);
 
   return NextResponse.json({

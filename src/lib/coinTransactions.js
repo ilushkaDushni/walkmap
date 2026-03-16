@@ -1,6 +1,6 @@
 /**
  * Логирование транзакций монет.
- * Типы: route_completion, achievement, gift_sent, gift_received, admin_add, admin_subtract, lobby_completion
+ * Типы: route_completion, achievement, gift_sent, gift_received, admin_add, admin_subtract, lobby_completion, challenge_stake, challenge_win, challenge_refund
  */
 
 /**

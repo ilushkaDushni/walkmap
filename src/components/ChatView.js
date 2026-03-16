@@ -15,6 +15,7 @@ import ChatSettingsModal from "./ChatSettingsModal";
 import VoiceMessage from "./VoiceMessage";
 import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 import LinkPreview, { extractUrls, MessageTextWithLinks } from "./chat/LinkPreview";
+import ChallengeCard from "./ChallengeCard";
 
 const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
@@ -439,6 +440,11 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
                 Присоединиться
               </button>
             </div>
+          )}
+
+          {/* Challenge card */}
+          {msg.type === "challenge" && msg.challengeData && (
+            <ChallengeCard challengeData={msg.challengeData} isMe={isMe} />
           )}
 
           {/* Text — ссылки кликабельные */}

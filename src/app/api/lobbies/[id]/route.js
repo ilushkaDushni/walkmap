@@ -47,7 +47,9 @@ export async function GET(request, { params }) {
     maxParticipants: lobby.maxParticipants,
     hostState: lobby.hostState,
     participantStates: lobby.participantStates || {},
+    raceState: lobby.raceState || null,
     hostOffline,
     createdAt: lobby.createdAt,
+    completedAt: lobby.completedAt || null,
   });
 }

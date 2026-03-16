@@ -25,10 +25,22 @@ export async function POST(request, { params }) {
     return NextResponse.json({ error: "Только хост может запустить" }, { status: 403 });
   }
 
+  const update = { $set: { status: "active" } };
+
+  // Race: запускаем с обратным отсчётом (startedAt через 5 секунд)
+  if (lobby.type === "race") {
+    const raceStartedAt = new Date(Date.now() + 5000);
+    update.$set["raceState.startedAt"] = raceStartedAt;
+  }
+
   await db.collection("lobbies").updateOne(
     { _id: new ObjectId(id) },
-    { $set: { status: "active" } }
+    update
   );
 
-  return NextResponse.json({ ok: true, status: "active" });
+  return NextResponse.json({
+    ok: true,
+    status: "active",
+    raceStartedAt: lobby.type === "race" ? update.$set["raceState.startedAt"] : undefined,
+  });
 }

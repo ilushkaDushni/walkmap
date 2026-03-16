@@ -6,6 +6,7 @@ import RouteMap from "@/components/RouteMap";
 import RouteComments from "@/components/RouteComments";
 import RouteRecords from "@/components/RouteRecords";
 import StartRouteButton from "@/components/StartRouteButton";
+import ChallengeButton from "@/components/ChallengeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -110,8 +111,9 @@ export default async function RouteDetailPage({ params }) {
         </div>
 
         {/* Начать маршрут */}
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
           <StartRouteButton route={serialized} />
+          <ChallengeButton routeId={serialized._id} routeTitle={serialized.title} />
         </div>
 
         {/* Рекорды */}

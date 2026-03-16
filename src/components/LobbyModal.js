@@ -8,6 +8,8 @@ import AudioPlayer from "./AudioPlayer";
 import useLobbyHost from "@/hooks/useLobbyHost";
 import useLobbyParticipant from "@/hooks/useLobbyParticipant";
 import { buildRouteEvents, getDirectedPath, remapSegmentsForDirectedPath } from "@/lib/geo";
+import RaceView from "./RaceView";
+import RacePodium from "./RacePodium";
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -609,7 +611,19 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
     );
   }
 
-  // === Экран: Активное прохождение ===
+  // === Экран: Активное прохождение (Race) ===
+  if (screen === "active" && lobbyState && lobbyState.type === "race") {
+    return modal(
+      <RaceView
+        lobbyState={lobbyState}
+        isHost={isHost}
+        onComplete={handleComplete}
+        onLeave={handleLeave}
+      />
+    );
+  }
+
+  // === Экран: Активное прохождение (Walk/Event) ===
   if (screen === "active" && lobbyState) {
     const progress = Math.round((lobbyState.hostState?.progress || 0) * 100);
 
@@ -806,6 +820,27 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
 
   // === Экран: Результаты ===
   if (screen === "results" && results) {
+    const closeResults = () => {
+      setCurrentLobbyId(null);
+      setResults(null);
+      window.dispatchEvent(new Event("lobby-left"));
+      onClose();
+    };
+
+    // Race results → подиум
+    if (results.isRace) {
+      return modal(
+        <RacePodium
+          results={results.results}
+          routeTitle={results.routeTitle}
+          isHost={isHost}
+          onRematch={handleRematch}
+          onClose={closeResults}
+        />
+      );
+    }
+
+    // Regular results
     return modal(
       <>
         <div className="text-center mb-4">
@@ -845,12 +880,7 @@ export default function LobbyModal({ isOpen, onClose, lobbyId, isHost }) {
             </button>
           )}
           <button
-            onClick={() => {
-              setCurrentLobbyId(null);
-              setResults(null);
-              window.dispatchEvent(new Event("lobby-left"));
-              onClose();
-            }}
+            onClick={closeResults}
             className="flex-1 flex items-center justify-center rounded-2xl bg-[var(--text-primary)] py-3 text-sm font-semibold text-[var(--bg-surface)] hover:opacity-90 transition"
           >
             Отлично!
