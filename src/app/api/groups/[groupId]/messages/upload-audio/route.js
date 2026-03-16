@@ -6,7 +6,13 @@ import { uploadFile } from "@/lib/storage";
 import { pushNotification } from "@/lib/sse";
 
 const MAX_SIZE = 15 * 1024 * 1024; // 15MB
-const ALLOWED_TYPES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"];
+const ALLOWED_BASES = ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"];
+
+function isAllowedAudio(mime) {
+  if (!mime) return false;
+  const base = mime.split(";")[0].trim().toLowerCase();
+  return ALLOWED_BASES.includes(base);
+}
 
 // POST /api/groups/[groupId]/messages/upload-audio — отправка голосового сообщения в групповой чат
 export async function POST(request, { params }) {
@@ -32,7 +38,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: "Файл обязателен" }, { status: 400 });
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!isAllowedAudio(file.type)) {
       return NextResponse.json({ error: "Недопустимый формат аудио" }, { status: 400 });
     }
 
