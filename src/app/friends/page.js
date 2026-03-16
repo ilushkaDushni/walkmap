@@ -326,7 +326,7 @@ export default function FriendsPage() {
   const renderFriendItem = (f) => (
     <button
       key={f.id}
-      onClick={() => { setAdminChatOpen(false); setChatFriendId(f.id); }}
+      onClick={() => { setAdminChatOpen(false); setActiveGroup(null); setChatFriendId(f.id); }}
       onContextMenu={(e) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, friend: f });
@@ -360,7 +360,7 @@ export default function FriendsPage() {
           {/* Закреплённый элемент "Администрация" */}
           {adminConversation && (
             <button
-              onClick={() => { setChatFriendId(null); setAdminChatOpen(true); }}
+              onClick={() => { setChatFriendId(null); setActiveGroup(null); setAdminChatOpen(true); }}
               className={`flex w-full items-center gap-3 rounded-2xl bg-[var(--bg-elevated)] px-4 py-3 text-left transition hover:bg-[var(--bg-elevated)]/80 shadow-[var(--shadow-sm)] ${
                 adminChatOpen ? "ring-2 ring-red-500" : ""
               }`}
