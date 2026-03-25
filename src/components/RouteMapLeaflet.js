@@ -68,7 +68,7 @@ function useRouteBounds(route) {
   return useMemo(() => {
     const points = [];
     route.path?.forEach((p) => points.push([p.lng, p.lat]));
-    route.checkpoints?.forEach((cp) => points.push([cp.position.lng, cp.position.lat]));
+    route.checkpoints?.forEach((cp) => cp.position && points.push([cp.position.lng, cp.position.lat]));
     if (route.finish?.position) points.push([route.finish.position.lng, route.finish.position.lat]);
     if (points.length < 2) return null;
     let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
@@ -272,7 +272,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
 
   // Directed path: от старта к финишу
   const { dirPath, reversed, offset } = useMemo(
-    () => getDirectedPath(route.path || [], route.startPointIndex, route.finishPointIndex),
+    () => getDirectedPath((route.path || []).filter(p => p && p.lat != null && p.lng != null), route.startPointIndex, route.finishPointIndex),
     [route.path, route.startPointIndex, route.finishPointIndex]
   );
 
@@ -367,7 +367,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
     if (i == null || i < 0 || i >= dirPath.length - 1) return null;
     const segStart = { lat: dirPath[i].lat, lng: dirPath[i].lng };
     const segEnd = { lat: dirPath[i + 1].lat, lng: dirPath[i + 1].lng };
-    const dividers = (route.checkpoints || []).filter((cp) => cp.isDivider);
+    const dividers = (route.checkpoints || []).filter((cp) => cp.isDivider && cp.position);
     const splitsOnEdge = dividers
       .map((cp) => {
         const proj = projectPointOnPath(cp.position, dirPath);
@@ -595,7 +595,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
           )}
 
           {/* Чекпоинты */}
-          {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent").map((cp) => {
+          {route.checkpoints?.filter((cp) => !cp.isEmpty && cp.color !== "transparent" && cp.position).map((cp) => {
             const isTriggeredGps = isGpsOverlay && gps.triggeredIds.has(cp.id);
             const isActive = started && currentEvent?.type === "checkpoint" && currentEvent.data.id === cp.id;
             const color = isTriggeredGps

@@ -11,6 +11,7 @@ import ForwardModal from "./chat/ForwardModal";
 import VoiceMessage from "./VoiceMessage";
 import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 import { getChatTheme, getAllChatThemes } from "@/lib/chatThemes";
+import MediaGallery from "./chat/MediaGallery";
 
 const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
@@ -65,6 +66,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
   const [typingUsers, setTypingUsers] = useState([]);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [galleryMsgId, setGalleryMsgId] = useState(null);
 
   // Reply state
   const [replyTo, setReplyTo] = useState(null);
@@ -103,7 +105,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
   const typingTimeoutsRef = useRef(new Map());
   const emojiRef = useRef(null);
 
-  const { recording, duration: recDuration, start: startRecording, stop: stopRecording } = useVoiceRecorder();
+  const { recording, duration: recDuration, audioBlob, start: startRecording, stop: stopRecording, cancel: cancelRecording, reset: resetRecording } = useVoiceRecorder();
 
   const fetchMessages = useCallback(async (after) => {
     if (!authFetch || !group?.id) return;
@@ -451,23 +453,25 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
     setImagePreview({ file, url });
   };
 
-  const handleVoiceSend = useCallback(async () => {
-    const blob = await stopRecording();
-    if (!blob || !authFetch || !group?.id) return;
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("file", blob, "voice.webm");
-      form.append("duration", String(Math.round(recDuration)));
-      const res = await authFetch(`/api/groups/${group.id}/messages/upload-audio`, { method: "POST", body: form });
-      if (res.ok) {
-        const msg = await res.json();
-        lastTimestampRef.current = msg.createdAt;
-        setMessages((prev) => [...prev, msg]);
-      }
-    } catch { /* ignore */ }
-    finally { setUploading(false); }
-  }, [stopRecording, authFetch, group?.id, recDuration]);
+  // Отправка голосового после записи (через useEffect, как в ChatView)
+  useEffect(() => {
+    if (!audioBlob || recording || !authFetch || !group?.id) return;
+    (async () => {
+      setUploading(true);
+      try {
+        const form = new FormData();
+        form.append("file", audioBlob, "voice.webm");
+        form.append("duration", String(Math.round(recDuration)));
+        const res = await authFetch(`/api/groups/${group.id}/messages/upload-audio`, { method: "POST", body: form });
+        if (res.ok) {
+          const msg = await res.json();
+          lastTimestampRef.current = msg.createdAt;
+          setMessages((prev) => [...prev, msg]);
+        }
+      } catch { /* ignore */ }
+      finally { setUploading(false); resetRecording(); }
+    })();
+  }, [audioBlob, recording, authFetch, group?.id, recDuration, resetRecording]);
 
   const theme = chatTheme;
 
@@ -661,7 +665,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
 
                     {/* Image */}
                     {msg.type === "image" && msg.imageUrl && (
-                      <img src={msg.imageUrl} alt="" className="rounded-xl max-w-full max-h-64 object-cover mb-1" />
+                      <img src={msg.imageUrl} alt="" className="rounded-xl max-w-full max-h-64 object-cover mb-1 cursor-pointer" onClick={() => setGalleryMsgId(msg.id)} />
                     )}
 
                     {/* Voice */}
@@ -711,6 +715,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
                         <span className={`text-xs italic ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}>ред.</span>
                       )}
                       <span className={`text-xs ${isMe || theme.dark ? "" : "text-[var(--text-muted)]"}`}>{timeShort(msg.createdAt)}</span>
+                      {isMe && !msg._optimistic && <Check className="h-2.5 w-2.5 ml-0.5" />}
                     </div>
                   </div>
 
@@ -924,14 +929,29 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
           </div>
 
           {recording ? (
-            /* Recording UI */
+            /* Recording UI — с ползунком как в ChatView */
             <div className="flex-1 flex items-center gap-3">
-              <div className="flex-1 flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-2.5">
-                <div className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-sm text-red-500 font-medium">{Math.floor(recDuration)}с</span>
+              <button
+                onClick={cancelRecording}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-500 transition hover:bg-red-500/20 shrink-0"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="flex-1 flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm font-medium text-[var(--text-primary)]">
+                  {Math.floor(recDuration / 60)}:{(recDuration % 60).toString().padStart(2, "0")}
+                </span>
+                <div className="flex-1 h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                  <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${Math.min(100, (recDuration / 120) * 100)}%` }} />
+                </div>
               </div>
-              <button onClick={handleVoiceSend} className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shrink-0">
-                <Square className="h-4 w-4 fill-current" />
+              <button
+                onClick={stopRecording}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white shrink-0"
+                style={{ backgroundColor: theme.accent }}
+              >
+                <Square className="h-4 w-4" fill="currentColor" />
               </button>
             </div>
           ) : (
@@ -973,8 +993,6 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
                   </button>
                 </>
               )}
-              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageSelect} />
-
               {/* Mentions autocomplete popup */}
               <div className="relative flex-1">
                 {mentionQuery && mentionResults.length > 0 && (
@@ -1071,6 +1089,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
             </>
           )}
         </div>
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageSelect} />
       </div>
 
       {/* Delete confirmation */}
@@ -1125,6 +1144,16 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
             const all = getAllChatThemes();
             setChatThemeState(all.find((t) => t.id === id) || all[0]);
           }}
+        />
+      )}
+
+      {/* Media Gallery */}
+      {galleryMsgId && (
+        <MediaGallery
+          messages={messages}
+          initialMsgId={galleryMsgId}
+          onClose={() => setGalleryMsgId(null)}
+          getSenderName={(m) => m.senderUsername || "Участник"}
         />
       )}
     </div>

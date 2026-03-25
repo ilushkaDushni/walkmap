@@ -16,6 +16,7 @@ import VoiceMessage from "./VoiceMessage";
 import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 import LinkPreview, { extractUrls, MessageTextWithLinks } from "./chat/LinkPreview";
 import ChallengeCard from "./ChallengeCard";
+import MediaGallery from "./chat/MediaGallery";
 
 const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
@@ -226,22 +227,11 @@ function DateSeparator({ label, theme }) {
 }
 
 // --- Image Lightbox ---
-function ImageLightbox({ src, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80" onClick={onClose}>
-      <button onClick={onClose} className="absolute top-4 right-4 text-white/80 hover:text-white">
-        <X className="h-6 w-6" />
-      </button>
-      <img src={src} alt="" className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
-    </div>
-  );
-}
 
 // --- Message Bubble ---
-function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDelete, onReaction, onEdit, onPin, isPinned, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu }) {
+function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDelete, onReaction, onEdit, onPin, isPinned, theme, fontClass, contextMenu, onContextMenu, onCloseContextMenu, onImageClick }) {
   const longPressTimer = useRef(null);
   const bubbleRef = useRef(null);
-  const [lightbox, setLightbox] = useState(false);
   const [imgRetry, setImgRetry] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -351,7 +341,7 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
                 alt=""
                 className="rounded-2xl max-w-full max-h-80 object-cover cursor-pointer"
                 style={isImageOnly ? { display: "block" } : undefined}
-                onClick={() => setLightbox(true)}
+                onClick={() => onImageClick?.(msg.id)}
                 onError={() => {
                   if (imgRetry < 2) {
                     // Авто-ретрай с кэш-бастингом
@@ -531,9 +521,6 @@ function MessageBubble({ msg, isMe, user, friend, grouped, isNew, onReply, onDel
         )}
       </div>
 
-      {lightbox && msg.imageUrl && (
-        <ImageLightbox src={msg.imageUrl} onClose={() => setLightbox(false)} />
-      )}
     </div>
   );
 }
@@ -548,6 +535,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
   const [activeContextMenu, setActiveContextMenu] = useState(null);
   const [showScrollFab, setShowScrollFab] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [galleryMsgId, setGalleryMsgId] = useState(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
@@ -975,6 +963,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
                 contextMenu={activeContextMenu?.msgId === msg.id ? activeContextMenu : null}
                 onContextMenu={handleMsgContextMenu}
                 onCloseContextMenu={handleCloseContextMenu}
+                onImageClick={setGalleryMsgId}
               />
             );
           })
@@ -1184,6 +1173,16 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
           onFontSizeChange={handleFontSizeChange}
           onClearHistory={handleClearHistory}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Media Gallery */}
+      {galleryMsgId && (
+        <MediaGallery
+          messages={messages}
+          initialMsgId={galleryMsgId}
+          onClose={() => setGalleryMsgId(null)}
+          getSenderName={(m) => m.senderId === user?.id ? "Вы" : (friend?.username || "Собеседник")}
         />
       )}
     </div>

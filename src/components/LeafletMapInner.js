@@ -352,7 +352,7 @@ export default function LeafletMapInner({
   const routeBounds = useMemo(() => {
     const points = [];
     path.forEach((p) => points.push([p.lng, p.lat]));
-    checkpoints.forEach((cp) => points.push([cp.position.lng, cp.position.lat]));
+    checkpoints.forEach((cp) => cp.position && points.push([cp.position.lng, cp.position.lat]));
     if (finish?.position) points.push([finish.position.lng, finish.position.lat]);
     if (points.length < 2) return null;
     let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
@@ -775,7 +775,7 @@ export default function LeafletMapInner({
         })}
 
       {/* Чекпоинты */}
-      {checkpoints.map((cp) => (
+      {checkpoints.filter((cp) => cp.position).map((cp) => (
         <CheckpointMarker
           key={cp.id}
           cp={cp}
