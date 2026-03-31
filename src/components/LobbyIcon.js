@@ -1,11 +1,16 @@
 "use client";
 
 import { useUser } from "./UserProvider";
+import { usePathname } from "next/navigation";
 
 export default function LobbyIcon({ lobbyId, participantCount, isActive, onClick, inline = false }) {
   const { user } = useUser();
+  const pathname = usePathname();
 
   if (!user) return null;
+
+  // Скрываем floating-кнопку на странице прохождения маршрута
+  if (!inline && /^\/routes\/[^/]+$/.test(pathname)) return null;
 
   return (
     <button

@@ -5,7 +5,7 @@ import { Bell, X, Check, CheckCheck, Trophy, MessageCircle, UserPlus, UserCheck,
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import useUnreadCount from "@/hooks/useUnreadCount";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import AchievementModal from "./AchievementModal";
 
 function timeAgo(date) {
@@ -122,6 +122,8 @@ function getNotificationLink(n) {
 export default function NotificationBell({ inline = false }) {
   const { user, authFetch } = useUser();
   const { count, refresh } = useUnreadCount();
+  const pathname = usePathname();
+  const hideFloating = !inline && /^\/routes\/[^/]+$/.test(pathname);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [total, setTotal] = useState(0);
@@ -534,6 +536,8 @@ export default function NotificationBell({ inline = false }) {
   }
 
   // Мобильный режим (плавающая кнопка)
+  if (hideFloating) return null;
+
   return (
     <>
       <button

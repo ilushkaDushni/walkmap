@@ -8,8 +8,9 @@ import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer, Camera } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
+import RoutePhotoCapture from "@/components/RoutePhotoCapture";
 
 function ElapsedTimer({ startedAt }) {
   const [elapsed, setElapsed] = useState(0);
@@ -110,6 +111,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
   const [gpsError, setGpsError] = useState(null);
   const [autoFollow, setAutoFollow] = useState(true);
   const [completeSent, setCompleteSent] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const userDragRef = useRef(false);
   const dashAnimRef = useRef(null);
   const lastCameraRef = useRef(0);
@@ -787,13 +789,22 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
               Низкая точность GPS ({Math.round(gps.accuracy)}м)
             </p>
           )}
-          <button
-            onClick={handleStopGps}
-            className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-red-300 px-4 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
-          >
-            <X className="h-3.5 w-3.5" />
-            Остановить GPS
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowPhotoCapture(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--accent-color)]/30 px-4 py-2 text-xs font-medium text-[var(--accent-color)] transition hover:bg-[var(--accent-color)]/5"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              Фото
+            </button>
+            <button
+              onClick={handleStopGps}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-red-300 px-4 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+            >
+              <X className="h-3.5 w-3.5" />
+              Стоп
+            </button>
+          </div>
         </div>
       )}
 
@@ -943,6 +954,16 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
             </div>
           )}
         </>
+      )}
+
+      {showPhotoCapture && (
+        <RoutePhotoCapture
+          routeId={route._id}
+          checkpointIndex={currentEvent?.type === "checkpoint" ? currentEvent.data?.index ?? -1 : -1}
+          coordinates={gps.position ? { lat: gps.position.lat, lng: gps.position.lng } : null}
+          onClose={() => setShowPhotoCapture(false)}
+          onPosted={() => setShowPhotoCapture(false)}
+        />
       )}
     </div>
   );

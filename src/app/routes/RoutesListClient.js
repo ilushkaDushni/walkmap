@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useUser } from "@/components/UserProvider";
 import RouteCard from "@/components/RouteCard";
-import { LogIn, MapPin, ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import { LogIn, MapPin, ArrowUpDown, SlidersHorizontal, Flame } from "lucide-react";
+import Link from "next/link";
 
 const SORT_OPTIONS = [
   { id: "default", label: "По умолчанию" },
@@ -127,6 +128,15 @@ export default function RoutesListClient({ routes: initialRoutes }) {
             {f.label}
           </button>
         ))}
+
+        {/* Heatmap link */}
+        <Link
+          href="/heatmap"
+          className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-orange-500/10 text-orange-500 border border-orange-500/20 hover:bg-orange-500/20 transition"
+        >
+          <Flame className="h-3 w-3" />
+          Тепловая карта
+        </Link>
 
         {/* Sort button */}
         <div className="relative shrink-0">

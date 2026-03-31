@@ -5,6 +5,7 @@ import { getDb } from "@/lib/mongodb";
 import RouteMap from "@/components/RouteMap";
 import RouteComments from "@/components/RouteComments";
 import RouteRecords from "@/components/RouteRecords";
+import RouteFeed from "@/components/RouteFeed";
 import StartRouteButton from "@/components/StartRouteButton";
 import ChallengeButton from "@/components/ChallengeButton";
 
@@ -119,6 +120,11 @@ export default async function RouteDetailPage({ params }) {
         {/* Рекорды */}
         <div className="mt-4">
           <RouteRecords routeId={serialized._id} />
+        </div>
+
+        {/* Лента (фото + комменты пользователей) */}
+        <div className="mt-4">
+          <RouteFeed routeId={serialized._id} checkpoints={serialized.checkpoints || []} />
         </div>
 
         {/* Comments */}

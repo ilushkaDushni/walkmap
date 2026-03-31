@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin, Route, ArrowRight, Map, Compass, Trophy, Zap, Shield } from "lucide-react";
+import Link from "next/link";
 import useInView from "./useInView";
 import { formatDist } from "./helpers";
 import { StatCard, OnlineStatCard } from "./StatCards";
@@ -117,9 +118,9 @@ export default function GuestView({ publicStats, weather, routeOfDay, featuredRo
         {/* Footer */}
         <div className="text-center pt-3 pb-2">
           <p className="text-xs text-[var(--text-muted)]">Ростов GO · 2026</p>
-          <button onClick={() => window.dispatchEvent(new Event("open-about-screen"))} className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition underline underline-offset-2">
+          <Link href="/about" className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition underline underline-offset-2">
             О приложении
-          </button>
+          </Link>
         </div>
       </div>
     </div>

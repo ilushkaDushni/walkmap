@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Map, Users, Gem, Trophy, Star, Crown, LifeBuoy } from "lucide-react";
+import { Map, Users, Gem, Trophy, Star, Crown, LifeBuoy, Flame } from "lucide-react";
 import Link from "next/link";
 import UserAvatar from "@/components/UserAvatar";
 import { ACHIEVEMENT_REGISTRY, COLOR_CLASSES } from "@/lib/achievements";
@@ -140,9 +140,10 @@ export default function AuthenticatedView({ user, userStats, publicStats, weathe
         )}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {[
             { icon: Map, title: "Маршруты", gradient: "from-green-500 to-emerald-500", bg: "bg-green-500/10", href: "/routes" },
+            { icon: Flame, title: "Хитмап", gradient: "from-orange-500 to-red-500", bg: "bg-orange-500/10", href: "/heatmap" },
             { icon: Users, title: "Друзья", gradient: "from-blue-500 to-sky-500", bg: "bg-blue-500/10", href: "/friends" },
             { icon: Gem, title: "Магазин", gradient: "from-pink-500 to-rose-500", bg: "bg-pink-500/10", href: "/shop" },
             { icon: Trophy, title: "Профиль", gradient: "from-purple-500 to-violet-500", bg: "bg-purple-500/10", onClick: () => window.dispatchEvent(new Event("open-profile-modal")) },
@@ -246,9 +247,9 @@ export default function AuthenticatedView({ user, userStats, publicStats, weathe
         {/* Footer */}
         <div className="text-center pt-3 pb-2">
           <p className="text-xs text-[var(--text-muted)]">Ростов GO · 2026</p>
-          <button onClick={() => window.dispatchEvent(new Event("open-about-screen"))} className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition underline underline-offset-2">
+          <Link href="/about" className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition underline underline-offset-2">
             О приложении
-          </button>
+          </Link>
         </div>
       </div>
 

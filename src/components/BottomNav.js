@@ -77,7 +77,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav data-bottom-nav className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none" style={isFriendsActive && isDesktop ? { display: "none" } : undefined}>
+      <nav data-bottom-nav className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none" style={pathname.startsWith("/admin/") || (isFriendsActive && isDesktop) ? { display: "none" } : undefined}>
         <div className="pointer-events-auto mx-3 mb-3 glass-nav rounded-2xl px-1.5 py-1 transition-colors relative overflow-hidden">
           {/* Скользящий индикатор */}
           {activeIdx >= 0 && (

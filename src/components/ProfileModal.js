@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle, LifeBuoy, Paperclip, GraduationCap, Star, Pin } from "lucide-react";
+import { X, LogIn, LogOut, Shield, UserPlus, ArrowLeft, Mail, Pencil, Settings, Camera, Trash2, Lock, ChevronDown, ChevronUp, Package, Info, Send, MapPin, CheckCircle, LifeBuoy, Paperclip, GraduationCap, Star, Pin, FileDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "./UserProvider";
@@ -2001,7 +2001,10 @@ function SettingsScreen({ modalShell, backBtn, closeBtn, onClose, setScreen }) {
 
         {/* О приложении */}
         <button
-          onClick={() => setScreen("about")}
+          onClick={() => {
+            onClose();
+            setTimeout(() => window.location.href = "/about", 300);
+          }}
           className="flex w-full items-center justify-between rounded-2xl bg-[var(--bg-elevated)] px-4 py-3"
         >
           <span className="text-sm text-[var(--text-secondary)]">О приложении</span>

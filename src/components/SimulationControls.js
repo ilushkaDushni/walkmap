@@ -11,8 +11,7 @@ export default function SimulationControls({
   speed,
   onStart,
   onPause,
-  onReset,
-  onSpeedChange,
+  turn,
 }) {
   const progressPercent = Math.round(progress * 100);
 

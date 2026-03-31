@@ -837,6 +837,16 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
   const isTyping = typingUsers.length > 0;
   const isAdminChatAsUser = adminMode && friendId === user?.id;
 
+  // Скрываем BottomNav когда чат открыт (не inline)
+  useEffect(() => {
+    if (inline) return;
+    const nav = document.querySelector("[data-bottom-nav]");
+    if (nav) nav.style.display = "none";
+    return () => {
+      if (nav) nav.style.display = "";
+    };
+  }, [inline]);
+
   return (
     <div className={inline ? "flex flex-col h-full bg-[var(--bg-surface)]" : "fixed inset-0 z-[56] bg-[var(--bg-surface)] flex flex-col"}>
       {/* Header */}

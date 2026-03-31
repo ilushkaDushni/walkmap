@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag, LifeBuoy, Mail } from "lucide-react";
+import { X, Shield, Route, Users, BarChart3, Crown, Database, MessageCircle, Megaphone, Coins, Users2, ShoppingBag, LifeBuoy, Mail, AlertTriangle } from "lucide-react";
 import { useUser } from "./UserProvider";
 import { useNavigationGuard } from "./NavigationGuardProvider";
 
@@ -12,6 +12,7 @@ export default function AdminModal({ isOpen, onClose }) {
   const [migrateLog, setMigrateLog] = useState([]);
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
   const [adminMsgCount, setAdminMsgCount] = useState(0);
+  const [reportsCount, setReportsCount] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -25,6 +26,12 @@ export default function AdminModal({ isOpen, onClose }) {
         authFetch("/api/admin/messages/unread-count")
           .then((r) => r.json())
           .then((d) => setAdminMsgCount(d.count || 0))
+          .catch(() => {});
+      }
+      if (hasPermission("route_posts.moderate")) {
+        authFetch("/api/admin/reports?limit=1")
+          .then((r) => r.json())
+          .then((d) => setReportsCount(d.total || 0))
           .catch(() => {});
       }
     } else {
@@ -137,6 +144,14 @@ export default function AdminModal({ isOpen, onClose }) {
       action: () => { navigate("/admin/tickets"); onClose(); },
       visible: hasPermission("feedback.manage"),
       badge: openTicketsCount > 0 ? openTicketsCount : null,
+    },
+    {
+      icon: AlertTriangle,
+      title: "Модерация контента",
+      description: "Жалобы на фото и посты в ленте маршрутов",
+      action: () => { navigate("/admin/moderation"); onClose(); },
+      visible: hasPermission("route_posts.moderate"),
+      badge: reportsCount > 0 ? reportsCount : null,
     },
   ].filter((s) => s.visible);
 

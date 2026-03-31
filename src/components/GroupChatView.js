@@ -499,6 +499,15 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
     return result;
   }, [messages]);
 
+  // Скрываем BottomNav когда GroupChat открыт
+  useEffect(() => {
+    const nav = document.querySelector("[data-bottom-nav]");
+    if (nav) nav.style.display = "none";
+    return () => {
+      if (nav) nav.style.display = "";
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: !theme.bg?.includes("url") ? (theme.bg || "var(--bg-surface)") : undefined, backgroundImage: theme.bg?.includes("url") ? theme.bg : undefined, backgroundSize: theme.bg?.includes("url") ? (theme.bgSize || "auto") : undefined, backgroundRepeat: theme.bg?.includes("url") ? "no-repeat" : undefined, backgroundPosition: theme.bg?.includes("url") ? "center" : undefined }}>
       {/* Header */}

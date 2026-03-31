@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Send, Trash2, MessageCircle, Reply, ChevronDown } from "lucide-react";
+import { Send, Trash2, MessageCircle, Reply, ChevronDown, Flag, X } from "lucide-react";
 import { useUser } from "./UserProvider";
 import UserAvatar from "./UserAvatar";
 import UserName from "./UserName";
+
+const REPORT_REASONS = [
+  { id: "spam", label: "Спам" },
+  { id: "nsfw", label: "Неприемлемый контент" },
+  { id: "offensive", label: "Оскорбление" },
+  { id: "other", label: "Другое" },
+];
 
 function timeAgo(date) {
   const now = Date.now();
@@ -84,7 +91,7 @@ function ReplyForm({ routeId, parentId, onReplyAdded, authFetch }) {
   );
 }
 
-function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete }) {
+function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete, onReport }) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replies, setReplies] = useState(comment.replies || []);
   const [replyCount, setReplyCount] = useState(comment.replyCount || 0);
@@ -154,13 +161,24 @@ function CommentItem({ comment, routeId, user, canManage, authFetch, onDelete })
           </div>
           <p className="text-sm text-[var(--text-secondary)] mt-0.5 break-words">{comment.text}</p>
           {user && (
-            <button
-              onClick={() => setShowReplyForm(!showReplyForm)}
-              className="flex items-center gap-1 mt-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
-            >
-              <Reply className="h-3 w-3" />
-              Ответить
-            </button>
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => setShowReplyForm(!showReplyForm)}
+                className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+              >
+                <Reply className="h-3 w-3" />
+                Ответить
+              </button>
+              {user.id !== comment.userId && (
+                <button
+                  onClick={() => onReport(comment.id)}
+                  className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-orange-500 transition"
+                >
+                  <Flag className="h-3 w-3" />
+                  Пожаловаться
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -229,6 +247,24 @@ export default function RouteComments({ routeId }) {
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [reportCommentId, setReportCommentId] = useState(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportText, setReportText] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+
+  const handleReport = async () => {
+    if (!reportReason || !reportCommentId) return;
+    setReportSending(true);
+    await authFetch(`/api/routes/${routeId}/comments/${reportCommentId}/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reportReason, comment: reportText }),
+    });
+    setReportSending(false);
+    setReportCommentId(null);
+    setReportReason("");
+    setReportText("");
+  };
 
   const loadComments = useCallback(async (offset = 0) => {
     try {
@@ -373,6 +409,7 @@ export default function RouteComments({ routeId }) {
               canManage={canManage}
               authFetch={authFetch}
               onDelete={handleDelete}
+              onReport={setReportCommentId}
             />
           ))}
         </div>
@@ -387,6 +424,56 @@ export default function RouteComments({ routeId }) {
         >
           {loadingMore ? "Загрузка..." : "Показать ещё"}
         </button>
+      )}
+
+      {/* Report modal */}
+      {reportCommentId && (
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center" onClick={() => setReportCommentId(null)}>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative w-full max-w-sm mx-auto bg-[var(--bg-surface)] rounded-t-3xl sm:rounded-3xl p-5 pb-8 sm:pb-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-[var(--text-primary)]">Пожаловаться на комментарий</h3>
+              <button onClick={() => setReportCommentId(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--bg-main)] text-[var(--text-muted)]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2 mb-3">
+              {REPORT_REASONS.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setReportReason(r.id)}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm transition ${
+                    reportReason === r.id
+                      ? "bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-medium border border-[var(--accent-color)]/30"
+                      : "bg-[var(--bg-main)] text-[var(--text-secondary)] border border-[var(--border-color)]"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reportText}
+              onChange={(e) => setReportText(e.target.value)}
+              placeholder="Подробности (необязательно)"
+              maxLength={300}
+              rows={2}
+              className="w-full resize-none rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none mb-3"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setReportCommentId(null)} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] border border-[var(--border-color)]">
+                Отмена
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!reportReason || reportSending}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-500 disabled:opacity-40 transition"
+              >
+                {reportSending ? "..." : "Отправить"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
