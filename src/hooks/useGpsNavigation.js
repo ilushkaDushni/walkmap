@@ -18,6 +18,7 @@ import {
 } from "@/lib/geo";
 
 const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = без сглаживания
+const DETOUR_RETURN_THRESHOLD = 40; // метров — считаем что вернулся на маршрут
 
 /**
  * Центральный хук GPS-навигации.
@@ -57,6 +58,12 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
   const [isOffRoute, setIsOffRoute] = useState(false);
   const [passedCoords, setPassedCoords] = useState([]);
   const [remainingCoords, setRemainingCoords] = useState([]);
+
+  // Режим перекуса / отклонения
+  const [detourMode, setDetourMode] = useState(false);
+  const [detourDistance, setDetourDistance] = useState(0); // расстояние до ближайшей точки маршрута
+  const [detourBearing, setDetourBearing] = useState(0); // направление обратно к маршруту
+  const detourStartTimeRef = useRef(null);
 
   const wakeLock = useWakeLock(active);
 
@@ -122,6 +129,22 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
       const proj = projectPointOnPath(smoothedPosition, dirPath);
       if (!proj) return;
 
+      // В режиме перекуса — обновляем расстояние/направление до маршрута, но НЕ двигаем прогресс
+      if (detourMode) {
+        setDetourDistance(proj.distance);
+        // Bearing от пользователя к ближайшей точке маршрута
+        const nearestPoint = proj.position || dirPath[proj.pathIndex];
+        if (nearestPoint) {
+          setDetourBearing(calculateBearing(smoothedPosition, nearestPoint));
+        }
+        // Автовозврат: если подошёл ближе порога — выключаем перекус
+        if (proj.distance <= DETOUR_RETURN_THRESHOLD) {
+          setDetourMode(false);
+          detourStartTimeRef.current = null;
+        }
+        return;
+      }
+
       setProjection(proj);
       setIsOffRoute(proj.distance > 50);
 
@@ -142,7 +165,17 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     }, 800);
 
     return () => clearTimeout(debounceRef.current);
-  }, [active, smoothedPosition, dirPath, cumDist]);
+  }, [active, smoothedPosition, dirPath, cumDist, detourMode]);
+
+  const startDetour = useCallback(() => {
+    setDetourMode(true);
+    detourStartTimeRef.current = Date.now();
+  }, []);
+
+  const stopDetour = useCallback(() => {
+    setDetourMode(false);
+    detourStartTimeRef.current = null;
+  }, []);
 
   const startGps = useCallback(() => {
     maxProgressRef.current = 0;
@@ -153,6 +186,10 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setIsOffRoute(false);
     setPassedCoords([]);
     setRemainingCoords([]);
+    setDetourMode(false);
+    setDetourDistance(0);
+    setDetourBearing(0);
+    detourStartTimeRef.current = null;
     setStartedAt(new Date());
     resetTrigger();
     startTracking();
@@ -168,6 +205,10 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setIsOffRoute(false);
     setPassedCoords([]);
     setRemainingCoords([]);
+    setDetourMode(false);
+    setDetourDistance(0);
+    setDetourBearing(0);
+    detourStartTimeRef.current = null;
     setStartedAt(null);
     resetTrigger();
   }, [stopTracking, resetTrigger]);
@@ -285,6 +326,12 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     nextEvent: navigationHint.nextEvent,
     distanceToNext: navigationHint.distanceToNext,
     turnDirection: navigationHint.turnDirection,
+    // Режим перекуса
+    detourMode,
+    detourDistance,
+    detourBearing,
+    startDetour,
+    stopDetour,
   };
 }
 

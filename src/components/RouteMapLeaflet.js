@@ -8,7 +8,7 @@ import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer, Camera } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer, Camera, Coffee, ArrowUpRight } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 import RoutePhotoCapture from "@/components/RoutePhotoCapture";
 
@@ -722,6 +722,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
       {/* === GPS панель (прогресс + предупреждения) === */}
       {gpsMode === "gps_active" && (
         <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4 space-y-2">
+          {/* Прогресс-бар */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center text-xs text-[var(--text-muted)]">
               <span>{Math.round(gps.progress * 100)}%</span>
@@ -738,50 +739,84 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
               />
             </div>
           </div>
-          {gps.nextEvent && (
-            <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
-              gps.distanceToNext < 20
-                ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-            }`}>
-              {gps.distanceToNext < 20 ? (
-                <span className="font-medium">
-                  Вы у точки «{gps.nextEvent.data?.title || "Чекпоинт"}»
+
+          {/* Режим перекуса — баннер */}
+          {gps.detourMode ? (
+            <div className="rounded-xl bg-orange-500/10 border border-orange-300/40 px-3 py-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400">
+                <Coffee className="h-4 w-4" />
+                Перекус — маршрут на паузе
+              </div>
+              <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300">
+                <span className="text-lg" style={{ transform: `rotate(${gps.detourBearing}deg)`, display: "inline-block" }}>
+                  <ArrowUpRight className="h-4 w-4" />
                 </span>
-              ) : (
-                <>
-                  <span className="text-lg">
-                    {gps.turnDirection ? ({
-                      "straight": "↑",
-                      "slight-right": "↗",
-                      "right": "→",
-                      "sharp-right": "↘",
-                      "slight-left": "↖",
-                      "left": "←",
-                      "sharp-left": "↙",
-                      "u-turn": "↩",
-                    }[gps.turnDirection.key] || "↑") : "↑"}
-                  </span>
-                  <span>
-                    Через <b>{gps.distanceToNext > 1000
-                      ? `${(gps.distanceToNext / 1000).toFixed(1)} км`
-                      : `${Math.round(gps.distanceToNext)} м`
-                    }</b>{" "}
-                    {gps.turnDirection?.label || "прямо"}
-                    {gps.nextEvent.type === "finish" ? " — финиш" : ""}
-                  </span>
-                </>
-              )}
+                <span>
+                  До маршрута: <b>{gps.detourDistance > 1000
+                    ? `${(gps.detourDistance / 1000).toFixed(1)} км`
+                    : `${Math.round(gps.detourDistance)} м`
+                  }</b>
+                </span>
+              </div>
+              <button
+                onClick={() => gps.stopDetour()}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+              >
+                <Navigation className="h-3.5 w-3.5" />
+                Вернуться на маршрут
+              </button>
             </div>
+          ) : (
+            <>
+              {/* Навигационная подсказка */}
+              {gps.nextEvent && (
+                <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                  gps.distanceToNext < 20
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                }`}>
+                  {gps.distanceToNext < 20 ? (
+                    <span className="font-medium">
+                      Вы у точки «{gps.nextEvent.data?.title || "Чекпоинт"}»
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-lg">
+                        {gps.turnDirection ? ({
+                          "straight": "↑",
+                          "slight-right": "↗",
+                          "right": "→",
+                          "sharp-right": "↘",
+                          "slight-left": "↖",
+                          "left": "←",
+                          "sharp-left": "↙",
+                          "u-turn": "↩",
+                        }[gps.turnDirection.key] || "↑") : "↑"}
+                      </span>
+                      <span>
+                        Через <b>{gps.distanceToNext > 1000
+                          ? `${(gps.distanceToNext / 1000).toFixed(1)} км`
+                          : `${Math.round(gps.distanceToNext)} м`
+                        }</b>{" "}
+                        {gps.turnDirection?.label || "прямо"}
+                        {gps.nextEvent.type === "finish" ? " — финиш" : ""}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+              {/* Предупреждение об отклонении */}
+              {gps.isOffRoute && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 text-center">
+                  Вы отклонились от маршрута
+                </div>
+              )}
+            </>
           )}
+
           {gps.wakeLockFailed && (
             <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-700 text-center">
               Не удалось заблокировать экран — он может погаснуть
-            </div>
-          )}
-          {gps.isOffRoute && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 text-center">
-              Вы отклонились от маршрута
             </div>
           )}
           {gps.accuracy > 100 && (
@@ -790,6 +825,15 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
             </p>
           )}
           <div className="flex gap-2">
+            {!gps.detourMode && (
+              <button
+                onClick={() => gps.startDetour()}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-orange-300 px-4 py-2 text-xs font-medium text-orange-600 transition hover:bg-orange-50"
+              >
+                <Coffee className="h-3.5 w-3.5" />
+                Перекус
+              </button>
+            )}
             <button
               onClick={() => setShowPhotoCapture(true)}
               className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--accent-color)]/30 px-4 py-2 text-xs font-medium text-[var(--accent-color)] transition hover:bg-[var(--accent-color)]/5"
