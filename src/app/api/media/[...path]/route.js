@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getFile } from "@/lib/storage";
 
-const ALLOWED_PREFIXES = ["avatars/", "photos/", "audio/", "chat/", "groups/"];
+const ALLOWED_PREFIXES = ["avatars/", "photos/", "audio/", "chat/", "groups/", "route-feed/"];
 
 // GET /api/media/:path — proxy S3 objects through the server
 export async function GET(request, { params }) {

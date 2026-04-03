@@ -68,13 +68,48 @@ export async function POST(request, { params }) {
     } catch (e) {
       if (e.code === 11000) {
         // Уже проходил — обновляем время если новый результат лучше
+        let newBestTime = false;
         if (duration && gpsVerified) {
-          await db.collection("completed_routes").updateOne(
+          const upd = await db.collection("completed_routes").updateOne(
             { userId, routeId: id, $or: [{ duration: null }, { duration: { $gt: duration } }] },
             { $set: { duration, pace, startedAt, completedAt: now, gpsVerified: true } }
           );
+          newBestTime = upd.modifiedCount > 0;
         }
-        return NextResponse.json({ alreadyCompleted: true, newBestTime: !!duration });
+
+        // Начисляем монеты даже при повторном прохождении
+        if (coins > 0) {
+          const updatedUser = await db.collection("users").findOneAndUpdate(
+            { _id: auth.user._id },
+            { $inc: { coins } },
+            { returnDocument: "after" }
+          );
+          await logCoinTransaction(db, {
+            userId,
+            type: "route_completion",
+            amount: coins,
+            balance: updatedUser.coins || 0,
+            meta: { routeId: id, routeTitle: route.title, repeat: true },
+          });
+        }
+
+        // Проверяем челленджи и достижения при повторном прохождении
+        if (duration && gpsVerified) {
+          try {
+            await checkAndResolveUserChallenges(db, userId, id, { duration, pace, gpsVerified });
+          } catch (err) {
+            console.error("Challenge resolve error:", err);
+          }
+        }
+        const { newAchievements: repeatAch, rewardCoins: repeatReward } = await checkAndGrantAchievements(auth.user._id);
+
+        return NextResponse.json({
+          alreadyCompleted: true,
+          newBestTime,
+          coins,
+          newAchievements: repeatAch,
+          achievementRewardCoins: repeatReward,
+        });
       }
       throw e;
     }

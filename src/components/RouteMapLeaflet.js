@@ -8,9 +8,12 @@ import useGpsNavigation from "@/hooks/useGpsNavigation";
 import useNotification from "@/hooks/useNotification";
 import { useUser } from "@/components/UserProvider";
 import { buildRouteEvents, splitPathByCheckpoints, projectPointOnPath, getDirectedPath, remapSegmentsForDirectedPath, haversineDistance } from "@/lib/geo";
-import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer, Camera, Coffee, ArrowUpRight } from "lucide-react";
+import { Download, Check, ChevronRight, ChevronLeft, Navigation, Locate, X, Timer, Camera, Coffee, ArrowUpRight, MapPin, View } from "lucide-react";
 import AudioPlayer from "@/components/AudioPlayer";
 import RoutePhotoCapture from "@/components/RoutePhotoCapture";
+import DetourSheet from "@/components/DetourSheet";
+import ArNavigationView from "@/components/ArNavigationView";
+import useDetourPlaces from "@/hooks/useDetourPlaces";
 
 function ElapsedTimer({ startedAt }) {
   const [elapsed, setElapsed] = useState(0);
@@ -32,6 +35,22 @@ function ElapsedTimer({ startedAt }) {
     <span className="flex items-center gap-1 text-xs font-mono text-[var(--text-secondary)]">
       <Timer className="h-3 w-3" />{text}
     </span>
+  );
+}
+
+function DistanceToTarget({ position, target }) {
+  const dist = haversineDistance(position, target);
+  const distText = dist > 1000
+    ? `${(dist / 1000).toFixed(1)} км`
+    : `${Math.round(dist)} м`;
+  const walkMin = Math.max(1, Math.round(dist / 83));
+  return (
+    <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300">
+      <MapPin className="h-4 w-4" />
+      <span>
+        До заведения: <b>{distText}</b> (~{walkMin} мин)
+      </span>
+    </div>
   );
 }
 
@@ -120,6 +139,13 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
   const { download, downloading, progress: dlProgress, done } = useOfflineDownload(route);
   const routeBounds = useRouteBounds(route);
   const { requestPermission, notify } = useNotification();
+
+  // Детур: заведения
+  const [detourSheetOpen, setDetourSheetOpen] = useState(false);
+  const detour = useDetourPlaces();
+
+  // AR-навигация
+  const [arMode, setArMode] = useState(false);
 
   const handleCheckpointNotification = useCallback((checkpoint, dist) => {
     notify(checkpoint.title || "Контрольная точка", {
@@ -261,7 +287,10 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ coins: gps.totalCoins, gpsVerified: true, startedAt: gps.startedAt?.toISOString() || null }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Server error");
+        return r.json();
+      })
       .then((data) => {
         if (data.newAchievements?.length > 0) {
           window.dispatchEvent(new CustomEvent("achievement-unlocked", {
@@ -269,7 +298,10 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
           }));
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // Сброс флага — позволит повторную попытку при следующем рендере
+        setCompleteSent(false);
+      });
   }, [gpsMode, completeSent, user, authFetch, route._id, gps.totalCoins, gps.startedAt]);
 
   // Directed path: от старта к финишу
@@ -367,6 +399,7 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
     if (!dirPath || dirPath.length < 2) return null;
     const i = currentEvent.data.pathIndex;
     if (i == null || i < 0 || i >= dirPath.length - 1) return null;
+    if (!dirPath[i] || !dirPath[i + 1]) return null;
     const segStart = { lat: dirPath[i].lat, lng: dirPath[i].lng };
     const segEnd = { lat: dirPath[i + 1].lat, lng: dirPath[i + 1].lng };
     const dividers = (route.checkpoints || []).filter((cp) => cp.isDivider && cp.position);
@@ -553,11 +586,15 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
             </Source>
           )}
 
-          {/* GPS: оставшийся путь */}
+          {/* GPS: оставшийся путь (серый при активном детуре, синий обычно) */}
           {isGpsOverlay && gps.remainingGeoJson && (
             <Source id="remaining-route" type="geojson" data={gps.remainingGeoJson}>
               <Layer id="remaining-route-base" type="line"
-                paint={{ "line-color": "#3b82f6", "line-width": 4, "line-opacity": 0.5 }} />
+                paint={{
+                  "line-color": gps.detourMode && gps.detourTarget ? "#9ca3af" : "#3b82f6",
+                  "line-width": gps.detourMode && gps.detourTarget ? 3 : 4,
+                  "line-opacity": gps.detourMode && gps.detourTarget ? 0.4 : 0.5,
+                }} />
             </Source>
           )}
 
@@ -569,6 +606,40 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
               <Layer id="accuracy-circle-border" type="line"
                 paint={{ "line-color": "#4285f4", "line-opacity": 0.3, "line-width": 1 }} />
             </Source>
+          )}
+
+          {/* Детур: маршрут к заведению (оранжевый) */}
+          {isGpsOverlay && gps.detourPath && (
+            <Source id="detour-path" type="geojson" data={gps.detourPath}>
+              <Layer id="detour-path-line" type="line"
+                paint={{ "line-color": "#f97316", "line-width": 4, "line-opacity": 0.9, "line-dasharray": [2, 1] }} />
+            </Source>
+          )}
+
+          {/* Детур: маршрут возврата (зелёный) */}
+          {isGpsOverlay && gps.detourReturnPath && gps.detourPhase === "returning" && (
+            <Source id="detour-return-path" type="geojson" data={gps.detourReturnPath}>
+              <Layer id="detour-return-path-line" type="line"
+                paint={{ "line-color": "#22c55e", "line-width": 4, "line-opacity": 0.9, "line-dasharray": [2, 1] }} />
+            </Source>
+          )}
+
+          {/* Детур: маркер заведения */}
+          {isGpsOverlay && gps.detourTarget && (
+            <Marker longitude={gps.detourTarget.lng} latitude={gps.detourTarget.lat}>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 border-2 border-white shadow-lg">
+                <MapPin className="h-4 w-4 text-white" />
+              </div>
+            </Marker>
+          )}
+
+          {/* Детур: точка возврата на маршрут */}
+          {isGpsOverlay && gps.detourReturnPoint && gps.detourMode && (
+            <Marker longitude={gps.detourReturnPoint.lng} latitude={gps.detourReturnPoint.lat}>
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500 border-2 border-white shadow">
+                <span className="text-[8px] text-white font-bold">R</span>
+              </div>
+            </Marker>
           )}
 
           {/* Подсветка активного отрезка (только без GPS overlay) */}
@@ -740,26 +811,48 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
             </div>
           </div>
 
-          {/* Режим перекуса — баннер */}
+          {/* Режим перекуса / детура — баннер */}
           {gps.detourMode ? (
             <div className="rounded-xl bg-orange-500/10 border border-orange-300/40 px-3 py-3 space-y-2">
+              {/* Заголовок с фазой */}
               <div className="flex items-center gap-2 text-sm font-medium text-orange-600 dark:text-orange-400">
                 <Coffee className="h-4 w-4" />
-                Перекус — маршрут на паузе
+                {gps.detourTarget
+                  ? gps.detourPhase === "going"
+                    ? `Идём в ${gps.detourTarget.name}`
+                    : gps.detourPhase === "returning"
+                    ? "Возвращаемся на маршрут"
+                    : "Перекус — маршрут на паузе"
+                  : "Перекус — маршрут на паузе"
+                }
               </div>
-              <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300">
-                <span className="text-lg" style={{ transform: `rotate(${gps.detourBearing}deg)`, display: "inline-block" }}>
-                  <ArrowUpRight className="h-4 w-4" />
-                </span>
-                <span>
-                  До маршрута: <b>{gps.detourDistance > 1000
-                    ? `${(gps.detourDistance / 1000).toFixed(1)} км`
-                    : `${Math.round(gps.detourDistance)} м`
-                  }</b>
-                </span>
-              </div>
+
+              {/* Расстояние до цели или до маршрута */}
+              {gps.detourTarget && gps.detourPhase === "going" && gps.position ? (
+                <DistanceToTarget position={gps.position} target={gps.detourTarget} />
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-orange-700 dark:text-orange-300">
+                  <span className="text-lg" style={{ transform: `rotate(${gps.detourBearing}deg)`, display: "inline-block" }}>
+                    <ArrowUpRight className="h-4 w-4" />
+                  </span>
+                  <span>
+                    До маршрута: <b>{gps.detourDistance > 1000
+                      ? `${(gps.detourDistance / 1000).toFixed(1)} км`
+                      : `${Math.round(gps.detourDistance)} м`
+                    }</b>
+                  </span>
+                </div>
+              )}
+
               <button
-                onClick={() => gps.stopDetour()}
+                onClick={() => {
+                  if (gps.detourTarget) {
+                    gps.exitDetourFull();
+                    detour.clearDetour();
+                  } else {
+                    gps.stopDetour();
+                  }
+                }}
                 className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
               >
                 <Navigation className="h-3.5 w-3.5" />
@@ -827,13 +920,25 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
           <div className="flex gap-2">
             {!gps.detourMode && (
               <button
-                onClick={() => gps.startDetour()}
+                onClick={() => {
+                  if (gps.position) {
+                    detour.fetchPlaces(gps.position.lat, gps.position.lng);
+                  }
+                  setDetourSheetOpen(true);
+                }}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-orange-300 px-4 py-2 text-xs font-medium text-orange-600 transition hover:bg-orange-50"
               >
                 <Coffee className="h-3.5 w-3.5" />
                 Перекус
               </button>
             )}
+            <button
+              onClick={() => setArMode(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-purple-300 px-4 py-2 text-xs font-medium text-purple-600 transition hover:bg-purple-50"
+            >
+              <View className="h-3.5 w-3.5" />
+              AR
+            </button>
             <button
               onClick={() => setShowPhotoCapture(true)}
               className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--accent-color)]/30 px-4 py-2 text-xs font-medium text-[var(--accent-color)] transition hover:bg-[var(--accent-color)]/5"
@@ -1009,6 +1114,56 @@ export default function RouteMapLeaflet({ route, preview, autoStart }) {
           onPosted={() => setShowPhotoCapture(false)}
         />
       )}
+
+      {/* AR-навигация */}
+      {arMode && gpsMode === "gps_active" && (
+        <ArNavigationView
+          position={gps.position}
+          nextEvent={gps.nextEvent}
+          distanceToNext={gps.distanceToNext}
+          turnDirection={gps.turnDirection}
+          detourTarget={gps.detourTarget}
+          detourPhase={gps.detourPhase}
+          onClose={() => setArMode(false)}
+        />
+      )}
+
+      {/* Детур: выбор заведения */}
+      <DetourSheet
+        open={detourSheetOpen}
+        onClose={() => {
+          setDetourSheetOpen(false);
+          if (!detour.selectedPlace) detour.clearDetour();
+        }}
+        places={detour.places}
+        loading={detour.loading}
+        categories={detour.categories}
+        activeCategory={detour.category}
+        onCategoryChange={(cat) => {
+          if (gps.position) detour.fetchPlaces(gps.position.lat, gps.position.lng, cat);
+        }}
+        onSelectPlace={async (place) => {
+          if (!gps.position) return;
+          const returnPt = gps.findReturnPoint();
+          await detour.buildDetourRoute(gps.position, place, returnPt);
+        }}
+        routeLoading={detour.routeLoading}
+        selectedPlace={detour.selectedPlace}
+        detourRoute={detour.detourRoute}
+        onConfirmDetour={(place) => {
+          const returnPt = gps.findReturnPoint();
+          gps.startDetourWithTarget(
+            { lat: place.lat, lng: place.lng, name: place.name },
+            detour.detourRoute,
+            detour.returnRoute,
+            returnPt
+          );
+          setDetourSheetOpen(false);
+        }}
+        onCancelSelection={() => {
+          detour.setSelectedPlace(null);
+        }}
+      />
     </div>
   );
 }

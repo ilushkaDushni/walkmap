@@ -303,10 +303,10 @@ export default function RouteFeed({ routeId, checkpoints = [] }) {
             <div key={post.id} className="glass-card p-3.5">
               {/* Header */}
               <div className="flex items-center gap-2.5 mb-2">
-                <UserAvatar user={post} size={32} />
+                <UserAvatar username={post.username} avatarUrl={post.avatarUrl} equippedItems={post.equippedItems} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <UserName user={post} className="text-sm font-semibold" />
+                    <UserName username={post.username} equippedItems={post.equippedItems} className="text-sm font-semibold" />
                     <span className="text-xs text-[var(--text-muted)]">{timeAgo(post.createdAt)}</span>
                   </div>
                   {post.checkpointIndex >= 0 && (

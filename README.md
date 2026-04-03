@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Ростов GO
 
-## Getting Started
+**Больше, чем просто прогулка** — PWA-приложение для интерактивных прогулочных маршрутов по Ростову-на-Дону с геймификацией, мультиплеером и социальными функциями.
 
-First, run the development server:
+## О проекте
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Ростов GO мотивирует жителей и гостей города к пешим прогулкам, знакомству с историей и достопримечательностями через игровые механики. Приложение превращает обычную прогулку в приключение с GPS-навигацией, достижениями, соревнованиями и общением.
+
+## Основные возможности
+
+- **GPS-навигация** — интерактивные маршруты с чекпоинтами, аудиогидом и пошаговой навигацией на карте (MapLibre GL + OpenFreeMap)
+- **Геймификация** — 30 достижений, система уровней, внутренняя валюта (монеты), магазин косметики (рамки, титулы, темы)
+- **Мультиплеер** — лобби для совместных прогулок, гонки с подиумом, челленджи (дуэли) между игроками со ставками
+- **Чат** — личные и групповые чаты с голосовыми сообщениями, реакциями, стикерами, пересылкой, закреплением
+- **Рекорды** — таблица лучших времён на каждом маршруте, глобальный лидерборд
+- **Тепловая карта** — визуализация активности пользователей на карте города
+- **Ролевая система** — 19 пермишенов, кастомные роли (Discord-style), полная админ-панель
+- **PWA** — оффлайн-режим, установка на домашний экран, кеширование карт и контента
+
+## Технологический стек
+
+| Технология | Назначение |
+|---|---|
+| Next.js 16 | Фреймворк (App Router, Turbopack) |
+| React 19 | UI-библиотека |
+| Tailwind CSS 4 | Стилизация + дизайн-система (CSS variables, glass UI) |
+| MongoDB Atlas | База данных (13+ коллекций) |
+| MapLibre GL JS | Карты (вектор, OpenFreeMap tiles) |
+| Serwist 9 | PWA / Service Worker |
+| JWT + bcrypt | Аутентификация (access + refresh tokens) |
+| Resend | Отправка email (верификация, сброс пароля) |
+| Yandex Cloud S3 | Медиа-хранилище |
+| PM2 | Процесс-менеджер (production) |
+
+## Масштаб
+
+- **22 700+** строк кода
+- **138** API-эндпоинтов
+- **83** React-компонента
+- **20** кастомных хуков
+- **24** утилитарных модуля
+- **30** достижений
+- **19** пермишенов в 8 группах
+
+## Архитектура
+
+```
+src/
+├── app/
+│   ├── api/          # 138 серверных API-эндпоинтов
+│   ├── admin/        # 11 страниц админ-панели
+│   ├── routes/       # Маршруты (список, детали)
+│   ├── friends/      # Друзья и чаты
+│   ├── shop/         # Магазин косметики
+│   ├── heatmap/      # Тепловая карта
+│   ├── about/        # О проекте
+│   └── settings/     # Настройки
+├── components/       # 83 UI-компонента
+│   ├── chat/         # Чат-компоненты
+│   └── home/         # Компоненты главной
+├── hooks/            # 20 кастомных хуков
+├── lib/              # Утилиты и бизнес-логика
+└── data/             # Статические данные маршрутов
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Запуск
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+# Установка зависимостей
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Настройка окружения — создать .env.local с:
+# MONGODB_URI, JWT_SECRET, RESEND_API_KEY, SUPERADMIN_EMAIL
 
-## Learn More
+# Режим разработки
+npm run dev
 
-To learn more about Next.js, take a look at the following resources:
+# Production-сборка
+npm run build && npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Деплой
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Приложение развёрнуто на VDS с PM2:
 
-## Deploy on Vercel
+```bash
+ssh root@<server> "cd /var/www/walkmap && git pull origin main && npm run build && pm2 restart all"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Автор
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Разработано для конкурса им. Вернадского (Москва, 2026).

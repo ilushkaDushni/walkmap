@@ -15,6 +15,7 @@ import {
   distanceAlongPath,
   calculateBearing,
   getTurnDirection,
+  haversineDistance,
 } from "@/lib/geo";
 
 const SMOOTH_FACTOR = 0.5; // EMA: 0 = игнорировать новые, 1 = без сглаживания
@@ -64,6 +65,15 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
   const [detourDistance, setDetourDistance] = useState(0); // расстояние до ближайшей точки маршрута
   const [detourBearing, setDetourBearing] = useState(0); // направление обратно к маршруту
   const detourStartTimeRef = useRef(null);
+
+  // Расширенный детур: маршрут к заведению
+  const [detourTarget, setDetourTarget] = useState(null); // { lat, lng, name, ... }
+  const [detourPath, setDetourPath] = useState(null); // GeoJSON LineString к заведению
+  const [detourReturnPath, setDetourReturnPath] = useState(null); // GeoJSON LineString возврат
+  const [detourReturnPoint, setDetourReturnPoint] = useState(null); // { lat, lng } точка возврата на маршрут
+  const [detourPhase, setDetourPhase] = useState("idle"); // idle | going | returning
+  const DETOUR_TARGET_THRESHOLD = 30; // метров — считаем что дошёл до заведения
+  const DETOUR_RETURN_THRESHOLD_EXT = 40; // метров — вернулся на маршрут
 
   const wakeLock = useWakeLock(active);
 
@@ -119,28 +129,47 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     onFinishTriggered,
   });
 
-  // Обновляем проекцию при изменении сглаженной позиции (с дебаунсом)
-  const debounceRef = useRef(null);
+  // Обновляем проекцию при изменении сглаженной позиции (throttle вместо debounce)
+  const lastProjectionUpdateRef = useRef(0);
+  const throttleRef = useRef(null);
+  const PROJECTION_THROTTLE_MS = 500;
+
   useEffect(() => {
     if (!active || !smoothedPosition || dirPath.length < 2) return;
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
+    const doUpdate = () => {
+      lastProjectionUpdateRef.current = Date.now();
+
       const proj = projectPointOnPath(smoothedPosition, dirPath);
       if (!proj) return;
 
-      // В режиме перекуса — обновляем расстояние/направление до маршрута, но НЕ двигаем прогресс
+      // В режиме перекуса — обновляем расстояние/направление, но НЕ двигаем прогресс
       if (detourMode) {
         setDetourDistance(proj.distance);
-        // Bearing от пользователя к ближайшей точке маршрута
         const nearestPoint = proj.position || dirPath[proj.pathIndex];
         if (nearestPoint) {
           setDetourBearing(calculateBearing(smoothedPosition, nearestPoint));
         }
-        // Автовозврат: если подошёл ближе порога — выключаем перекус
-        if (proj.distance <= DETOUR_RETURN_THRESHOLD) {
-          setDetourMode(false);
-          detourStartTimeRef.current = null;
+
+        // Расширенный детур с целью
+        if (detourTarget) {
+          const distToTarget = haversineDistance(smoothedPosition, detourTarget);
+
+          if (detourPhase === "going") {
+            if (distToTarget <= DETOUR_TARGET_THRESHOLD) {
+              setDetourPhase("returning");
+            }
+          } else if (detourPhase === "returning") {
+            if (proj.distance <= DETOUR_RETURN_THRESHOLD_EXT) {
+              exitDetourFull();
+            }
+          }
+        } else {
+          // Простой детур (без цели) — автовозврат при приближении к маршруту
+          if (proj.distance <= DETOUR_RETURN_THRESHOLD) {
+            setDetourMode(false);
+            detourStartTimeRef.current = null;
+          }
         }
         return;
       }
@@ -162,10 +191,20 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
       const { passed, remaining } = splitPathAtProjection(dirPath, clampedProjection);
       setPassedCoords(passed);
       setRemainingCoords(remaining);
-    }, 800);
+    };
 
-    return () => clearTimeout(debounceRef.current);
-  }, [active, smoothedPosition, dirPath, cumDist, detourMode]);
+    const elapsed = Date.now() - lastProjectionUpdateRef.current;
+    if (elapsed >= PROJECTION_THROTTLE_MS) {
+      // Достаточно времени прошло — обновляем сразу
+      doUpdate();
+    } else {
+      // Ещё рано — планируем на оставшееся время (trailing edge)
+      if (throttleRef.current) clearTimeout(throttleRef.current);
+      throttleRef.current = setTimeout(doUpdate, PROJECTION_THROTTLE_MS - elapsed);
+    }
+
+    return () => { if (throttleRef.current) clearTimeout(throttleRef.current); };
+  }, [active, smoothedPosition, dirPath, cumDist, detourMode, detourTarget, detourPhase]);
 
   const startDetour = useCallback(() => {
     setDetourMode(true);
@@ -174,6 +213,86 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
 
   const stopDetour = useCallback(() => {
     setDetourMode(false);
+    detourStartTimeRef.current = null;
+  }, []);
+
+  /**
+   * Найти ближайшую точку маршрута ВПЕРЕДИ текущей позиции для возврата.
+   * Ищем точку минимум на 100м вперёд по маршруту (чтобы не вернуться на ту же точку).
+   */
+  const findReturnPoint = useCallback(() => {
+    if (!dirPath.length || !smoothedPosition) return null;
+    const proj = projectPointOnPath(smoothedPosition, dirPath);
+    if (!proj) return dirPath[0];
+
+    // Расстояние от начала пути до текущей проекции
+    const pi = Math.min(proj.pathIndex, cumDist.length - 2);
+    const currentDist = cumDist[pi] +
+      proj.fraction * (cumDist[pi + 1] - cumDist[pi]);
+    const targetDist = currentDist + 100; // минимум 100м вперёд
+
+    // Ищем первую точку пути которая дальше targetDist
+    for (let i = proj.pathIndex + 1; i < dirPath.length; i++) {
+      if (cumDist[i] >= targetDist) {
+        return { lat: dirPath[i].lat, lng: dirPath[i].lng };
+      }
+    }
+
+    // Если маршрут кончается раньше — берём последнюю точку
+    const last = dirPath[dirPath.length - 1];
+    return { lat: last.lat, lng: last.lng };
+  }, [dirPath, smoothedPosition, cumDist]);
+
+  /**
+   * Начать детур с целью (маршрут к заведению).
+   * @param {{ lat, lng, name }} target — заведение
+   * @param {{ path, distance, duration }} routeToPlace — маршрут до заведения
+   * @param {{ path, distance, duration }} routeBack — маршрут возврата
+   * @param {{ lat, lng }} returnPt — точка возврата на основной маршрут
+   */
+  const startDetourWithTarget = useCallback((target, routeToPlace, routeBack, returnPt) => {
+    setDetourMode(true);
+    setDetourTarget(target);
+    setDetourPhase("going");
+    detourStartTimeRef.current = Date.now();
+
+    // GeoJSON для линии к заведению
+    if (routeToPlace?.path?.length >= 2) {
+      setDetourPath({
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: routeToPlace.path.map((p) => [p.lng, p.lat]),
+        },
+        properties: { distance: routeToPlace.distance, duration: routeToPlace.duration },
+      });
+    }
+
+    // GeoJSON для линии возврата
+    if (routeBack?.path?.length >= 2) {
+      setDetourReturnPath({
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: routeBack.path.map((p) => [p.lng, p.lat]),
+        },
+        properties: { distance: routeBack.distance, duration: routeBack.duration },
+      });
+    }
+
+    if (returnPt) setDetourReturnPoint(returnPt);
+  }, []);
+
+  /**
+   * Полный выход из расширенного детура.
+   */
+  const exitDetourFull = useCallback(() => {
+    setDetourMode(false);
+    setDetourTarget(null);
+    setDetourPath(null);
+    setDetourReturnPath(null);
+    setDetourReturnPoint(null);
+    setDetourPhase("idle");
     detourStartTimeRef.current = null;
   }, []);
 
@@ -189,6 +308,11 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setDetourMode(false);
     setDetourDistance(0);
     setDetourBearing(0);
+    setDetourTarget(null);
+    setDetourPath(null);
+    setDetourReturnPath(null);
+    setDetourReturnPoint(null);
+    setDetourPhase("idle");
     detourStartTimeRef.current = null;
     setStartedAt(new Date());
     resetTrigger();
@@ -208,6 +332,11 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     setDetourMode(false);
     setDetourDistance(0);
     setDetourBearing(0);
+    setDetourTarget(null);
+    setDetourPath(null);
+    setDetourReturnPath(null);
+    setDetourReturnPoint(null);
+    setDetourPhase("idle");
     detourStartTimeRef.current = null;
     setStartedAt(null);
     resetTrigger();
@@ -332,6 +461,15 @@ export default function useGpsNavigation({ route, active, onCheckpointTriggered,
     detourBearing,
     startDetour,
     stopDetour,
+    // Расширенный детур
+    detourTarget,
+    detourPath,
+    detourReturnPath,
+    detourReturnPoint,
+    detourPhase,
+    startDetourWithTarget,
+    exitDetourFull,
+    findReturnPoint,
   };
 }
 

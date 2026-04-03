@@ -17,6 +17,7 @@ import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 import LinkPreview, { extractUrls, MessageTextWithLinks } from "./chat/LinkPreview";
 import ChallengeCard from "./ChallengeCard";
 import MediaGallery from "./chat/MediaGallery";
+import ChatMediaPanel from "./chat/ChatMediaPanel";
 
 const FONT_CLASS = { sm: "text-xs", base: "text-sm", lg: "text-base" };
 
@@ -536,6 +537,7 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
   const [showScrollFab, setShowScrollFab] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [galleryMsgId, setGalleryMsgId] = useState(null);
+  const [showMediaPanel, setShowMediaPanel] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
@@ -889,6 +891,12 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
 
         <div className="flex items-center gap-1 shrink-0">
           <button
+            onClick={() => setShowMediaPanel(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition"
+          >
+            <ImageIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+          </button>
+          <button
             onClick={() => setShowSettings(true)}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition"
           >
@@ -1192,6 +1200,15 @@ export default function ChatView({ friendId, friend, onBack, inline = false, adm
           messages={messages}
           initialMsgId={galleryMsgId}
           onClose={() => setGalleryMsgId(null)}
+          getSenderName={(m) => m.senderId === user?.id ? "Вы" : (friend?.username || "Собеседник")}
+        />
+      )}
+
+      {/* Media Panel */}
+      {showMediaPanel && (
+        <ChatMediaPanel
+          mediaUrl={`/api/messages/${conversationKey}/media`}
+          onClose={() => setShowMediaPanel(false)}
           getSenderName={(m) => m.senderId === user?.id ? "Вы" : (friend?.username || "Собеседник")}
         />
       )}

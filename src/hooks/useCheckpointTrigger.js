@@ -20,6 +20,9 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
   const [triggeredSegmentIds, setTriggeredSegmentIds] = useState(new Set());
   const [activeSegment, setActiveSegment] = useState(null);
   const audioRef = useRef(null);
+  // Очередь чекпоинтов/сегментов, пойманных пока активен другой
+  const pendingCheckpointsRef = useRef([]);
+  const pendingSegmentsRef = useRef([]);
 
   const playAudio = useCallback((urls) => {
     if (!urls?.length) return;
@@ -38,6 +41,12 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       const radius = activeCheckpoint.triggerRadiusMeters || 20;
       if (dist > radius * 1.5) {
         setActiveCheckpoint(null);
+        // Проверяем очередь — активируем следующий пендинг
+        if (pendingCheckpointsRef.current.length > 0) {
+          const next = pendingCheckpointsRef.current.shift();
+          setActiveCheckpoint(next);
+          playAudio(next.audio);
+        }
       }
     }
     if (activeSegment) {
@@ -45,15 +54,16 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       const radius = activeSegment.triggerRadiusMeters || 30;
       if (dist > radius * 1.5) {
         setActiveSegment(null);
+        if (pendingSegmentsRef.current.length > 0) {
+          const next = pendingSegmentsRef.current.shift();
+          setActiveSegment(next);
+        }
       }
     }
-  }, [userPosition, activeCheckpoint, activeSegment]);
+  }, [userPosition, activeCheckpoint, activeSegment, playAudio]);
 
   useEffect(() => {
     if (!userPosition) return;
-
-    // Блокируем новые триггеры пока есть активный (непройденный) чекпоинт/сегмент
-    if (activeCheckpoint || activeSegment) return;
 
     // Проверяем чекпоинты
     for (const cp of checkpoints) {
@@ -61,10 +71,16 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       const dist = haversineDistance(userPosition, cp.position);
       if (dist <= (cp.triggerRadiusMeters || 20)) {
         setTriggeredIds((prev) => new Set([...prev, cp.id]));
-        setActiveCheckpoint(cp);
         setTotalCoins((prev) => prev + (cp.coinsReward || 0));
-        playAudio(cp.audio);
         onCheckpointTriggered?.(cp, Math.round(dist));
+
+        if (activeCheckpoint) {
+          // Уже есть активный — добавляем в очередь вместо потери
+          pendingCheckpointsRef.current.push(cp);
+        } else {
+          setActiveCheckpoint(cp);
+          playAudio(cp.audio);
+        }
         break; // один за раз
       }
     }
@@ -75,28 +91,48 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
       const dist = haversineDistance(userPosition, seg.position);
       if (dist <= (seg.triggerRadiusMeters || 30)) {
         setTriggeredSegmentIds((prev) => new Set([...prev, seg.id]));
-        setActiveSegment(seg);
+
+        if (activeSegment) {
+          pendingSegmentsRef.current.push(seg);
+        } else {
+          setActiveSegment(seg);
+        }
         break; // один за раз
       }
     }
 
-    // Проверяем финиш (не блокируется — финиш всегда срабатывает)
+    // Проверяем финиш — только если все чекпоинты собраны
     if (finish?.position && !finishReached) {
-      const dist = haversineDistance(userPosition, finish.position);
-      if (dist <= 30) {
-        setFinishReached(true);
-        setTotalCoins((prev) => prev + (finish.coinsReward || 0));
-        onFinishTriggered?.();
+      const allCheckpointsTriggered = checkpoints.length === 0 ||
+        checkpoints.every((cp) => triggeredIds.has(cp.id));
+
+      if (allCheckpointsTriggered) {
+        const dist = haversineDistance(userPosition, finish.position);
+        if (dist <= 30) {
+          setFinishReached(true);
+          setTotalCoins((prev) => prev + (finish.coinsReward || 0));
+          onFinishTriggered?.();
+        }
       }
     }
   }, [userPosition, checkpoints, segments, finish, triggeredIds, triggeredSegmentIds, finishReached, activeCheckpoint, activeSegment, playAudio]);
 
   const dismissActiveCheckpoint = useCallback(() => {
     setActiveCheckpoint(null);
-  }, []);
+    // При ручном дисмиссе тоже проверяем очередь
+    if (pendingCheckpointsRef.current.length > 0) {
+      const next = pendingCheckpointsRef.current.shift();
+      setActiveCheckpoint(next);
+      playAudio(next.audio);
+    }
+  }, [playAudio]);
 
   const dismissActiveSegment = useCallback(() => {
     setActiveSegment(null);
+    if (pendingSegmentsRef.current.length > 0) {
+      const next = pendingSegmentsRef.current.shift();
+      setActiveSegment(next);
+    }
   }, []);
 
   const reset = useCallback(() => {
@@ -106,6 +142,8 @@ export default function useCheckpointTrigger({ checkpoints = [], segments = [], 
     setTotalCoins(0);
     setTriggeredSegmentIds(new Set());
     setActiveSegment(null);
+    pendingCheckpointsRef.current = [];
+    pendingSegmentsRef.current = [];
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;

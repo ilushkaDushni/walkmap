@@ -12,6 +12,7 @@ import VoiceMessage from "./VoiceMessage";
 import useVoiceRecorder from "@/hooks/useVoiceRecorder";
 import { getChatTheme, getAllChatThemes } from "@/lib/chatThemes";
 import MediaGallery from "./chat/MediaGallery";
+import ChatMediaPanel from "./chat/ChatMediaPanel";
 
 const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
@@ -67,6 +68,7 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [galleryMsgId, setGalleryMsgId] = useState(null);
+  const [showMediaPanel, setShowMediaPanel] = useState(false);
 
   // Reply state
   const [replyTo, setReplyTo] = useState(null);
@@ -531,6 +533,9 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
           </button>
         </div>
         <div className="flex items-center gap-1">
+          <button onClick={() => setShowMediaPanel(true)} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition">
+            <ImageIcon className="h-5 w-5 text-[var(--text-secondary)]" />
+          </button>
           <button onClick={() => setShowSearch((v) => !v)} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--bg-elevated)] transition">
             <Search className="h-5 w-5 text-[var(--text-secondary)]" />
           </button>
@@ -1162,6 +1167,15 @@ export default function GroupChatView({ group, onBack, onGroupUpdated, onLeaveGr
           messages={messages}
           initialMsgId={galleryMsgId}
           onClose={() => setGalleryMsgId(null)}
+          getSenderName={(m) => m.senderUsername || "Участник"}
+        />
+      )}
+
+      {/* Media Panel */}
+      {showMediaPanel && (
+        <ChatMediaPanel
+          mediaUrl={`/api/groups/${group?.id}/messages/media`}
+          onClose={() => setShowMediaPanel(false)}
           getSenderName={(m) => m.senderUsername || "Участник"}
         />
       )}
