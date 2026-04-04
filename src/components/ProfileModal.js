@@ -33,6 +33,13 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyEmail, setVerifyEmail] = useState("");
 
+  // Recovery fields (unauthenticated)
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryNewPwd, setRecoveryNewPwd] = useState("");
+  const [recoveryNewPwd2, setRecoveryNewPwd2] = useState("");
+  const [recoveryMsg, setRecoveryMsg] = useState({ text: "", ok: false });
+
   // Edit fields
   const [editBio, setEditBio] = useState("");
   const [cropImageSrc, setCropImageSrc] = useState(null);
@@ -436,6 +443,85 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
       setPwdMsg({ text: e.message, ok: false });
     } finally {
       setSavingPwd(false);
+    }
+  };
+
+  // === Recovery handlers (unauthenticated) ===
+  const handleRecoveryForgotPassword = async () => {
+    if (!recoveryEmail.trim()) {
+      setRecoveryMsg({ text: "Укажите email", ok: false });
+      return;
+    }
+    setSubmitting(true);
+    setRecoveryMsg({ text: "", ok: false });
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setRecoveryMsg({ text: `Код отправлен на ${recoveryEmail}`, ok: true });
+      setScreen("forgot-code");
+    } catch (e) {
+      setRecoveryMsg({ text: e.message, ok: false });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRecoveryResetPassword = async () => {
+    if (recoveryNewPwd.length < 6) {
+      setRecoveryMsg({ text: "Пароль минимум 6 символов", ok: false });
+      return;
+    }
+    if (recoveryNewPwd !== recoveryNewPwd2) {
+      setRecoveryMsg({ text: "Пароли не совпадают", ok: false });
+      return;
+    }
+    setSubmitting(true);
+    setRecoveryMsg({ text: "", ok: false });
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail.trim(), code: recoveryCode, newPassword: recoveryNewPwd }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setRecoveryMsg({ text: "Пароль изменён! Теперь войдите с новым паролем", ok: true });
+      setRecoveryCode("");
+      setRecoveryNewPwd("");
+      setRecoveryNewPwd2("");
+      setTimeout(() => { setScreen("login"); setRecoveryMsg({ text: "", ok: false }); }, 2000);
+    } catch (e) {
+      setRecoveryMsg({ text: e.message, ok: false });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRecoveryForgotUsername = async () => {
+    if (!recoveryEmail.trim()) {
+      setRecoveryMsg({ text: "Укажите email", ok: false });
+      return;
+    }
+    setSubmitting(true);
+    setRecoveryMsg({ text: "", ok: false });
+    try {
+      const res = await fetch("/api/auth/forgot-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recoveryEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      setRecoveryMsg({ text: "Если аккаунт существует, логин отправлен на почту", ok: true });
+    } catch (e) {
+      setRecoveryMsg({ text: e.message, ok: false });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -978,6 +1064,13 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
           >
             О приложении
           </button>
+          <a
+            href="mailto:supotr.rostov.go@mail.ru?subject=Поддержка Ростов GO"
+            className="flex items-center justify-center gap-1.5 w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition pt-1"
+          >
+            <Mail className="h-3 w-3" />
+            Связаться с поддержкой
+          </a>
         </div>
       </>
     );
@@ -1016,6 +1109,159 @@ export default function ProfileModal({ isOpen, onClose, initialScreen }) {
             <LogIn className="h-4 w-4" />
             {submitting ? "Вход..." : "Войти"}
           </button>
+          <div className="flex justify-between pt-1">
+            <button
+              onClick={() => { setScreen("forgot"); setRecoveryEmail(""); setRecoveryMsg({ text: "", ok: false }); setError(""); }}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+            >
+              Забыли пароль?
+            </button>
+            <button
+              onClick={() => { setScreen("forgot-username"); setRecoveryEmail(""); setRecoveryMsg({ text: "", ok: false }); setError(""); }}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
+            >
+              Забыли логин?
+            </button>
+          </div>
+          <a
+            href="mailto:supotr.rostov.go@mail.ru?subject=Поддержка Ростов GO"
+            className="flex items-center justify-center gap-1.5 w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition pt-1"
+          >
+            <Mail className="h-3 w-3" />
+            Связаться с поддержкой
+          </a>
+        </div>
+      </>
+    );
+  }
+
+  // === Экран: Забыли пароль (ввод email) ===
+  if (screen === "forgot") {
+    return modalShell(
+      <>
+        {backBtn("login")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
+            <Lock className="h-8 w-8 text-[var(--text-secondary)]" />
+          </div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Сброс пароля</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-1 text-center">Введите email, на который зарегистрирован аккаунт</p>
+        </div>
+        <div className="space-y-3">
+          <input
+            type="email"
+            value={recoveryEmail}
+            onChange={(e) => setRecoveryEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRecoveryForgotPassword()}
+            placeholder="Email"
+            className={inputCls}
+          />
+          {recoveryMsg.text && (
+            <p className={`text-xs ${recoveryMsg.ok ? "text-green-500" : "text-red-400"}`}>{recoveryMsg.text}</p>
+          )}
+          <button onClick={handleRecoveryForgotPassword} disabled={submitting} className={btnPrimary}>
+            <Send className="h-4 w-4" />
+            {submitting ? "Отправка..." : "Отправить код"}
+          </button>
+          <a
+            href="mailto:supotr.rostov.go@mail.ru?subject=Поддержка Ростов GO — сброс пароля"
+            className="flex items-center justify-center gap-1.5 w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition pt-1"
+          >
+            <Mail className="h-3 w-3" />
+            Связаться с поддержкой
+          </a>
+        </div>
+      </>
+    );
+  }
+
+  // === Экран: Ввод кода + новый пароль ===
+  if (screen === "forgot-code") {
+    return modalShell(
+      <>
+        {backBtn("forgot")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
+            <Lock className="h-8 w-8 text-[var(--text-secondary)]" />
+          </div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Новый пароль</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-1 text-center">Код отправлен на {recoveryEmail}</p>
+        </div>
+        <div className="space-y-3">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={recoveryCode}
+            onChange={(e) => setRecoveryCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="6-значный код"
+            className={`${inputCls} text-center text-lg tracking-[0.3em]`}
+          />
+          <input
+            type="password"
+            value={recoveryNewPwd}
+            onChange={(e) => setRecoveryNewPwd(e.target.value)}
+            placeholder="Новый пароль"
+            className={inputCls}
+          />
+          <input
+            type="password"
+            value={recoveryNewPwd2}
+            onChange={(e) => setRecoveryNewPwd2(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRecoveryResetPassword()}
+            placeholder="Повторите пароль"
+            className={inputCls}
+          />
+          {recoveryMsg.text && (
+            <p className={`text-xs ${recoveryMsg.ok ? "text-green-500" : "text-red-400"}`}>{recoveryMsg.text}</p>
+          )}
+          <button onClick={handleRecoveryResetPassword} disabled={submitting} className={btnPrimary}>
+            <Lock className="h-4 w-4" />
+            {submitting ? "Сохранение..." : "Сбросить пароль"}
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // === Экран: Забыли логин ===
+  if (screen === "forgot-username") {
+    return modalShell(
+      <>
+        {backBtn("login")}
+        {closeBtn}
+        <div className="flex flex-col items-center mb-4">
+          <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--bg-elevated)]">
+            <Mail className="h-8 w-8 text-[var(--text-secondary)]" />
+          </div>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Напомнить логин</h2>
+          <p className="text-xs text-[var(--text-muted)] mt-1 text-center">Введите email — мы отправим ваш логин на почту</p>
+        </div>
+        <div className="space-y-3">
+          <input
+            type="email"
+            value={recoveryEmail}
+            onChange={(e) => setRecoveryEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRecoveryForgotUsername()}
+            placeholder="Email"
+            className={inputCls}
+          />
+          {recoveryMsg.text && (
+            <p className={`text-xs ${recoveryMsg.ok ? "text-green-500" : "text-red-400"}`}>{recoveryMsg.text}</p>
+          )}
+          <button onClick={handleRecoveryForgotUsername} disabled={submitting} className={btnPrimary}>
+            <Send className="h-4 w-4" />
+            {submitting ? "Отправка..." : "Отправить логин на почту"}
+          </button>
+          <a
+            href="mailto:supotr.rostov.go@mail.ru?subject=Поддержка Ростов GO — забыл логин"
+            className="flex items-center justify-center gap-1.5 w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition pt-1"
+          >
+            <Mail className="h-3 w-3" />
+            Связаться с поддержкой
+          </a>
         </div>
       </>
     );
