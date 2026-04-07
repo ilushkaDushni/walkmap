@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft, Footprints, Ruler, Coins, Trophy, Shield, Map, Compass,
-  Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon,
+  Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon, Swords,
   UserPlus, UserCheck, Clock, Gift, Trash2, X,
 } from "lucide-react";
 import UserAvatar from "@/components/UserAvatar";
@@ -16,7 +16,7 @@ import { isOnline, formatLastSeen } from "@/lib/onlineStatus";
 
 const ICON_MAP = {
   Footprints, Coins, Compass, Ruler, Map, Trophy,
-  Shield, Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon,
+  Shield, Crown, Zap, Flame, Globe, Gem, MessageCircle, Star, Moon, Swords,
 };
 
 function formatDist(m) {
@@ -60,6 +60,7 @@ export default function ProfileClient({ profile }) {
   const [giftError, setGiftError] = useState("");
   const [giftSending, setGiftSending] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [selectedAch, setSelectedAch] = useState(null);
 
   const fetchFriendStatus = useCallback(async () => {
     if (!authFetch || !user || isOwnProfile) return;
@@ -329,9 +330,11 @@ export default function ProfileClient({ profile }) {
             const prog = a.progress(stats);
             const isSpecial = ok && prog.special;
             return (
-              <div
+              <button
                 key={a.slug}
-                className={`flex flex-col items-center rounded-xl py-2.5 px-1 min-w-0 transition ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"} ${isSpecial ? "ring-1 ring-orange-400/50 shadow-[0_0_12px_rgba(251,146,60,0.3)]" : ""}`}
+                type="button"
+                onClick={() => setSelectedAch(a)}
+                className={`flex flex-col items-center rounded-xl py-2.5 px-1 min-w-0 transition active:scale-95 hover:brightness-110 cursor-pointer ${ok ? colors.bg : "bg-[var(--bg-elevated)] opacity-50"} ${isSpecial ? "ring-1 ring-orange-400/50 shadow-[0_0_12px_rgba(251,146,60,0.3)]" : ""}`}
                 title={`${a.title}: ${a.desc}`}
               >
                 <Icon className={`h-5 w-5 shrink-0 ${ok ? colors.text : "text-[var(--text-muted)]"}`} />
@@ -339,11 +342,76 @@ export default function ProfileClient({ profile }) {
                 <span className={`text-[10px] mt-0.5 ${ok ? colors.text : "text-[var(--text-muted)]"}`}>
                   {prog.special ? prog.special : `${prog.current}/${prog.target}${prog.unit ? ` ${prog.unit}` : ""}`}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
       </div>
+
+      {/* Achievement modal */}
+      {selectedAch && (() => {
+        const Ic = ICON_MAP[selectedAch.icon] || Trophy;
+        const colors = COLOR_CLASSES[selectedAch.color] || COLOR_CLASSES.blue;
+        const prog = selectedAch.progress(stats);
+        const unlocked = achievementSet.has(selectedAch.slug) || selectedAch.check(stats);
+        const pct = Math.min(100, Math.round((prog.current / prog.target) * 100));
+        return (
+          <div
+            className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
+            onClick={() => setSelectedAch(null)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="relative w-full max-w-sm mx-4 mb-6 sm:mb-0 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] p-5 shadow-[var(--shadow-lg)] animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setSelectedAch(null)}
+                className="absolute top-3 right-3 p-1 rounded-lg hover:bg-[var(--bg-elevated)] transition"
+              >
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+              <div className="flex flex-col items-center text-center">
+                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${unlocked ? colors.bg : "bg-[var(--bg-elevated)]"} mb-3 ${unlocked && prog.special ? "ring-2 ring-orange-400/60 shadow-[0_0_20px_rgba(251,146,60,0.4)]" : ""}`}>
+                  <Ic className={`h-8 w-8 ${unlocked ? colors.text : "text-[var(--text-muted)]"}`} />
+                </div>
+                <h3 className={`text-lg font-bold ${unlocked ? colors.text : "text-[var(--text-primary)]"}`}>
+                  {selectedAch.title}
+                </h3>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">{selectedAch.desc}</p>
+                {selectedAch.flavor && (
+                  <p className="text-xs text-[var(--text-muted)] italic mt-2">&laquo;{selectedAch.flavor}&raquo;</p>
+                )}
+                {!prog.special && (
+                  <div className="w-full mt-4">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-[var(--text-muted)]">Прогресс</span>
+                      <span className={`font-bold ${unlocked ? colors.text : "text-[var(--text-secondary)]"}`}>
+                        {prog.current}/{prog.target}{prog.unit ? ` ${prog.unit}` : ""}
+                      </span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${unlocked ? "bg-gradient-to-r from-green-500 to-emerald-400" : "bg-[var(--text-muted)]/30"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className={`flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full ${unlocked ? "bg-yellow-500/10" : "bg-[var(--bg-elevated)]"}`}>
+                  <Coins className={`h-4 w-4 ${unlocked ? "text-yellow-500" : "text-[var(--text-muted)]"}`} />
+                  <span className={`text-sm font-bold ${unlocked ? "text-yellow-500" : "text-[var(--text-muted)]"}`}>
+                    {unlocked ? "+" : ""}{selectedAch.reward}
+                  </span>
+                </div>
+                {unlocked && (
+                  <span className="text-xs text-green-500 font-medium mt-2">Получено!</span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Gift modal */}
       {giftOpen && (
